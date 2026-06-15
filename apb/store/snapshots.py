@@ -46,14 +46,19 @@ def _init(c: sqlite3.Connection) -> None:
     c.commit()
 
 
+def _cell(v):
+    """SQLite can't bind dict/list/tuple params — stringify them; pass scalars through."""
+    return str(v) if isinstance(v, (dict, list, tuple)) else v
+
+
 def record(incidents: list[dict]) -> int:
     """Upsert a batch of incidents. Returns rows written."""
     now = time.time()
     rows = [(
-        d.get("metro"), str(d.get("call_id")), d.get("type"), d.get("summary"),
-        d.get("location"), d.get("sentiment"), d.get("threat_score", 0.0),
-        1 if d.get("emerging") else 0, d.get("lat"), d.get("lon"),
-        d.get("at"), d.get("ts"), now, now,
+        _cell(d.get("metro")), str(d.get("call_id")), _cell(d.get("type")),
+        _cell(d.get("summary")), _cell(d.get("location")), _cell(d.get("sentiment")),
+        d.get("threat_score", 0.0), 1 if d.get("emerging") else 0,
+        d.get("lat"), d.get("lon"), _cell(d.get("at")), d.get("ts"), now, now,
     ) for d in incidents if d.get("lat") is not None and d.get("call_id") is not None]
     if not rows:
         return 0

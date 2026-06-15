@@ -91,11 +91,7 @@
     border:1px solid var(--line);font-family:var(--font)}
   .leaflet-popup-tip{background:#0d1119}
   .pop b{color:var(--accent)} .pop .f{font-size:11px;color:var(--dim);margin-top:4px}
-  /* city aggregate bubble label */
-  .bubble-lbl span{position:absolute;transform:translate(-50%,-50%);font-size:11px;
-    font-weight:700;color:#fff;text-shadow:0 0 5px #000,0 0 3px #000;pointer-events:none}
-  .pulse-ring{animation:ring 1.8s ease-out infinite}
-  @keyframes ring{0%{stroke-opacity:.9}50%{stroke-opacity:.25}100%{stroke-opacity:.9}}
+  /* new-incident ping (brief one-shot, not a persistent throb) */
   .ping span{position:absolute;left:0;top:0;width:14px;height:14px;
     margin:-7px 0 0 -7px;border-radius:50%;border:2px solid var(--accent);
     animation:ping 2s ease-out forwards;pointer-events:none}
@@ -103,8 +99,6 @@
   .ping.mid span{border-color:var(--warn)}
   @keyframes ping{0%{transform:scale(.3);opacity:.95}100%{transform:scale(5);opacity:0}}
   @keyframes fade{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
-  .surge-ring{animation:surge 1.3s ease-out infinite}
-  @keyframes surge{0%{stroke-opacity:1;stroke-width:3}100%{stroke-opacity:.1;stroke-width:1}}
 </style>
 </head>
 <body>
@@ -151,7 +145,7 @@
   THREAT INTENSITY
   <div class="bar"></div>
   <div class="ends"><span>low</span><span>critical</span></div>
-  <div class="hint">zoom in for incident detail · scoped to map view</div>
+  <div class="hint">each dot = one incident · color = severity · scoped to map view</div>
 </div>
 
 <div id="footer" class="hud">
@@ -171,10 +165,9 @@
 <script>
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
-const CITY_ZOOM = 9;           // below this -> city bubbles; at/above -> incident detail
 
-const map = L.map('map',{zoomControl:false,attributionControl:false})
-  .setView([39.5, -98.35], 4);
+const map = L.map('map',{zoomControl:false,attributionControl:false,preferCanvas:true})
+  .setView([39.5, -98.35], 4);   // canvas renderer: thousands of incident dots stay fast
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
   {maxZoom:19}).addTo(map);
@@ -183,7 +176,6 @@ let heat = L.heatLayer([], {radius:30, blur:22, maxZoom:14, max:1.0,
   gradient:{0.0:'#1b3a8c',0.35:'#2f8fd0',0.55:'#37e0c4',0.75:'#ffb02e',1.0:'#ff3b6b'}})
   .addTo(map);
 let markers   = L.layerGroup().addTo(map);
-let cityLayer = L.layerGroup().addTo(map);
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
 let alertLayer = L.layerGroup().addTo(map);
@@ -202,6 +194,7 @@ const winHours = () => document.getElementById('window').value;
 const winLabel = () => document.getElementById('window').selectedOptions[0].textContent.trim();
 const isNational = () => document.getElementById('metro').value==='__all__';
 const cityName = m => (m||'?').replace(/^(ag_|pp_|p2c_|ss_)/,'').replace(/_/g,' ').slice(0,30);
+
 
 function ago(ts){
   if(!ts) return '';
@@ -261,60 +254,33 @@ async function load(){
 }
 
 // ── draw: filtered + viewport-scoped render, city bubbles vs incident detail ──
+// dot size grows with zoom so dots stay readable from country to street level
+const DOT_R = z => z<6 ? 2 : z<9 ? 2.6 : z<12 ? 4 : 6;
+
 function draw(){
   const scoped = inView(applyFilters(currentData));
-  markers.clearLayers(); cityLayer.clearLayers();
-  const zoomedOut = map.getZoom() < CITY_ZOOM;
-
-  if(zoomedOut){
-    heat.setLatLngs([]);                       // no smeary heat at country/region zoom
-    cityBubbles(scoped).forEach(renderBubble); // per-city aggregate granularity
-  } else {
-    heat.setOptions({radius:32, blur:22, max:1.0, minOpacity:0.15, maxZoom:14});
-    heat.setLatLngs(scoped.map(d=>[d.lat,d.lon,Math.max(0.08,d.threat_score)]));
-    scoped.filter(d=>d.emerging || d.threat_score>=0.8).forEach(d=>{
-      const m=L.circleMarker([d.lat,d.lon],{radius:7,color:'#ff3b6b',weight:2,
-        fillColor:'#ff3b6b',fillOpacity:.5});
-      m.on('click',()=>openIncident(d)); m.addTo(markers);
-    });
-  }
-  updateCount(scoped, zoomedOut);
+  markers.clearLayers();
+  const z = map.getZoom();
+  // tight density heat UNDERLAY — keeps the heatmap glow without smearing over detail
+  heat.setOptions({radius: z<7?14:20, blur: z<7?11:15, max:1.0, minOpacity:0.20, maxZoom:15});
+  heat.setLatLngs(scoped.map(d=>[d.lat, d.lon, Math.max(0.12, d.threat_score)]));
+  // one severity-colored dot per incident — specific everywhere, no aggregation circles
+  const base = DOT_R(z);
+  scoped.forEach(d=>{
+    const hi = d.threat_score>=0.7;
+    L.circleMarker([d.lat,d.lon],{radius: base+(hi?1.5:0), stroke:false,
+      fillColor:sevColor(d.threat_score), fillOpacity: hi?0.9:0.5})
+      .on('click',()=>openIncident(d)).addTo(markers);
+  });
+  updateCount(scoped);
   if(isNational()) renderEmergingPanel(scoped);
   else renderIncidentPanel(scoped);
 }
 
-function cityBubbles(pts){
-  const g = {};
-  pts.forEach(d=>{ (g[d.metro] ||= []).push(d); });
-  return Object.entries(g).map(([metro,arr])=>({
-    metro, cnt:arr.length,
-    lat: arr.reduce((s,d)=>s+d.lat,0)/arr.length,
-    lon: arr.reduce((s,d)=>s+d.lon,0)/arr.length,
-    peak: Math.max(...arr.map(d=>d.threat_score)),
-  })).sort((a,b)=>b.cnt-a.cnt);
-}
-
-function renderBubble(b){
-  const col = sevColor(b.peak);
-  const r = 7 + Math.min(30, Math.sqrt(b.cnt)*4.5);
-  const m = L.circleMarker([b.lat,b.lon],{radius:r,color:col,weight:1.5,
-    fillColor:col,fillOpacity:.16});
-  m.bindTooltip(`${cityName(b.metro)} · ${b.cnt} incidents · peak ${b.peak.toFixed(2)}`,
-    {direction:'top'});
-  m.on('click',()=>map.flyTo([b.lat,b.lon],11));
-  m.addTo(cityLayer);
-  if(b.cnt>=2){
-    L.marker([b.lat,b.lon],{interactive:false,icon:L.divIcon({className:'bubble-lbl',
-      html:`<span>${b.cnt}</span>`,iconSize:[0,0]})}).addTo(cityLayer);
-  }
-}
-
-function updateCount(scoped, zoomedOut){
+function updateCount(scoped){
   const emg = scoped.filter(d=>d.emerging).length;
-  const scopeTxt = zoomedOut ? `${cityBubbles(scoped).length} cities · ${winLabel()}`
-                             : `in view · ${winLabel()}`;
   document.getElementById('count').innerHTML =
-    `${scoped.length}<small> ${scopeTxt}${emg?` · ${emg} emerging`:''}</small>`;
+    `${scoped.length}<small> in view · ${winLabel()}${emg?` · ${emg} emerging`:''}</small>`;
 }
 
 // ── side panels ──────────────────────────────────────────────────────────────
@@ -340,8 +306,8 @@ function renderEmergingPanel(scoped){
   const cl = emergingClusters.filter(c=>b.contains([c.lat,c.lon]))
     .sort((a,b)=>(b.latest_ts||0)-(a.latest_ts||0));
   if(showSpikes) cl.slice(0,40).forEach(c=>{
-    const ring=L.circleMarker([c.lat,c.lon],{radius:8+Math.min(18,c.count/6),
-      color:'#ff3b6b',weight:2,fill:false,className:'pulse-ring'});
+    const ring=L.circleMarker([c.lat,c.lon],{radius:9+Math.min(16,c.count/5),
+      color:'#ff3b6b',weight:1.5,fill:false,opacity:.6});
     ring.bindTooltip(`${c.count} converging · peak ${c.peak_threat} · ${ago(c.latest_ts)}`,{direction:'top'});
     ring.on('click',()=>onEmergingClick(c));
     ring.addTo(emergingLayer);
@@ -383,7 +349,7 @@ async function loadAlerts(){
   alertLayer.clearLayers();
   if(!showSurges) return;                       // toggled off in the ALERTS selector
   surgeAlerts.forEach(a=>{
-    const ring=L.circleMarker(a._c,{radius:24,color:'#ff3b6b',weight:3,fill:false,className:'surge-ring'});
+    const ring=L.circleMarker(a._c,{radius:22,color:'#ff3b6b',weight:2,fill:false,opacity:.65,dashArray:'5 5'});
     ring.bindTooltip(`⚠ SURGE · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)`,
       {direction:'top'});
     ring.on('click',()=>focusSurge(a)); ring.addTo(alertLayer);

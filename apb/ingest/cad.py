@@ -53,6 +53,26 @@ def parse_ts(v) -> float | None:
         return None          # allow ~1 day skew for tz quirks; reject real garbage
     return ts
 
+
+def _loc_str(v) -> str | None:
+    """Coerce a CAD 'location' value to a display string. Socrata 'location' columns are
+    dicts {latitude, longitude, human_address:'{...json...}'} — pull a readable address so
+    the UI shows text (and the SQLite poller doesn't choke on a dict)."""
+    if v is None or isinstance(v, str):
+        return v
+    if isinstance(v, dict):
+        ha = v.get("human_address")
+        if isinstance(ha, str):
+            try:
+                a = json.loads(ha)
+                s = ", ".join(p for p in (a.get("address"), a.get("city"),
+                                          a.get("state")) if p)
+                return s or None
+            except (ValueError, AttributeError):
+                return None
+        return None
+    return str(v)
+
 # ── incident type → (normalized type, base threat 0..1) ──────────────────────
 _TYPE_RULES: list[tuple[str, tuple[str, float]]] = [
     # weapons / violence (most specific first)
@@ -561,7 +581,7 @@ class CadIngest:
                 "call_id": str(r.get(feed.id_field) or r.get("id") or len(out)),
                 "metro": feed.metro, "type": itype,
                 "summary": str(raw_type) or itype,
-                "location": (r.get(akey) if akey else None),
+                "location": _loc_str(r.get(akey) if akey else None),
                 "sentiment": _SENTIMENT[min(4, int(threat * 5))],
                 "threat_score": round(threat, 2), "emerging": threat >= 0.9,
                 "lat": lat, "lon": lon, "at": at, "ts": parse_ts(at),
