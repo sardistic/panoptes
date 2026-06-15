@@ -43,7 +43,7 @@
   /* ── command bar ── */
   #top{top:30px;left:16px;right:16px;display:flex;align-items:center;gap:16px;
     padding:11px 16px;flex-wrap:wrap;border-top:2px solid var(--red)}
-  #logo{height:24px;width:auto;display:block;filter:none}
+  #logo{height:44px;width:auto;display:block;margin:-6px 0}
   #top .brand{font-weight:700;letter-spacing:.26em;font-size:15px;color:var(--txt);
     background:none;-webkit-text-fill-color:currentColor}
   #top .sub{color:var(--dim);font-size:9px;letter-spacing:.2em;line-height:1.4;
@@ -69,7 +69,6 @@
   .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block}
   button.on .led{background:var(--red)}
   button#surgesBtn.on .led{background:var(--amber)}
-  #pauseBtn{display:flex;align-items:center;gap:7px}
 
   /* ── incident rail (LEFT) ── */
   #side{top:100px;left:16px;width:320px;max-height:calc(100% - 196px);
@@ -201,9 +200,9 @@
   <span class="spacer"></span>
   <label class="ctl">Area<select id="metro"><option>loading feeds…</option></select></label>
   <label class="ctl">Window<select id="window" title="time window">
-    <option value="0.0833">LIVE · 5M</option>
+    <option value="0.0833" selected>LIVE · 5M</option>
     <option value="0.25">15 MIN</option>
-    <option value="1" selected>1 HOUR</option>
+    <option value="1">1 HOUR</option>
     <option value="6">6 HOURS</option>
     <option value="12">12 HOURS</option>
     <option value="24">24 HOURS</option>
@@ -219,7 +218,6 @@
     <button id="spikesBtn" class="on" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
   </span></label>
-  <button id="pauseBtn">PAUSE</button>
   <span class="spacer"></span>
   <span class="pill"><span class="dot"></span><span id="status">LIVE</span></span>
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
@@ -565,10 +563,6 @@ document.getElementById('surgesBtn').onclick=e=>{
   if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
 };
 document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
-document.getElementById('pauseBtn').onclick=e=>{
-  paused=!paused; e.currentTarget.classList.toggle('on',paused);
-  e.currentTarget.textContent=paused?'RESUME':'PAUSE';
-};
 
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
