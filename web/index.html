@@ -99,6 +99,16 @@
   .ping.mid span{border-color:var(--warn)}
   @keyframes ping{0%{transform:scale(.3);opacity:.95}100%{transform:scale(5);opacity:0}}
   @keyframes fade{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
+  /* threat-throb: high-threat incidents pulse — faster + brighter with severity */
+  .tdot{display:block;border-radius:50%;pointer-events:auto;cursor:pointer;
+    animation-name:throb;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+  @keyframes throb{0%,100%{transform:scale(.7);opacity:.6}50%{transform:scale(1.3);opacity:1}}
+  /* surge: soft pulsing area glow instead of a hard red ring */
+  .surge-halo span{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;
+    border-radius:50%;pointer-events:auto;cursor:pointer;
+    background:radial-gradient(circle,rgba(255,59,107,.42),rgba(255,59,107,0) 70%);
+    animation:surgepulse 2.6s ease-in-out infinite}
+  @keyframes surgepulse{0%,100%{transform:scale(.65);opacity:.5}50%{transform:scale(1.15);opacity:.95}}
 </style>
 </head>
 <body>
@@ -129,7 +139,7 @@
     <option value="0.7">🔴 HIGH ≥0.70</option>
   </select></label>
   <label class="ctl">ALERTS<span style="display:flex;gap:6px">
-    <button id="spikesBtn" class="on" title="emerging-spike rings">⚡ SPIKES</button>
+    <button id="spikesBtn" class="on" title="pulse high-threat incidents">⚡ SPIKES</button>
     <button id="surgesBtn" class="on" title="surge-anomaly alerts">⚠ SURGES</button>
   </span></label>
   <button id="pauseBtn">⏸ PAUSE</button>
@@ -145,7 +155,7 @@
   THREAT INTENSITY
   <div class="bar"></div>
   <div class="ends"><span>low</span><span>critical</span></div>
-  <div class="hint">each dot = one incident · color = severity · scoped to map view</div>
+  <div class="hint">each dot = one incident · color + throb = threat · scoped to map view</div>
 </div>
 
 <div id="footer" class="hud">
@@ -176,6 +186,7 @@ let heat = L.heatLayer([], {radius:30, blur:22, maxZoom:14, max:1.0,
   gradient:{0.0:'#1b3a8c',0.35:'#2f8fd0',0.55:'#37e0c4',0.75:'#ffb02e',1.0:'#ff3b6b'}})
   .addTo(map);
 let markers   = L.layerGroup().addTo(map);
+let throbLayer = L.layerGroup().addTo(map);   // DOM dots that pulse by threat level
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
 let alertLayer = L.layerGroup().addTo(map);
@@ -256,22 +267,45 @@ async function load(){
 // ── draw: filtered + viewport-scoped render, city bubbles vs incident detail ──
 // dot size grows with zoom so dots stay readable from country to street level
 const DOT_R = z => z<6 ? 2 : z<9 ? 2.6 : z<12 ? 4 : 6;
+const THROB_MIN = 0.8;      // only genuinely severe incidents pulse (shootings, fires,
+                            // assaults at peak) — keeps the map calm, throb = real spikes
+const THROB_CAP = 60;       // hard cap on simultaneously-pulsing dots (most severe first)
+
+// a DOM dot that pulses faster + glows brighter as threat rises
+function throbDot(d, z){
+  const t = d.threat_score, col = sevColor(t);
+  const s = (z<7?7:9) + t*5;                 // bigger with threat
+  const dur = (2.3 - t*1.4).toFixed(2);      // higher threat -> faster pulse
+  const m = L.marker([d.lat,d.lon],{icon:L.divIcon({className:'tdot-wrap',
+    iconSize:[s,s], iconAnchor:[s/2,s/2],
+    html:`<i class="tdot" style="width:${s}px;height:${s}px;background:${col};`
+      +`box-shadow:0 0 ${4+t*9}px ${col};animation-duration:${dur}s"></i>`})});
+  m.on('click',()=>openIncident(d));
+  return m;
+}
 
 function draw(){
   const scoped = inView(applyFilters(currentData));
-  markers.clearLayers();
+  markers.clearLayers(); throbLayer.clearLayers();
   const z = map.getZoom();
   // tight density heat UNDERLAY — keeps the heatmap glow without smearing over detail
   heat.setOptions({radius: z<7?14:20, blur: z<7?11:15, max:1.0, minOpacity:0.20, maxZoom:15});
   heat.setLatLngs(scoped.map(d=>[d.lat, d.lon, Math.max(0.12, d.threat_score)]));
-  // one severity-colored dot per incident — specific everywhere, no aggregation circles
+  // the most severe incidents pulse (capped for perf); everything else = static dot
+  const hot = showSpikes
+    ? scoped.filter(d=>d.threat_score>=THROB_MIN)
+            .sort((a,b)=>b.threat_score-a.threat_score).slice(0, THROB_CAP)
+    : [];
+  const hotSet = new Set(hot);
   const base = DOT_R(z);
   scoped.forEach(d=>{
+    if(hotSet.has(d)) return;                // rendered as a throb dot below
     const hi = d.threat_score>=0.7;
     L.circleMarker([d.lat,d.lon],{radius: base+(hi?1.5:0), stroke:false,
       fillColor:sevColor(d.threat_score), fillOpacity: hi?0.9:0.5})
       .on('click',()=>openIncident(d)).addTo(markers);
   });
+  hot.forEach(d=>throbLayer.addLayer(throbDot(d, z)));
   updateCount(scoped);
   if(isNational()) renderEmergingPanel(scoped);
   else renderIncidentPanel(scoped);
@@ -305,13 +339,8 @@ function renderEmergingPanel(scoped){
   // viewport-scoped + most-recent first
   const cl = emergingClusters.filter(c=>b.contains([c.lat,c.lon]))
     .sort((a,b)=>(b.latest_ts||0)-(a.latest_ts||0));
-  if(showSpikes) cl.slice(0,40).forEach(c=>{
-    const ring=L.circleMarker([c.lat,c.lon],{radius:9+Math.min(16,c.count/5),
-      color:'#ff3b6b',weight:1.5,fill:false,opacity:.6});
-    ring.bindTooltip(`${c.count} converging · peak ${c.peak_threat} · ${ago(c.latest_ts)}`,{direction:'top'});
-    ring.on('click',()=>onEmergingClick(c));
-    ring.addTo(emergingLayer);
-  });
+  // spikes are shown on the map by the throbbing high-threat dots (see draw());
+  // this panel is the ranked, most-recent-first list with click-to-correlate.
   const feed=document.getElementById('feed'); feed.innerHTML='';
   if(!cl.length){ feed.innerHTML='<div class="loc" style="padding:8px">no emerging clusters in view</div>'; }
   cl.slice(0,30).forEach((c,i)=>{
@@ -349,10 +378,11 @@ async function loadAlerts(){
   alertLayer.clearLayers();
   if(!showSurges) return;                       // toggled off in the ALERTS selector
   surgeAlerts.forEach(a=>{
-    const ring=L.circleMarker(a._c,{radius:22,color:'#ff3b6b',weight:2,fill:false,opacity:.65,dashArray:'5 5'});
-    ring.bindTooltip(`⚠ SURGE · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)`,
+    const m=L.marker(a._c,{icon:L.divIcon({className:'surge-halo',iconSize:[0,0],
+      html:'<span></span>'})});
+    m.bindTooltip(`⚠ SURGE · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)`,
       {direction:'top'});
-    ring.on('click',()=>focusSurge(a)); ring.addTo(alertLayer);
+    m.on('click',()=>focusSurge(a)); m.addTo(alertLayer);
   });
 }
 const surgeName = a => (a.name||a.metro||'').replace(/^(ag_|pp_|p2c_|ss_)/,'');
@@ -444,7 +474,7 @@ document.getElementById('type').onchange=draw;
 document.getElementById('minThreat').onchange=draw;
 document.getElementById('spikesBtn').onclick=e=>{
   showSpikes=!showSpikes; e.target.classList.toggle('on',showSpikes);
-  if(!showSpikes) emergingLayer.clearLayers(); else if(isNational()) draw();
+  draw();                       // toggles the threat-throb pulse on the dots
 };
 document.getElementById('surgesBtn').onclick=e=>{
   showSurges=!showSurges; e.target.classList.toggle('on',showSurges);
