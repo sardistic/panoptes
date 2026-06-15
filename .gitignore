@@ -20,6 +20,9 @@ data/raw/
 web/_*
 *.log
 
+# root-level design/authoring scratch copies (the live UI is web/index.html)
+/index*.html
+
 # os / editor
 .DS_Store
 Thumbs.db
