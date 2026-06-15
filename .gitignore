@@ -1,0 +1,31 @@
+# secrets — NEVER commit (Google API key etc.); set these as Railway variables
+.env
+.env.local
+.env.*.local
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# local runtime state — regenerable or ephemeral, not part of the repo
+data/*.sqlite
+data/*.sqlite-journal
+data/_*
+data/audio/
+data/raw/
+web/_*
+*.log
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# NOTE: the discovery catalogs (data/sources_catalog.json, arcgis_catalog.json,
+# p2c_agencies.json, pulsepoint_agencies.json, southern_agencies.json, type_map.json)
+# ARE committed on purpose — apb.ingest.cad loads them at startup.

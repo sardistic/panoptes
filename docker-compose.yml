@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: apb
+      POSTGRES_PASSWORD: apb
+      POSTGRES_DB: apb
+    ports:
+      - "5432:5432"
+    volumes:
+      - apb_pgdata:/var/lib/postgresql/data
+
+volumes:
+  apb_pgdata:

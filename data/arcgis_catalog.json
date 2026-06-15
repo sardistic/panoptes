@@ -1,0 +1,5530 @@
+[
+  {
+    "name": "CallsforService",
+    "owner": "IT_MurphyTX",
+    "url": "https://services5.arcgis.com/lt8CbgYaNuFrQ7kB/arcgis/rest/services/CallsforService_8bb3685bbbf64b098a24e1fe48c3538c/FeatureServer/0",
+    "time_field": "calldate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "callid",
+      "callphone",
+      "officer1",
+      "officer2",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "locdesc"
+    ],
+    "sample": [
+      33.0113185779976,
+      -96.5955866009946
+    ]
+  },
+  {
+    "name": "Crime Incidents [2016 to 11/11/25]",
+    "owner": "opendataCLE",
+    "url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Crime_Incidents/FeatureServer/0",
+    "time_field": "TimeGroup",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PrimaryKey",
+      "CaseNumber",
+      "District",
+      "UCRdesc",
+      "OffenseYear",
+      "TimeGroup",
+      "ReportedDate",
+      "OffenseMonth",
+      "OffenseDay",
+      "TimeBlock",
+      "DOWname"
+    ],
+    "sample": [
+      41.4709900000991,
+      -81.7075459940092
+    ]
+  },
+  {
+    "name": "PSDWIncidents",
+    "owner": "ChesterfieldVA",
+    "url": "https://services3.arcgis.com/TsynfzBSE6sXfoLq/arcgis/rest/services/PSDWIncidents/FeatureServer/0",
+    "time_field": "RecordDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "RecordType",
+      "RecordDate",
+      "CADAgency",
+      "CADPrimaryUnitID",
+      "CADDisposition1_Text",
+      "CADDisposition2_Text",
+      "CADDisposition3_Text",
+      "DimLocationID",
+      "DimLocationAddress",
+      "DimLocationLatitude",
+      "DimLocationLongitude"
+    ],
+    "sample": [
+      37.4615651804055,
+      -77.4979611281283
+    ]
+  },
+  {
+    "name": "Police",
+    "owner": "esri_dashboardpub",
+    "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/PoliceAGOL/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "unitname",
+      "status",
+      "type",
+      "callnumber",
+      "speed",
+      "lastreport",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor"
+    ],
+    "sample": [
+      34.07365278,
+      -117.204469118
+    ]
+  },
+  {
+    "name": "PSDWIncidents_ProdA",
+    "owner": "ChesterfieldVA",
+    "url": "https://services3.arcgis.com/TsynfzBSE6sXfoLq/arcgis/rest/services/PSDWIncidents_ProdA/FeatureServer/0",
+    "time_field": "RecordDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "RecordType",
+      "RecordDate",
+      "CADAgency",
+      "CADPrimaryUnitID",
+      "CADDisposition1_Text",
+      "CADDisposition2_Text",
+      "CADDisposition3_Text",
+      "DimLocationID",
+      "DimLocationAddress",
+      "DimLocationLatitude",
+      "DimLocationLongitude"
+    ],
+    "sample": [
+      37.3099078499904,
+      -77.4110712112676
+    ]
+  },
+  {
+    "name": "Aurora IL Police Calls For Service",
+    "owner": "AuroraData",
+    "url": "https://services1.arcgis.com/79UxTxnBeBW8JHY4/arcgis/rest/services/Aurora_IL_Police_CallsForService_view/FeatureServer/0",
+    "time_field": "CALL_RECEIVED",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "CALL_CLEARED",
+      "CALL_RECEIVED",
+      "CFS_NUM",
+      "DISPOSITION",
+      "EventName",
+      "Category",
+      "INC_REPORT_NUM",
+      "STREETADDRESS",
+      "DISTRICT",
+      "AREA"
+    ],
+    "sample": [
+      41.7650454070001,
+      -88.313611715
+    ]
+  },
+  {
+    "name": "INCIDENTS_PART1_PART2",
+    "owner": "maps.phl.data",
+    "url": "https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/INCIDENTS_PART1_PART2/FeatureServer/0",
+    "time_field": "dispatch_date_time",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "dc_dist",
+      "psa",
+      "dispatch_date_time",
+      "dispatch_date",
+      "dispatch_time",
+      "hour",
+      "dc_key",
+      "location_block",
+      "ucr_general",
+      "text_general_code",
+      "point_x"
+    ],
+    "sample": [
+      40.01070988,
+      -75.07958932
+    ]
+  },
+  {
+    "name": "Police Calls for Service",
+    "owner": "opendataCLE",
+    "url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/CAD_Police/FeatureServer/0",
+    "time_field": "IncidentDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "eid",
+      "incident_num",
+      "recordserialno",
+      "IncidentNumber",
+      "IncidentTypeDescription",
+      "IncidentSubTypeCode",
+      "Disposition1",
+      "DispositionDescription1",
+      "AllDispositions",
+      "AllDispositionDescriptions",
+      "DispatchedAndArrived"
+    ],
+    "sample": [
+      41.4893024285351,
+      -81.6516109476851
+    ]
+  },
+  {
+    "name": "Metro Nashville Police Department Calls for Service",
+    "owner": "NashvilleOpenData",
+    "url": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Metro_Nashville_Police_Department_Calls_for_Service_view/FeatureServer/0",
+    "time_field": "Call_Received",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Event_Number",
+      "Complaint_Number",
+      "Tencode",
+      "Tencode_Description",
+      "Tencode_Suffix",
+      "Tencode_Suffix_Description",
+      "Disposition_Code",
+      "Disposition_Description",
+      "Block",
+      "Street_Name",
+      "Unit_Dispatched"
+    ],
+    "sample": [
+      36.2350000003162,
+      -86.5930000003419
+    ]
+  },
+  {
+    "name": "RMS Crime Incidents",
+    "owner": "topsoil.integration_detroitmi",
+    "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/RMS_Crime_Incidents/FeatureServer/0",
+    "time_field": "incident_occurred_at",
+    "geocoded": true,
+    "fields": [
+      "incident_entry_id",
+      "nearest_intersection",
+      "offense_category",
+      "offense_description",
+      "state_offense_code",
+      "arrest_charge",
+      "charge_description",
+      "incident_occurred_at",
+      "incident_time",
+      "incident_day_of_week",
+      "incident_hour_of_day",
+      "incident_year"
+    ],
+    "sample": [
+      42.3575569236142,
+      -83.2371449248209
+    ]
+  },
+  {
+    "name": "Fulton_911_Online_basemap2",
+    "owner": "knozaki",
+    "url": "https://services1.arcgis.com/Ggva1SWphWGX4bb8/arcgis/rest/services/Fulton_911_Online_basemap2/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "ID",
+      "X",
+      "Y",
+      "Source",
+      "Type",
+      "Location",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor"
+    ],
+    "sample": [
+      40.4663574808637,
+      -89.9516229549521
+    ]
+  },
+  {
+    "name": "Police Calls for Service",
+    "owner": "MpdCrimeAnalyst",
+    "url": "https://services8.arcgis.com/OPmRdssd8jj0bT5H/arcgis/rest/services/Police_Calls_for_Service/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "EVENT_NUMBER",
+      "PROBLEM",
+      "DESCRIPTION",
+      "PRIORITY",
+      "TOC",
+      "WEEKDAY",
+      "HOUR",
+      "HOURRANGE",
+      "FIRST_ASSIGNED",
+      "FIRST_ARRIVED",
+      "DIFFERENCE",
+      "ADDRESS"
+    ],
+    "sample": [
+      37.434198,
+      -121.885717
+    ]
+  },
+  {
+    "name": "Calls_For_Service",
+    "owner": "PD_CommunityContact",
+    "url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/CFS_Past_28_Days/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OID",
+      "Master_Incident_Number",
+      "Agency_Type",
+      "Response_Date",
+      "Time_First_Unit_Arrived",
+      "Problem",
+      "Call_Disposition",
+      "Time_CallClosed",
+      "CallDuration",
+      "Address",
+      "ID"
+    ],
+    "sample": [
+      39.9871505169535,
+      -105.232652784661
+    ]
+  },
+  {
+    "name": "Aurora IL Police Calls For Service old",
+    "owner": "AuroraData",
+    "url": "https://services1.arcgis.com/79UxTxnBeBW8JHY4/arcgis/rest/services/AuroraIL.Police_CallsForService/FeatureServer/0",
+    "time_field": "CALL_RECEIVED",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "CALL_CLEARED",
+      "CALL_RECEIVED",
+      "CFS_NUM",
+      "DISPOSITION",
+      "EventName",
+      "Category",
+      "INC_REPORT_NUM",
+      "STREETADDRESS",
+      "DISTRICT",
+      "AREA",
+      "GlobalID"
+    ],
+    "sample": [
+      41.7583740210001,
+      -88.34958397
+    ]
+  },
+  {
+    "name": "Crimes",
+    "owner": "abhines@cityofeagan.com_cityofeagan",
+    "url": "https://services1.arcgis.com/6KEQnrFDevRaxA3V/arcgis/rest/services/Crimes_39555559678e4bd0a6fadab24001d1a2/FeatureServer/0",
+    "time_field": "reportdate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "sequence",
+      "statute",
+      "nibrscode",
+      "nibrsoffense",
+      "nibrsdesc",
+      "nibrscrimeag",
+      "nibrsgroup",
+      "attemptcompleted",
+      "narrative"
+    ],
+    "sample": [
+      44.8474379999561,
+      -93.1617430002352
+    ]
+  },
+  {
+    "name": "Calls_For_Service",
+    "owner": "AdminModelLE",
+    "url": "https://services1.arcgis.com/fGahaSQSAcHXfi8G/arcgis/rest/services/Calls_For_Service/FeatureServer/0",
+    "time_field": "EventTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Crime_Num",
+      "Address",
+      "Call_Type",
+      "EventTime",
+      "Call_Status",
+      "Car_Number",
+      "Situation_Found",
+      "Action_Taken",
+      "Call_Type_Description",
+      "X",
+      "Y"
+    ],
+    "sample": [
+      39.9123,
+      -75.2403
+    ]
+  },
+  {
+    "name": "Police Incidents",
+    "owner": "townofcary_carync",
+    "url": "https://services2.arcgis.com/l4TwMwwoiuEVRPw9/arcgis/rest/services/PoliceIncidents/FeatureServer/0",
+    "time_field": "Time_From",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Crime_Category",
+      "Crime_Type",
+      "chrgcnt",
+      "UCR",
+      "District",
+      "Beat_Number",
+      "Map_Reference",
+      "Incident_Number",
+      "Time_From",
+      "Time_To",
+      "Date_From"
+    ],
+    "sample": [
+      35.777171104,
+      -78.8372899
+    ]
+  },
+  {
+    "name": "RMS Crime Incidents 2025",
+    "owner": "topsoil.integration_detroitmi",
+    "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/RMS_Crime_Incidents_2025/FeatureServer/0",
+    "time_field": "incident_occurred_at",
+    "geocoded": true,
+    "fields": [
+      "incident_entry_id",
+      "nearest_intersection",
+      "offense_category",
+      "offense_description",
+      "state_offense_code",
+      "arrest_charge",
+      "charge_description",
+      "incident_occurred_at",
+      "incident_time",
+      "incident_day_of_week",
+      "incident_hour_of_day",
+      "incident_year"
+    ],
+    "sample": [
+      42.2667052584203,
+      -83.1635326851487
+    ]
+  },
+  {
+    "name": "BPD Crimes",
+    "owner": "Boise_GIS",
+    "url": "https://services1.arcgis.com/WHM6qC35aMtyAAlN/arcgis/rest/services/BPD_Crimes_Public/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "ChargeID",
+      "DRNumber",
+      "IncidentType",
+      "CrimeCode",
+      "CrimeCodeDescription",
+      "CrimeCodeGroup",
+      "ChargeCategory",
+      "CrimeType",
+      "IncidentAddress",
+      "City",
+      "District"
+    ],
+    "sample": [
+      43.5807866242879,
+      -116.216064224946
+    ]
+  },
+  {
+    "name": "VA Beach 911 calls Jan 2024",
+    "owner": "Katelyn.E.Chadwick_GSS_Admin",
+    "url": "https://services.arcgis.com/RuMxwoJBLS7erjQj/arcgis/rest/services/VA_Beach_911_calls_Jan_2024_WFL1/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "FACILITYID",
+      "NAME",
+      "OWNER",
+      "OWNTYPE",
+      "SUBTYPEFIELD",
+      "FEATURECODE",
+      "FULLADDR",
+      "AGENCYURL",
+      "OPERDAYS",
+      "OPERHOURS",
+      "CONTACT"
+    ],
+    "sample": [
+      36.7522373752878,
+      -76.0658218732317
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "cocgis@edge.gocolumbiamo.com_gocolumbiamo",
+    "url": "https://services.arcgis.com/GHhNHT1xiCkCAXvo/arcgis/rest/services/Crimes_public_5065541538a64410b0dc75b9276284aa/FeatureServer/0",
+    "time_field": "reportdate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "sequence",
+      "statute",
+      "nibrscode",
+      "nibrsoffense",
+      "nibrsdesc",
+      "nibrscrimeag",
+      "nibrsgroup",
+      "attemptcompleted",
+      "fulladdr"
+    ],
+    "sample": [
+      38.8996254336653,
+      -92.34331186535
+    ]
+  },
+  {
+    "name": "Metro Nashville Police Department Calls for Service - 2024",
+    "owner": "NashvilleOpenData",
+    "url": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Metro_Nashville_Police_Department_Calls_for_Service_2024/FeatureServer/0",
+    "time_field": "Call_Received",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Event_Number",
+      "Complaint_Number",
+      "Tencode",
+      "Tencode_Description",
+      "Tencode_Suffix",
+      "Tencode_Suffix_Description",
+      "Disposition_Code",
+      "Disposition_Description",
+      "Block",
+      "Street_name",
+      "Unit_Dispatched"
+    ],
+    "sample": [
+      36.102,
+      -86.716
+    ]
+  },
+  {
+    "name": "Police Transparency - Calls for Service - Last 90 Days (Dataset)",
+    "owner": "TempeData",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/CallsForService_Internal_DTI_view_last3months/FeatureServer/0",
+    "time_field": "OccurrenceDatetime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PrimaryKey",
+      "OccurrenceDatetime",
+      "OccurrenceYear",
+      "OccurrenceMonth",
+      "OccurrenceHour",
+      "OccurrenceWeek",
+      "OccurrenceDatePart",
+      "OccurrenceWeekday",
+      "ObfuscatedAddress",
+      "FinalCaseType",
+      "Priority"
+    ],
+    "sample": [
+      33.3784627213131,
+      -111.893611972916
+    ]
+  },
+  {
+    "name": "Crime Incidents",
+    "owner": "opendataCLE",
+    "url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Crime_Incidents_P1RMS/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PrimaryKey",
+      "CaseNumber",
+      "District",
+      "IncidentDesc",
+      "OffenseYear",
+      "ReportedDate",
+      "OffenseMonth",
+      "OffenseDay",
+      "TimeBlock",
+      "DOWname",
+      "DOW"
+    ],
+    "sample": [
+      41.5571163892355,
+      -81.5648040557215
+    ]
+  },
+  {
+    "name": "2026 Wildland Fire Incident Locations to Date",
+    "owner": "NIFC_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_YearToDate/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "SourceOID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate",
+      "FinalAcres"
+    ],
+    "sample": [
+      33.9124148441145,
+      -118.179612165099
+    ]
+  },
+  {
+    "name": "Current Wildland Fire Incident Locations",
+    "owner": "NIFC_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "SourceOID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate",
+      "FinalAcres"
+    ],
+    "sample": [
+      33.3439298583915,
+      -116.722309871076
+    ]
+  },
+  {
+    "name": "New Starts - Wildland Fire Incident Locations (Last 24 Hours)",
+    "owner": "NIFC_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Last24h/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "SourceOID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate",
+      "FinalAcres"
+    ],
+    "sample": [
+      34.6875949319856,
+      -118.135012222378
+    ]
+  },
+  {
+    "name": "InFORM Fire Occurrence Data Records",
+    "owner": "InFORM.Fuels_nifc",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/InFORM_FireOccurrence_Public/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "CalculatedAcres",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "CreatedOnDateTime",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate"
+    ],
+    "sample": [
+      39.2444060764017,
+      -108.937810929233
+    ]
+  },
+  {
+    "name": "QFES Current Incidents Public View",
+    "owner": "PublicSafetyQld_Data",
+    "url": "https://services1.arcgis.com/vkTwD8kHw2woKBqV/arcgis/rest/services/ESCAD_Current_Incidents_Public/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Master_Incident_Number",
+      "Response_Date",
+      "LastUpdate",
+      "CurrentStatus",
+      "Location",
+      "Jurisdiction",
+      "Latitude",
+      "Longitude",
+      "VehiclesAssigned",
+      "VehiclesOnRoute",
+      "VehiclesOnScene"
+    ],
+    "sample": [
+      -14.765804,
+      144.082017
+    ]
+  },
+  {
+    "name": "WFIGS - Wildland Fire Locations 2023",
+    "owner": "CA_Office_of_Emergency_Services_GIS",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/ArcGIS/rest/services/WFIGS_Incident_Locations/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "SourceOID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate",
+      "FinalAcres"
+    ],
+    "sample": [
+      33.8089848325406,
+      -118.180712156993
+    ]
+  },
+  {
+    "name": "Wildland Fire Incident Locations",
+    "owner": "NIFC_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations/FeatureServer/0",
+    "time_field": "ContainmentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "SourceOID",
+      "ABCDMisc",
+      "ADSPermissionState",
+      "ContainmentDateTime",
+      "ControlDateTime",
+      "CreatedBySystem",
+      "IncidentSize",
+      "DiscoveryAcres",
+      "DispatchCenterID",
+      "EstimatedCostToDate",
+      "FinalAcres"
+    ],
+    "sample": [
+      33.8089848325406,
+      -118.180712156993
+    ]
+  },
+  {
+    "name": "BLM ID FireData v2",
+    "owner": "bweihausen_nifc",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/BLM_ID_FireData_v2/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Station_Name",
+      "Type",
+      "Resources",
+      "Staffing",
+      "SITE_ID",
+      "ADM_UNIT_CD",
+      "PARENT_CD",
+      "Status",
+      "Comments",
+      "GlobalID",
+      "CreationDate"
+    ],
+    "sample": [
+      42.7954948953455,
+      -112.850070432222
+    ]
+  },
+  {
+    "name": "NERIS Public Fire Departments",
+    "owner": "neris.analytics_nerisopen",
+    "url": "https://services5.arcgis.com/lPbcyJOcoLyZmvo6/arcgis/rest/services/NERIS Public Fire Departments/FeatureServer/0",
+    "time_field": "time_zone",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "neris_id",
+      "name",
+      "address_line_1",
+      "address_line_2",
+      "city",
+      "state",
+      "zip_code",
+      "time_zone",
+      "station_count",
+      "unit_count",
+      "internal_id"
+    ],
+    "sample": [
+      40.1720800000001,
+      -74.1545399999999
+    ]
+  },
+  {
+    "name": "Police Transparency - Calls for Service - All Data (Dataset)",
+    "owner": "TempeData",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/Calls_For_Service/FeatureServer/0",
+    "time_field": "OccurrenceDatetime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PrimaryKey",
+      "OccurrenceDatetime",
+      "OccurrenceYear",
+      "OccurrenceMonth",
+      "OccurrenceHour",
+      "OccurrenceWeek",
+      "OccurrenceDatePart",
+      "OccurrenceWeekday",
+      "ObfuscatedAddress",
+      "FinalCaseType",
+      "InitialCaseType"
+    ],
+    "sample": [
+      33.3778517312824,
+      -111.962553159082
+    ]
+  },
+  {
+    "name": "Calls for Service (2016-2019) - Deprecated Dataset",
+    "owner": "TempeData",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/calls_for_service_archive/FeatureServer/0",
+    "time_field": "OccurrenceDatetime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PrimaryKey",
+      "OccurrenceDatetime",
+      "OccurrenceYear",
+      "OccurrenceMonth",
+      "OccurrenceHour",
+      "OccurrenceWeek",
+      "OccurrenceDatePart",
+      "OccurrenceWeekday",
+      "ObfuscatedAddress",
+      "XCoordinate",
+      "YCoordinate"
+    ],
+    "sample": [
+      33.4252546086268,
+      -111.938487239638
+    ]
+  },
+  {
+    "name": "Police Calls for Service (Transient Activity)",
+    "owner": "CityofEscondido",
+    "url": "https://services2.arcgis.com/eJcVbjTyyZIzZ5Ye/arcgis/rest/services/Police_Transient_Activity/FeatureServer/0",
+    "time_field": "Entry_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Event_ID",
+      "Case__",
+      "Entry_Date",
+      "Address",
+      "Event_Type",
+      "Desc_",
+      "Beat2",
+      "Bt_Atom",
+      "Latitude",
+      "Longitude"
+    ],
+    "sample": [
+      33.1089020000001,
+      -117.082611
+    ]
+  },
+  {
+    "name": "Police_Incidents_2019",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2019/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9542029983103,
+      -93.2973957326758
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_2Years",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_2Years/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9223029105358,
+      -93.285720499608
+    ]
+  },
+  {
+    "name": "Police_Incidents_2018_PIMS",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2018_PIMS/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9438363857633,
+      -93.2550182732894
+    ]
+  },
+  {
+    "name": "Police_Incidents_2017",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2017/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      45.006849699147,
+      -93.29431515175
+    ]
+  },
+  {
+    "name": "Police Incidents 2016",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2016/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      44.9852852935036,
+      -93.2429353775592
+    ]
+  },
+  {
+    "name": "Police Incidents 2015",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2015/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      45.0030963042632,
+      -93.3070221053115
+    ]
+  },
+  {
+    "name": "Police Incidents 2010",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2010/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      44.900290836028,
+      -93.2882394897507
+    ]
+  },
+  {
+    "name": "Police_Incidents_2018",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2018/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      44.9197047965774,
+      -93.2696076905462
+    ]
+  },
+  {
+    "name": "Police Incidents 2011",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2011/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      44.9358521633241,
+      -93.2251421583674
+    ]
+  },
+  {
+    "name": "Police Incidents 2012",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2012/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      44.969862876399,
+      -93.2793251748097
+    ]
+  },
+  {
+    "name": "Police Incidents 2014",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2014/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      45.0150401573465,
+      -93.3069793616737
+    ]
+  },
+  {
+    "name": "Police Incidents 2013",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/PoliceOffense2013/FeatureServer/0",
+    "time_field": "ReportedDate",
+    "geocoded": true,
+    "fields": [
+      "PublicAddress",
+      "ControlNbr",
+      "CCN",
+      "Precinct",
+      "ReportedDate",
+      "BeginDate",
+      "Time",
+      "Offense",
+      "Description",
+      "UCRCode",
+      "EnteredDate",
+      "GBSID"
+    ],
+    "sample": [
+      45.0285994352372,
+      -93.2970275671397
+    ]
+  },
+  {
+    "name": "Police_Incidents_2020",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2020/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.973193159011,
+      -93.2153481322518
+    ]
+  },
+  {
+    "name": "Police_Incidents_2021",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2021/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9700264282766,
+      -93.2499657879071
+    ]
+  },
+  {
+    "name": "Police_Incidents_2022",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2022/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9987524365617,
+      -93.305061860089
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_7_Days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_7_Days/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9350398389906,
+      -93.2561897671498
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_2Weeks",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_2Weeks/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9546388308716,
+      -93.2829644719095
+    ]
+  },
+  {
+    "name": "Police_Incidents_2023",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2023/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9828599118796,
+      -93.2853010699136
+    ]
+  },
+  {
+    "name": "Incidents",
+    "owner": "tom.lange_ucboulder",
+    "url": "https://services.arcgis.com/b3fMqPOmotX6SV4k/arcgis/rest/services/Incidents/FeatureServer/0",
+    "time_field": "DateReported",
+    "geocoded": true,
+    "fields": [
+      "OID",
+      "CaseNumber",
+      "DateReported",
+      "IncidentType",
+      "Location",
+      "Description",
+      "CaseStatus",
+      "Disposition",
+      "Lat",
+      "Lon",
+      "DoW",
+      "Month"
+    ],
+    "sample": [
+      39.999642183,
+      -105.252924439
+    ]
+  },
+  {
+    "name": "Daily Raleigh Police Incidents",
+    "owner": "OpenData_ral",
+    "url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Daily_Police_Incidents/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GlobalID",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "case_number",
+      "crime_category",
+      "crime_code",
+      "crime_description",
+      "crime_type",
+      "reported_block_address"
+    ],
+    "sample": [
+      35.7979806954127,
+      -78.556663030017
+    ]
+  },
+  {
+    "name": "Police_Incidents_2024",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2024/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9223029105358,
+      -93.285720499608
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_7Days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_7Days/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9350398389906,
+      -93.2561897671498
+    ]
+  },
+  {
+    "name": "NIBRS Group A Crime Data",
+    "owner": "baltimore_city",
+    "url": "https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/NIBRS_GroupA_Crime_Data/FeatureServer/0",
+    "time_field": "CrimeDateTime",
+    "geocoded": true,
+    "fields": [
+      "RowID",
+      "CCNumber",
+      "CrimeDateTime",
+      "CrimeCode",
+      "Description",
+      "Inside_Outside",
+      "Weapon",
+      "Shooting",
+      "Post",
+      "Gender",
+      "Age",
+      "Race"
+    ],
+    "sample": [
+      39.3007710000001,
+      -76.59783
+    ]
+  },
+  {
+    "name": "Police_Incidents_2025",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_2025/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9996249198992,
+      -93.2997948740848
+    ]
+  },
+  {
+    "name": "Incidents",
+    "owner": "gisdba_cobgis",
+    "url": "https://services1.arcgis.com/EYzEZbDhXZjURPbP/arcgis/rest/services/Incidents/FeatureServer/0",
+    "time_field": "CALLRECEIVEDRESPONSETIMESEC",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "PRIORITY",
+      "INC_TYPE",
+      "INC_NUM",
+      "CALLRECEIVEDRESPONSETIMESEC",
+      "CALLDISPATCHRESPONSETIMESEC",
+      "FROM_DATE",
+      "SOURC_DESC",
+      "SECTOR",
+      "POLICE_DIST",
+      "SUB_DIST",
+      "LATITUDE"
+    ],
+    "sample": [
+      47.6000000000001,
+      -122.121
+    ]
+  },
+  {
+    "name": "GEMS Electric",
+    "owner": "JenAmes",
+    "url": "https://services2.arcgis.com/b1ixAfZlGa0SKuLS/arcgis/rest/services/GEMS_E/FeatureServer/0",
+    "time_field": "resolved_date",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "callername",
+      "callernumber",
+      "notified911",
+      "didnotnotify911",
+      "address",
+      "department",
+      "public_works_issue",
+      "electric_issue",
+      "sewer_issue",
+      "fire_issue"
+    ],
+    "sample": [
+      40.2430659114584,
+      -75.2905689064835
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_28days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_28days/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9814129191557,
+      -93.2332243351146
+    ]
+  },
+  {
+    "name": "Police_Incidents_Last_Week",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Police_Incidents_Last_Week/FeatureServer/0",
+    "time_field": "reportedDate",
+    "geocoded": true,
+    "fields": [
+      "publicaddress",
+      "caseNumber",
+      "precinct",
+      "reportedDate",
+      "reportedTime",
+      "beginDate",
+      "reportedDateTime",
+      "beginTime",
+      "offense",
+      "description",
+      "UCRCode",
+      "enteredDate"
+    ],
+    "sample": [
+      44.9223029105358,
+      -93.285720499608
+    ]
+  },
+  {
+    "name": "Shooting and Firearm Discharges Open Data",
+    "owner": "TorontoPoliceService",
+    "url": "https://services.arcgis.com/S9th0jAJ7bqgIRjw/arcgis/rest/services/Shooting_and_Firearm_Discharges_Open_Data/FeatureServer/0",
+    "time_field": "OCC_DATE",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "EVENT_UNIQUE_ID",
+      "OCC_DATE",
+      "OCC_YEAR",
+      "OCC_MONTH",
+      "OCC_DOW",
+      "OCC_DOY",
+      "OCC_DAY",
+      "OCC_HOUR",
+      "OCC_TIME_RANGE",
+      "DIVISION",
+      "DEATH"
+    ],
+    "sample": [
+      43.7337424510001,
+      -79.538218382
+    ]
+  },
+  {
+    "name": "Part 1 Crime Data (Legacy SRS)",
+    "owner": "baltimore_city",
+    "url": "https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/Part1_Crime_Beta/FeatureServer/0",
+    "time_field": "CrimeDateTime",
+    "geocoded": true,
+    "fields": [
+      "RowID",
+      "CCNumber",
+      "CrimeDateTime",
+      "CrimeCode",
+      "Description",
+      "Inside_Outside",
+      "Weapon",
+      "Post",
+      "Gender",
+      "Age",
+      "Race",
+      "Ethnicity"
+    ],
+    "sample": [
+      39.288352112,
+      -76.660731201
+    ]
+  },
+  {
+    "name": "Metro Nashville Police Department Incidents",
+    "owner": "NashvilleOpenData",
+    "url": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Metro_Nashville_Police_Department_Incidents_view/FeatureServer/0",
+    "time_field": "Incident_Occurred",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Primary_Key",
+      "Incident_Number",
+      "Report_Type",
+      "Report_Type_Description",
+      "Incident_Status_Code",
+      "Incident_Status_Description",
+      "Investigation_Status",
+      "Incident_Location",
+      "Latitude",
+      "Longitude",
+      "RPA"
+    ],
+    "sample": [
+      36.1900000002129,
+      -86.8400000001089
+    ]
+  },
+  {
+    "name": "VicEmergency - Incidents",
+    "owner": "jakc",
+    "url": "https://services1.arcgis.com/vHnIGBHHqDR6y0CR/arcgis/rest/services/Vic_Emergency_Incidents/FeatureServer/0",
+    "time_field": "lastUpdateDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "incidentNo",
+      "lastUpdateDateTime",
+      "originDateTime",
+      "incidentType",
+      "incidentLocation",
+      "incidentStatus",
+      "incidentSize",
+      "name",
+      "territory",
+      "resourceCount",
+      "eventCode"
+    ],
+    "sample": [
+      -37.25,
+      142.4935
+    ]
+  },
+  {
+    "name": "OPD Calls",
+    "owner": "GISAdmin_Oshkosh",
+    "url": "https://services1.arcgis.com/FxsZDd9jOLijkyzz/arcgis/rest/services/Crimes/FeatureServer/0",
+    "time_field": "Incident_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Incident_Type",
+      "Incident_Date",
+      "Report_Number",
+      "Longitude",
+      "Latitude",
+      "DayofWeek",
+      "TimeofDay",
+      "DistrictName",
+      "ReportingArea"
+    ],
+    "sample": [
+      44.0211006321044,
+      -88.5420895252306
+    ]
+  },
+  {
+    "name": "USA Current Wildfires",
+    "owner": "esri_livefeeds2",
+    "url": "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/USA_Wildfires_v1/FeatureServer/0",
+    "time_field": "ICS209ReportDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "IncidentName",
+      "IncidentTypeCategory",
+      "UniqueFireIdentifier",
+      "DailyAcres",
+      "CalculatedAcres",
+      "PercentContained",
+      "ICS209ReportDateTime",
+      "FireDiscoveryDateTime",
+      "DiscoveryAcres",
+      "POOCounty",
+      "POOState"
+    ],
+    "sample": [
+      39.9594440000001,
+      -107.745278
+    ]
+  },
+  {
+    "name": "Wildfire Aware Incident, Population, and Environment Enriched Layer",
+    "owner": "esri_livefeeds2",
+    "url": "https://services9.arcgis.com/RHVPKKiFTONKtxq3/arcgis/rest/services/Wildfire_aggregated_v1/FeatureServer/0",
+    "time_field": "ModifiedOnDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "IRWINID",
+      "sum_p0010001",
+      "sum_h0010001",
+      "sum_estimatedunder18pop",
+      "sum_estimated18to64pop",
+      "sum_estimated65pluspop",
+      "sum_estimated0_14pop",
+      "sum_estimated15_17pop",
+      "sum_estimated65_79pop",
+      "sum_estimated80pluspop",
+      "sum_estimatedownerhousingunits"
+    ],
+    "sample": [
+      39.9594454726348,
+      -107.745277999643
+    ]
+  },
+  {
+    "name": "Montgomery County 911 Incidents",
+    "owner": "Montco_Data",
+    "url": "https://services1.arcgis.com/kOChldNuKsox8qZD/arcgis/rest/services/Montgomery_County_911_Incidents/FeatureServer/0",
+    "time_field": "GE_UPDATETIME",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "type",
+      "incidentno",
+      "incidenttype",
+      "incidentsubtype",
+      "location",
+      "mun",
+      "dispatched",
+      "station",
+      "Lat",
+      "Lon",
+      "GE_UPDATETIME"
+    ],
+    "sample": [
+      40.12292,
+      -75.36139
+    ]
+  },
+  {
+    "name": "Wildfire Year-to-Date",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/Wildfire_year_to_date/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      49.8110330000001,
+      -113.937867
+    ]
+  },
+  {
+    "name": "Hanover Fire EMS Apparatus (Public View)",
+    "owner": "rivero0106",
+    "url": "https://services8.arcgis.com/009gTsDOw2lLZcaU/arcgis/rest/services/Hanover_Fire_EMS_Apparatus_(Public_View)/FeatureServer/0",
+    "time_field": "IncidentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GlobalID",
+      "RecordID",
+      "AgencyState",
+      "AgencyFDID",
+      "IncidentDateTime",
+      "DistrictFromReport",
+      "StationFromReport",
+      "IncJurisdictionCalculated",
+      "StationCalcualted",
+      "IncidentDistrictCalculated",
+      "IncidentNumber"
+    ],
+    "sample": [
+      37.8287400001578,
+      -77.4539299996599
+    ]
+  },
+  {
+    "name": "EGP Active Incidents (Public)",
+    "owner": "egp_admin",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/EGP_Active_Incidents_Prod_Public_View/FeatureServer/0",
+    "time_field": "EstimatedCostToDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "CalculatedAcres",
+      "DailyAcres",
+      "Dispatch_Center",
+      "EstimatedCostToDate",
+      "Discovery_Date",
+      "GACC",
+      "Sit209_Report_Status",
+      "Name",
+      "Incident_Type_Kind",
+      "IrwinID",
+      "PercentContained"
+    ],
+    "sample": [
+      29.6066667,
+      -81.9305556
+    ]
+  },
+  {
+    "name": "Current Wildfires from IRWIN Public View",
+    "owner": "WFTIIC_DM",
+    "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/Current_Wildfires_from_IRWIN_Public_View/FeatureServer/0",
+    "time_field": "CreatedOnDateTime",
+    "geocoded": true,
+    "fields": [
+      "IrwinID",
+      "CreatedOnDateTime",
+      "IncidentName",
+      "InitialLatitude",
+      "InitialLongitude",
+      "County",
+      "POOProtectingAgency",
+      "FireIdentifier",
+      "IncidentSize",
+      "DataSource",
+      "ContainmentDateTime",
+      "ControlDateTime"
+    ],
+    "sample": [
+      40.570563,
+      -122.39328
+    ]
+  },
+  {
+    "name": "Wildfire Location - Active",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/wildfire_location_active/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      58.5280000000001,
+      -115.164667
+    ]
+  },
+  {
+    "name": "Wildfire Location - Non Active",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/wildfire_location_non_active/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      49.8110330000001,
+      -113.937867
+    ]
+  },
+  {
+    "name": "Fire_Evacuation_Centers_Public",
+    "owner": "GISAdmin_MontereyCo",
+    "url": "https://services2.arcgis.com/nOGTdfb4kF4dZljH/arcgis/rest/services/Fire_Evacuation_Centers_Public/FeatureServer/0",
+    "time_field": "created_da",
+    "geocoded": true,
+    "fields": [
+      "FID",
+      "created_da",
+      "created_us",
+      "last_edite",
+      "last_edi_1",
+      "incident_n",
+      "category",
+      "category_o",
+      "status",
+      "summary",
+      "alertincid",
+      "alertinc_1"
+    ],
+    "sample": [
+      36.59550299996,
+      -121.704759000017
+    ]
+  },
+  {
+    "name": "EOC Evacuation Wildfire App Fire Metrics VL",
+    "owner": "CountyofNevada",
+    "url": "https://services1.arcgis.com/UvqJJ6GFv4u5BZQj/arcgis/rest/services/EOC_Evacuation_Wildfire_App_Fire_Metrics_VL/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "enter_the_date_and_time_for_you",
+      "what_is_the_containment_of_the_",
+      "how_many_structures_are_current",
+      "how_many_structures_have_been_d",
+      "how_many_personnel_have_been_as",
+      "what_is_the_name_of_the_wildfir"
+    ],
+    "sample": [
+      0,
+      0
+    ]
+  },
+  {
+    "name": "Aug2020Fires",
+    "owner": "GISAdmin_MontereyCo",
+    "url": "https://services2.arcgis.com/nOGTdfb4kF4dZljH/arcgis/rest/services/Aug2020Fires/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "FID",
+      "Name",
+      "Incident_Site",
+      "GlobalID"
+    ],
+    "sample": [
+      36.1110212772066,
+      -121.610965950026
+    ]
+  },
+  {
+    "name": "Mosquito Fire_ShelterLocations",
+    "owner": "edcgis",
+    "url": "https://services.arcgis.com/UHg8l1wC48WQyDSO/arcgis/rest/services/Mosquito_Fire_ShelterLocations/FeatureServer/0",
+    "time_field": "IncidentDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Address",
+      "Hours",
+      "Status",
+      "Incident",
+      "IncidentDate",
+      "Notes"
+    ],
+    "sample": [
+      38.6606302079829,
+      -121.003796874302
+    ]
+  },
+  {
+    "name": "Active Mutual Aid Wildfires",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/Active_Mutual_Aid_Wildfires/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      52.3097490000001,
+      -114.717846
+    ]
+  },
+  {
+    "name": "Extinguished Wildfires",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/Extinguished_Wildfires/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      49.8110330000001,
+      -113.937867
+    ]
+  },
+  {
+    "name": "Active_Wildfires_(PROD)",
+    "owner": "WMBappServices",
+    "url": "https://services.arcgis.com/Eb8P5h4CJk8utIBz/arcgis/rest/services/Active_Wildfires_(PROD)/FeatureServer/0",
+    "time_field": "FIRE_STATUS_DATE",
+    "geocoded": true,
+    "fields": [
+      "LABEL",
+      "FIRE_NUMBER",
+      "LATITUDE",
+      "LONGITUDE",
+      "FIRE_YEAR",
+      "FIRE_TYPE",
+      "FIRE_STATUS",
+      "FIRE_STATUS_DATE",
+      "AREA_ESTIMATE",
+      "SIZE_CLASS",
+      "ASSESSMENT_ASSISTANCE_DATE",
+      "INCIDENT_TYPE"
+    ],
+    "sample": [
+      58.5280000000001,
+      -115.164667
+    ]
+  },
+  {
+    "name": "FireIncidents_dashboard",
+    "owner": "YAUFR89",
+    "url": "https://services3.arcgis.com/k8cLsFwM1kswCLW3/arcgis/rest/services/FireIncidents_dashboard_b5c5f85e81f44f75a8106c999309fc28/FeatureServer/0",
+    "time_field": "calldate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "nfirscode",
+      "nfirstype",
+      "fulladdr",
+      "municipality",
+      "respondingunit",
+      "cause",
+      "calldate",
+      "dispatchdate",
+      "enroutedate",
+      "arrivaltime",
+      "cleardate"
+    ],
+    "sample": [
+      39.9823254,
+      -76.7285705
+    ]
+  },
+  {
+    "name": "NASF Fire Occurrence Data 2017 - 2019",
+    "owner": "MontanaDNRC",
+    "url": "https://services2.arcgis.com/DRQySz3VhPgOv7Bo/arcgis/rest/services/NASF_Fire_Occurrence_Data/FeatureServer/0",
+    "time_field": "Fire_Discovery_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Local_Incident_ID",
+      "Fire_Discovery_Date",
+      "Incident_Name",
+      "Fire_Discovery_Time",
+      "Fire_Containment_Date",
+      "Fire_Containment_Time",
+      "Fire_Reporting_Agency_Unit_ID",
+      "State",
+      "State_FIPS",
+      "County",
+      "County_FIPS"
+    ],
+    "sample": [
+      46.8859072979311,
+      -105.021911197122
+    ]
+  },
+  {
+    "name": "WV_EFire_InFORM_view",
+    "owner": "a052881@wv.gov_WVDOF",
+    "url": "https://services6.arcgis.com/iQxzOWEp1MXm2FTa/arcgis/rest/services/WV_EFire_InFORM_view/FeatureServer/0",
+    "time_field": "OrignOwnerDateNotified",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "IncidentName",
+      "IncidentTypeCategory",
+      "IncidentTypeKind",
+      "DiscoveryAcres",
+      "DistrictReportNumber",
+      "LocalIncidentIdentifier",
+      "DOF_Season",
+      "Calendar_Year",
+      "CalculatedAcres",
+      "FinalAcres"
+    ],
+    "sample": [
+      38.2847183118588,
+      -82.149621280398
+    ]
+  },
+  {
+    "name": "IMSR_Incident_Locations View: Current",
+    "owner": "BLM_NIFC_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/IMSR_Incident_Locations_Most_Recent_View/FeatureServer/0",
+    "time_field": "initial_imsr_date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "latitude",
+      "longitude",
+      "initial_imsr_date",
+      "fire_name",
+      "incident_id",
+      "x100pct",
+      "imt_type",
+      "gacc",
+      "new_to_imsr",
+      "post_date_isoformat",
+      "IrwinID"
+    ],
+    "sample": [
+      42.6590069087858,
+      -103.638010163814
+    ]
+  },
+  {
+    "name": "CAL FIRE Aircraft Tracking public view",
+    "owner": "ITS.GIS.CALFIRE",
+    "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CAL_FIRE_Aircraft_Tracking_public_view/FeatureServer/0",
+    "time_field": "batchDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "unitId",
+      "category",
+      "batchDateTime",
+      "spd",
+      "cog",
+      "tailNumber",
+      "organizationGroup",
+      "symbology",
+      "mission",
+      "notes",
+      "altitude"
+    ],
+    "sample": [
+      40.8635279793599,
+      -122.356285785977
+    ]
+  },
+  {
+    "name": "CAL FIRE Damage Inspection (DINS) Data",
+    "owner": "dins.CALFIRE",
+    "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/POSTFIRE_MASTER_DATA_SHARE/FeatureServer/0",
+    "time_field": "INCIDENTSTARTDATE",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GLOBALID",
+      "DAMAGE",
+      "STRUCTURETYPE",
+      "STREETNUMBER",
+      "STREETNAME",
+      "STREETTYPE",
+      "STREETSUFFIX",
+      "CITY",
+      "STATE",
+      "ZIPCODE",
+      "CALFIREUNIT"
+    ],
+    "sample": [
+      38.474960181728,
+      -122.044464987987
+    ]
+  },
+  {
+    "name": "BPD Crime Incident Blotter",
+    "owner": "PD_CommunityContact",
+    "url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/BPD_Crime_Incident_Blotter/FeatureServer/0",
+    "time_field": "Report_Date",
+    "geocoded": true,
+    "fields": [
+      "Report_Number",
+      "Report_Title",
+      "Report_Date",
+      "Report_Year",
+      "Report_Month",
+      "Report_Month_Num",
+      "Report_Day",
+      "Report_Day_Num",
+      "Report_Hour",
+      "auto_narrative",
+      "STAddress",
+      "ESRI_OID"
+    ],
+    "sample": [
+      40.0175,
+      -105.277
+    ]
+  },
+  {
+    "name": "Public_Crime_Reports",
+    "owner": "kthomas2@pwcgov.org",
+    "url": "https://services2.arcgis.com/0Q7l03Ls62VG0fy4/arcgis/rest/services/Public_Crime_Reports/FeatureServer/0",
+    "time_field": "OccurredOn",
+    "geocoded": true,
+    "fields": [
+      "ObjectID",
+      "UniqueID",
+      "InstanceID",
+      "CaseNo",
+      "OccurredOn",
+      "OccurredBetween",
+      "BlockAddress",
+      "City",
+      "State",
+      "ZipCode",
+      "IBRCode",
+      "CrimeCategory"
+    ],
+    "sample": [
+      38.6798115998676,
+      -77.3511757676895
+    ]
+  },
+  {
+    "name": "SanDiego_crime_2007",
+    "owner": "kekenesri",
+    "url": "https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/SanDiego_crime_2007/FeatureServer/0",
+    "time_field": "date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "id",
+      "date",
+      "year",
+      "month",
+      "day",
+      "week",
+      "dow",
+      "time",
+      "hour",
+      "is_night",
+      "type"
+    ],
+    "sample": [
+      33.1652657915831,
+      -117.345141244573
+    ]
+  },
+  {
+    "name": "Chicago Crime",
+    "owner": "Heather_JS9",
+    "url": "https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/Chicago_Crime/FeatureServer/0",
+    "time_field": "Date",
+    "geocoded": true,
+    "fields": [
+      "ID",
+      "Case_Number",
+      "Date",
+      "Block",
+      "IUCR",
+      "Primary_Type",
+      "Description",
+      "Location_Description",
+      "Arrest",
+      "Domestic",
+      "Beat",
+      "District"
+    ],
+    "sample": [
+      41.769686733,
+      -87.587404836
+    ]
+  },
+  {
+    "name": "Roseville Crime Data",
+    "owner": "CityofRoseville",
+    "url": "https://services1.arcgis.com/yIZWbv8PF0WADSXn/arcgis/rest/services/CrimeMapping/FeatureServer/0",
+    "time_field": "Time_",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GlobalID",
+      "Type_",
+      "Description_",
+      "Location_",
+      "Agency_",
+      "CaseNumber",
+      "Time_",
+      "Date_",
+      "DayOfWeek",
+      "Sequence_DayOfWeek",
+      "Date2"
+    ],
+    "sample": [
+      38.7835361243923,
+      -121.265864088845
+    ]
+  },
+  {
+    "name": "CRIME DATA",
+    "owner": "darunkumar@grand_rapids.mi.us_grandrapids",
+    "url": "https://services2.arcgis.com/L81TiOwAPO1ZvU9b/arcgis/rest/services/CRIME_DALLLLLLL/FeatureServer/0",
+    "time_field": "USER_DATEOFOFFENSE",
+    "geocoded": true,
+    "fields": [
+      "ObjectID",
+      "X",
+      "Y",
+      "USER_INCNUMBER",
+      "USER_OFFENSECODE",
+      "USER_Beat__",
+      "USER_Service_Area",
+      "USER_MICRCODE",
+      "USER_Offense_Description",
+      "USER_NIBRS_Maping",
+      "USER_NIBRS_Category",
+      "USER_NIBRS_GRP"
+    ],
+    "sample": [
+      42.945853566313,
+      -85.6626482248029
+    ]
+  },
+  {
+    "name": "LawIncidents_14days",
+    "owner": "randcogis",
+    "url": "https://gis.randolphcountync.gov/arcgis/rest/services/Sheriff/LawIncidents_14days/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "number_",
+      "Day_Of_Week",
+      "dtrepor",
+      "nature",
+      "RespZone",
+      "IncDisp",
+      "offeobs",
+      "obsdesc",
+      "status",
+      "Hour_",
+      "Offense_Type"
+    ],
+    "sample": [
+      35.88446600000003,
+      -79.74295399999994
+    ]
+  },
+  {
+    "name": "US Police Killings 2013 to 2019",
+    "owner": "carmstead83",
+    "url": "https://services9.arcgis.com/uPQyVUNozOtWbtrl/arcgis/rest/services/US_Police_Killings_2013_to_2019/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "NAME",
+      "State",
+      "PD",
+      "POPULATION",
+      "Black_People_Killed_by_Police__",
+      "Hispanic_People_Killed_by_Polic",
+      "Native_American_People_Killed_b",
+      "Asian_People_Killed_by_Police__",
+      "Pacific_Islanders_Killed_by_Pol",
+      "White_People_Killed_by_Police__",
+      "Unknown_Race_People_Killed_by_P"
+    ],
+    "sample": [
+      33.4461143080001,
+      -112.073868093
+    ]
+  },
+  {
+    "name": "Crime_NIBRS_Daily",
+    "owner": "Shital_COV",
+    "url": "https://services7.arcgis.com/MyTOuXKXZoizwPz9/arcgis/rest/services/Crime_NIBRS/FeatureServer/0",
+    "time_field": "DATEREPORTED",
+    "geocoded": true,
+    "fields": [
+      "ObjectID",
+      "Status",
+      "Score",
+      "Match_type",
+      "Match_addr",
+      "Addr_type",
+      "CATEGORY",
+      "NIBRSCODE",
+      "CASEN",
+      "DATEREPORTED",
+      "DATEOCCURRED",
+      "ADDRESS"
+    ],
+    "sample": [
+      38.100143003107,
+      -122.243243320893
+    ]
+  },
+  {
+    "name": "Omaha Police Incident Data",
+    "owner": "CJCarsley2",
+    "url": "https://services1.arcgis.com/tIBLyYZX96jUntYm/arcgis/rest/services/Omaha_Police_Incident_Data_(View)/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "RB",
+      "dteMidpoint",
+      "NIBRSCategory",
+      "AddressBlock",
+      "LatBlock",
+      "LonBlock",
+      "dteMaxSystem",
+      "PK",
+      "police_districts",
+      "police_precincts",
+      "Neighborhood_Associations"
+    ],
+    "sample": [
+      41.2524681090001,
+      -95.973449707
+    ]
+  },
+  {
+    "name": "Police Transparency - Arrests - Last 90 Days (Dataset)",
+    "owner": "TempeData",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/DTI_Arrests/FeatureServer/0",
+    "time_field": "arrest_time",
+    "geocoded": true,
+    "fields": [
+      "rin",
+      "primary_key",
+      "arrest_type",
+      "arrest_translation",
+      "arrest_dt",
+      "arrest_time",
+      "arrest_hour_of_day",
+      "location",
+      "municipality",
+      "jurisdiction",
+      "district",
+      "zone"
+    ],
+    "sample": [
+      33.3372294001769,
+      -111.970773424222
+    ]
+  },
+  {
+    "name": "Boston Crime Incidents v2.2 - Application View",
+    "owner": "BPDMaps",
+    "url": "https://services.arcgis.com/sFnw0xNflSi8J0uh/arcgis/rest/services/Boston_Crime_Incidents__App_View/FeatureServer/0",
+    "time_field": "REPORT_DATE",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "INC_NUM",
+      "OFF_SEQ_NUM",
+      "CRIME",
+      "CRIME_TYPE",
+      "NIBRS_CODE",
+      "NIBRS_DESC",
+      "OFFENSE_CODE",
+      "OFFENSE_DESC",
+      "BLOCK",
+      "ADDRESS",
+      "CITY"
+    ],
+    "sample": [
+      42.3340786478251,
+      -71.071700585151
+    ]
+  },
+  {
+    "name": "MPD Public Safety Incidents",
+    "owner": "opmautomation_memegis",
+    "url": "https://services2.arcgis.com/saWmpKJIUAjyyNVc/arcgis/rest/services/MPD_Public_Safety_Incidents/FeatureServer/0",
+    "time_field": "Offense_Datetime",
+    "geocoded": true,
+    "fields": [
+      "Crime_ID",
+      "Offense_Datetime",
+      "Reported_Datetime",
+      "Agency_Crime_ID",
+      "UCR_Incident_Code",
+      "Block",
+      "Street_Name",
+      "Street_Address",
+      "City",
+      "State",
+      "ZIP_Code",
+      "Full_Address"
+    ],
+    "sample": [
+      35.106,
+      -89.935
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "doeser_avl",
+    "url": "https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/Crimes_public_c4e5a6ee960c4710b634386c8c034aa7/FeatureServer/0",
+    "time_field": "offendatefr",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "officer",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "offendatefr",
+      "offendateto"
+    ],
+    "sample": [
+      35.5683397985525,
+      -82.5784676341113
+    ]
+  },
+  {
+    "name": "Fire Incidents",
+    "owner": "topsoil.integration_detroitmi",
+    "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/Fire_Incidents/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "incident_exposure_id",
+      "incident_id",
+      "incident_number",
+      "address",
+      "incident_type_description",
+      "property_use",
+      "engine_area",
+      "structure_status",
+      "called_at",
+      "dispatched_at",
+      "arrived_at",
+      "unit_cleared_at"
+    ],
+    "sample": [
+      42.427521,
+      -83.1621375
+    ]
+  },
+  {
+    "name": "LA DOTD Report Road Emergency",
+    "owner": "matthew.gore9",
+    "url": "https://services.arcgis.com/Ie0K5n4UyLAfvdiX/arcgis/rest/services/service_e29217b40cfa47e0bbfd75d5ccfd6eb2/FeatureServer/0",
+    "time_field": "date_and_time",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "emergency_event",
+      "date_and_time",
+      "report_status",
+      "type",
+      "type_other",
+      "debris_type",
+      "debris_type_other",
+      "description",
+      "comments",
+      "name"
+    ],
+    "sample": [
+      29.9897158800001,
+      -89.94355618
+    ]
+  },
+  {
+    "name": "Dallas Fire Rescue GIS Public Trail Markers",
+    "owner": "victor.nava@dallascityhall.com_DallasGIS",
+    "url": "https://services2.arcgis.com/rwnOSbfKSwyTBcwN/arcgis/rest/services/Dallas_Fire_Rescue_GIS_Public_Trail_Markers/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "TITLE",
+      "DESCRIPTIO",
+      "ADDRESS",
+      "LATITUDE",
+      "LONGITUDE",
+      "GlobalID"
+    ],
+    "sample": [
+      32.8521404466073,
+      -96.8738034552055
+    ]
+  },
+  {
+    "name": "Current_CAD_Calls_Public",
+    "owner": "Michelle.Maldonado@visalia.gov_Visalia",
+    "url": "https://services7.arcgis.com/q3SI94vj8qWDxwBr/arcgis/rest/services/Current_CAD_Calls_Public/FeatureServer/0",
+    "time_field": "ReportedAddress",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "CallType",
+      "ReportedAddress",
+      "City",
+      "CallPriority",
+      "CallZone",
+      "DT_Reported",
+      "CommonName"
+    ],
+    "sample": [
+      36.356338,
+      -119.394634
+    ]
+  },
+  {
+    "name": "Firefighting ESF 4",
+    "owner": "nancy.milholland_sfdem",
+    "url": "https://services.arcgis.com/Zs2aNLFN00jrS4gG/arcgis/rest/services/Firefighting_ESF_4/FeatureServer/0",
+    "time_field": "created_user",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "status",
+      "station",
+      "address",
+      "city",
+      "state",
+      "zipcode",
+      "x",
+      "y",
+      "id",
+      "zip",
+      "lat"
+    ],
+    "sample": [
+      37.7970055294526,
+      -122.410125165036
+    ]
+  },
+  {
+    "name": "Fire Calls for Service",
+    "owner": "opendataCLE",
+    "url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/CAD_Fire/FeatureServer/0",
+    "time_field": "IncidentDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "incident_num",
+      "recordserialno",
+      "offlineincidentNumber",
+      "IncidentNumber",
+      "IncidentTypeDescription",
+      "IncidentSubTypeDescription",
+      "disposition1",
+      "dispositiondescription1",
+      "alldispositions",
+      "alldispositiondescriptions",
+      "currentprioritykey"
+    ],
+    "sample": [
+      41.5372863243552,
+      -81.6258013092048
+    ]
+  },
+  {
+    "name": "Emergency Phones",
+    "owner": "welchparker",
+    "url": "https://services3.arcgis.com/21H3muniXm83m5hZ/arcgis/rest/services/EmergencyPhones/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "light_id"
+    ],
+    "sample": [
+      37.0032796478543,
+      -122.066101721469
+    ]
+  },
+  {
+    "name": "e911_Publishable_Data_Live",
+    "owner": "iramirez_rockwallcounty",
+    "url": "https://services9.arcgis.com/9RjmpzvuPPeYSNdf/arcgis/rest/services/e911_Publishable_Data_Live/FeatureServer/0",
+    "time_field": "DateUpdate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "DateUpdate",
+      "Number",
+      "Street",
+      "A3",
+      "A2",
+      "Asset_ID",
+      "DP_Notes1",
+      "DP_Notes2",
+      "DP_Notes3",
+      "Source",
+      "DiscrpAgID"
+    ],
+    "sample": [
+      32.927164114,
+      -96.45854976
+    ]
+  },
+  {
+    "name": "2015 Calls for Service and Officer Initiated Calls",
+    "owner": "pdi_editor",
+    "url": "https://services2.arcgis.com/tQaXW7Zb1Vphzvgd/arcgis/rest/services/2015_Calls_for_Service/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "Master_Incident_Number",
+      "Response_Date",
+      "Problem",
+      "Address",
+      "City",
+      "State",
+      "Postal_Code",
+      "Call_Disposition",
+      "Time_CallClosed",
+      "LONGITUDE",
+      "LATITUDE",
+      "FID"
+    ],
+    "sample": [
+      32.806688,
+      -79.9571
+    ]
+  },
+  {
+    "name": "All Wildfires_FireYear",
+    "owner": "vfrontroth.scfc",
+    "url": "https://services9.arcgis.com/MvVEDRWecTZBD2xl/arcgis/rest/services/All_Wildfires_FireYear/FeatureServer/0",
+    "time_field": "RECEIVED",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "FIRE_NUMBER",
+      "CFS_NUMBER",
+      "INCIDENT_CODE",
+      "INCIDENT_DESCRIPTION",
+      "DISPATCH_CENTER",
+      "RECEIVED",
+      "REPORTED_DATE",
+      "DISPATCHED",
+      "INITIAL_ATTACK_WARDEN",
+      "DETECTION_METHOD",
+      "IC"
+    ],
+    "sample": [
+      34.4333339998533,
+      -79.9000019997327
+    ]
+  },
+  {
+    "name": "PutnamCountyDispatchLayer",
+    "owner": "brooke.tillis_PCGIS",
+    "url": "https://services1.arcgis.com/YZc1OyqL6jbIOeOv/arcgis/rest/services/PutnamCountyDispatchLayer/FeatureServer/0",
+    "time_field": "LASTUPDATE",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "FACILITYID",
+      "NAME",
+      "OWNER",
+      "OWNTYPE",
+      "SUBTYPEFIELD",
+      "FEATURECODE",
+      "FULLADDR",
+      "MUNICIPALITY",
+      "STATE",
+      "CAPTUREMETH",
+      "LOCATIONTYPE"
+    ],
+    "sample": [
+      29.4922855461308,
+      -81.8305532766465
+    ]
+  },
+  {
+    "name": "ESRIFireIncidentsnoapparatusdetails",
+    "owner": "YAUFR89",
+    "url": "https://services3.arcgis.com/k8cLsFwM1kswCLW3/arcgis/rest/services/ESRIFireIncidentsnoapparatusdetails/FeatureServer/0",
+    "time_field": "Dispatch_Call_Created",
+    "geocoded": true,
+    "fields": [
+      "Incident_Id",
+      "Incident_Number",
+      "Dispatch_Type",
+      "Primary_Incident_Group",
+      "Primary_Incident_Sub_Group",
+      "Primary_Incident_Type",
+      "Address",
+      "Fire_Zone",
+      "Response_Zone",
+      "First_Arriving_Unit",
+      "Dispatch_Call_Created",
+      "Dispatch_Call_Created_Time"
+    ],
+    "sample": [
+      40.052881,
+      -76.6910531
+    ]
+  },
+  {
+    "name": "National Dispatch Locations Public",
+    "owner": "DMP_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/DMP_National_Dispatch_Locations_Public/FeatureServer/0",
+    "time_field": "DateCurrent",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GeometryID",
+      "GACCUnitID",
+      "DispName",
+      "DispUnitID",
+      "DispAddress",
+      "DispTier",
+      "DispArea",
+      "DispContactPhone",
+      "DispEmail",
+      "LatWGS84",
+      "LongWGS84"
+    ],
+    "sample": [
+      32.3668033003169,
+      -86.2677100792263
+    ]
+  },
+  {
+    "name": "DCFEMS Alarm Box Numbers",
+    "owner": "timothy.hutchison_MPD1",
+    "url": "https://services.arcgis.com/neT9SoYxizqTHZPH/arcgis/rest/services/DCFEMS_Alarm_Box_Numbers/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Box_Number",
+      "Latitude",
+      "Longitude",
+      "Address",
+      "Description",
+      "Series_A",
+      "Series"
+    ],
+    "sample": [
+      38.8947852000001,
+      -77.0136739
+    ]
+  },
+  {
+    "name": "FireIncidents_SFFD",
+    "owner": "sfgov_agofo",
+    "url": "https://services.arcgis.com/Zs2aNLFN00jrS4gG/arcgis/rest/services/FireIncidents_SFFD/FeatureServer/0",
+    "time_field": "CALL_DATE",
+    "geocoded": true,
+    "fields": [
+      "INC_NO",
+      "CALL_DATE",
+      "RECEIVED_DTTM",
+      "DISPATCH_DTTM",
+      "ON_SCENE_DTTM",
+      "RESPONSE_INTERVAL",
+      "MEET_RESPONSE_CRITERIA",
+      "AVAILABLE_DTTM",
+      "ALARMS",
+      "DISPOSITION",
+      "BATTALION",
+      "STATION_AREA"
+    ],
+    "sample": [
+      37.7895278930664,
+      -122.413726806641
+    ]
+  },
+  {
+    "name": "Nevada Interagency Dispatch Centers",
+    "owner": "NVFireInfo_Authoritative",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/NV_Interagency_Dispatch_Centers/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Unit",
+      "Center_Name",
+      "Radio_Call_Sign",
+      "Center_Location",
+      "Lat",
+      "Long",
+      "Physical_Address",
+      "City",
+      "State",
+      "Zip_Code",
+      "Phone_Number"
+    ],
+    "sample": [
+      36.2114342833044,
+      -115.205748846948
+    ]
+  },
+  {
+    "name": "Emergency Call Boxes",
+    "owner": "eocgisfc",
+    "url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Call_Boxes/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GlobalID",
+      "CreationDate",
+      "Creator",
+      "EditDate",
+      "Editor",
+      "Name",
+      "Address",
+      "City",
+      "Notes"
+    ],
+    "sample": [
+      38.4183279228474,
+      -122.550499888144
+    ]
+  },
+  {
+    "name": "Hawaii Emergency Shelters",
+    "owner": "Learn_ArcGIS",
+    "url": "https://services2.arcgis.com/j80Jz20at6Bi0thr/arcgis/rest/services/Hawaii_Emergency_Shelters/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "NAME",
+      "ADDRESS",
+      "PLACE",
+      "STATE",
+      "ZIP",
+      "PHONE",
+      "FID"
+    ],
+    "sample": [
+      19.7211634960004,
+      -155.095684995
+    ]
+  },
+  {
+    "name": "San Diego County and CAL Fire Sandbags - Public",
+    "owner": "oes_services",
+    "url": "https://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/San_Diego_County_and_CAL_Fire_Sandbag_Locations_view/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "ObjectID",
+      "Loc_name",
+      "Status",
+      "Score",
+      "Match_type",
+      "Match_addr",
+      "LongLabel",
+      "ShortLabel",
+      "Addr_type",
+      "Type",
+      "PlaceName",
+      "Place_addr"
+    ],
+    "sample": [
+      32.6293781600013,
+      -116.469400253002
+    ]
+  },
+  {
+    "name": "Aurora IL Police Incidents",
+    "owner": "AuroraData",
+    "url": "https://services1.arcgis.com/79UxTxnBeBW8JHY4/arcgis/rest/services/AuroraIL.Police_Incidents/FeatureServer/0",
+    "time_field": "REPORTED_ON",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "DISTRICT",
+      "INCIDENT_NUM",
+      "REPORTED_ON",
+      "GROUPING",
+      "STREETADDR",
+      "AREA"
+    ],
+    "sample": [
+      41.74862332,
+      -88.2911278129999
+    ]
+  },
+  {
+    "name": "Incident Status Report",
+    "owner": "nathaniel.smith_nema",
+    "url": "https://services5.arcgis.com/p6OJnG6npkIZvirZ/arcgis/rest/services/service_ef9afb69da174fd988e4fa7171e6d0e1/FeatureServer/0",
+    "time_field": "incident_date",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "incident_name",
+      "incident_description",
+      "incident_date",
+      "report_date",
+      "jurisdiction",
+      "first_name",
+      "last_name",
+      "email",
+      "callback_number",
+      "incident_commander"
+    ],
+    "sample": [
+      40.7809159582,
+      -98.1703228643153
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "EvanstonGIS",
+    "url": "https://services3.arcgis.com/RVAJnWJd9M0xRdYG/arcgis/rest/services/Crimes_public_577c2aa657d74d24967b41a88f711f59/FeatureServer/0",
+    "time_field": "offendatefr",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "officer",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "offendatefr",
+      "offendateto"
+    ],
+    "sample": [
+      42.0520369865007,
+      -87.7068961210159
+    ]
+  },
+  {
+    "name": "Crime Data 2023 - Part 1 Offenses (With Lat & Long Info)",
+    "owner": "admin_syr",
+    "url": "https://services6.arcgis.com/bdPqSfflsdgFRVVM/arcgis/rest/services/crime_data_1_auto_update/FeatureServer/0",
+    "time_field": "DATEEND",
+    "geocoded": true,
+    "fields": [
+      "DATEEND",
+      "TIMESTART",
+      "TIMEEND",
+      "ADDRESS",
+      "Arrest",
+      "LarcenyCode",
+      "CODE_DEFINED",
+      "LAT",
+      "LONG",
+      "ObjectId"
+    ],
+    "sample": [
+      43.067961,
+      -76.1737229999999
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "Police.COG_gresham",
+    "url": "https://services6.arcgis.com/8RqShouHu44gYmHT/arcgis/rest/services/Crimes_public_322ab2e53c114550be2571e79ee69a2f/FeatureServer/0",
+    "time_field": "offendatefr",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "officer",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "offendatefr",
+      "offendateto"
+    ],
+    "sample": [
+      45.4912891550604,
+      -122.479442902781
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "city_of_yakima",
+    "url": "https://services5.arcgis.com/drBwGNA3YMS2QPJd/arcgis/rest/services/Crimes_public_fc349e427d9945729c4e985666b31686/FeatureServer/0",
+    "time_field": "reportdate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "sequence",
+      "statute",
+      "nibrscode",
+      "nibrsoffense",
+      "nibrsdesc",
+      "nibrscrimeag",
+      "nibrsgroup",
+      "city",
+      "state"
+    ],
+    "sample": [
+      46.618411,
+      -120.53345
+    ]
+  },
+  {
+    "name": "Crime Data 2024 Part 1 Offenses With Lat and Long Info",
+    "owner": "admin_syr",
+    "url": "https://services6.arcgis.com/bdPqSfflsdgFRVVM/arcgis/rest/services/Crime_Data_2024_Part_1_Offenses_With_Lat_and_Long_Info/FeatureServer/0",
+    "time_field": "DATEEND",
+    "geocoded": true,
+    "fields": [
+      "DATEEND",
+      "TIMESTART",
+      "TIMEEND",
+      "ADDRESS",
+      "Arrest",
+      "LarcenyCode",
+      "CODE_DEFINED",
+      "LAT",
+      "LONG",
+      "ObjectId"
+    ],
+    "sample": [
+      43.044444012,
+      -76.1536186479999
+    ]
+  },
+  {
+    "name": "Hate Crime Incident (Open Data)",
+    "owner": "TempeData",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/hate_crime_open_data/FeatureServer/0",
+    "time_field": "CrimeDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "XCoordinate",
+      "YCoordinate",
+      "BiasType",
+      "VictimCount",
+      "RMSID",
+      "CrimeStatus",
+      "OffenseType",
+      "Note",
+      "LocationType",
+      "VictimType",
+      "VictimRace"
+    ],
+    "sample": [
+      33.3843279866596,
+      -111.967103827003
+    ]
+  },
+  {
+    "name": "EmergencyResponseFacilities",
+    "owner": "HarveyGIS",
+    "url": "https://services2.arcgis.com/NYSVwQ7Ci1T1U8La/arcgis/rest/services/EmergencyResponseFacilities_35386cff8c754e7392880d55f120d9da/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "facilityid",
+      "facilityarea",
+      "name",
+      "factype",
+      "fulladdr",
+      "municipality",
+      "agency",
+      "agencytype",
+      "phone",
+      "agencyurl",
+      "operdays"
+    ],
+    "sample": [
+      38.0029590059233,
+      -97.5069192344516
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "cowgis",
+    "url": "https://services5.arcgis.com/QfFJJU2FARaLlY26/arcgis/rest/services/Crimes_public_81ed9b2b381240a59391f53bc35142fc/FeatureServer/0",
+    "time_field": "offendatefr",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "officer",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "offendatefr",
+      "offendateto"
+    ],
+    "sample": [
+      38.6918756056022,
+      -121.765267309497
+    ]
+  },
+  {
+    "name": "Crimes_public",
+    "owner": "vbhupathi_peoria_il",
+    "url": "https://services1.arcgis.com/Vm4J3EDyqMzmDYgP/arcgis/rest/services/Crimes_public_b259ad13665440579e8fa083818cdd9f/FeatureServer/0",
+    "time_field": "reportdate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "sequence",
+      "statute",
+      "nibrscode",
+      "nibrsoffense",
+      "nibrsdesc",
+      "nibrscrimeag",
+      "nibrsgroup",
+      "attemptcompleted",
+      "fulladdr"
+    ],
+    "sample": [
+      40.7122469008162,
+      -89.5892015282432
+    ]
+  },
+  {
+    "name": "Sheriff Incident Previous Day Response Data (Public Use)",
+    "owner": "ShanePavlak",
+    "url": "https://gis.miottawa.org/arcgis/rest/services/HostedServices/SheriffIncidentResponseDaily/FeatureServer/0",
+    "time_field": "CombinedDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Mapped",
+      "IncidentNumber",
+      "CombinedDateTime",
+      "CategoryPublic",
+      "IncidentTypeDesc",
+      "Department",
+      "IncidentAddress",
+      "VenueLabel",
+      "NatureofCall",
+      "GlobalID"
+    ],
+    "sample": [
+      42.98074062713107,
+      -85.81535409216598
+    ]
+  },
+  {
+    "name": "Sheriff Service Calls - Symbolized - Layer View",
+    "owner": "CountyofNevada",
+    "url": "https://services1.arcgis.com/UvqJJ6GFv4u5BZQj/arcgis/rest/services/Sheriff_Service_Calls_CSV/FeatureServer/0",
+    "time_field": "time_created",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "event_no",
+      "agency",
+      "call_type",
+      "call_type_explain",
+      "input_location",
+      "time_created",
+      "longitude",
+      "latitude",
+      "gisgeocode",
+      "Category",
+      "ObjectId2"
+    ],
+    "sample": [
+      39.319,
+      -120.1544
+    ]
+  },
+  {
+    "name": "2022 Reported Incidents",
+    "owner": "andrewscw_MontVA_GIS",
+    "url": "https://services5.arcgis.com/IZ8QFYP84iubFqmi/arcgis/rest/services/2022_Reported_Incidents/FeatureServer/0",
+    "time_field": "DateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "DateTime",
+      "Number",
+      "Type",
+      "Category",
+      "ApprxAddr",
+      "POINT_X",
+      "POINT_Y",
+      "GlobalID"
+    ],
+    "sample": [
+      37.1020853301244,
+      -80.425424689597
+    ]
+  },
+  {
+    "name": "Next Generation 911",
+    "owner": "RenvilleCounty",
+    "url": "https://gis.renvillecountymn.gov/arcgis/rest/services/Sheriff/911DataLayers/FeatureServer/0",
+    "time_field": "created_user",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "UNIQUE_ID",
+      "OWNER",
+      "ADDRESS",
+      "ANUMBER",
+      "ST_CONCAT",
+      "ST_PRE_TYP",
+      "ST_NAME",
+      "ST_POS_TYP",
+      "ST_POS_DIR",
+      "SUB_TYPE1",
+      "SUB_ID1"
+    ],
+    "sample": [
+      44.687648869611806,
+      -94.93973412666476
+    ]
+  },
+  {
+    "name": "Fresno County Sheriff's Office ICS 214",
+    "owner": "Teresa.Burgamy@fresnosheriff.org_FresnoSheriff",
+    "url": "https://services3.arcgis.com/mftV9iWT07JQBrOI/arcgis/rest/services/service_5417c16850c54fc28e1bfc817652fa97/FeatureServer/0",
+    "time_field": "timereg",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "fsonote",
+      "fsonotea",
+      "fsoincidentname",
+      "fsoagencyassisting",
+      "operationalperiodfrom",
+      "operationalperiodto",
+      "unitname",
+      "uniticsposition",
+      "unithome",
+      "unitother"
+    ],
+    "sample": [
+      36.736369019717,
+      -119.789178986004
+    ]
+  },
+  {
+    "name": "County_Police_Calls_City_Limits",
+    "owner": "Will_Hutchinson",
+    "url": "https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/County_Police_Calls_City_Limits/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Status",
+      "Score",
+      "Match_type",
+      "Match_addr",
+      "Addr_type",
+      "AddNum",
+      "Side",
+      "StPreDir",
+      "StPreType",
+      "StName",
+      "StType"
+    ],
+    "sample": [
+      35.3598277191606,
+      -82.4807438796509
+    ]
+  },
+  {
+    "name": "YTD_CRIME_WM",
+    "owner": "TorontoPoliceService",
+    "url": "https://services.arcgis.com/S9th0jAJ7bqgIRjw/arcgis/rest/services/YTD_CRIME_WM/FeatureServer/0",
+    "time_field": "OCC_DATE_AGOL",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "OCC_DATE_AGOL",
+      "REPORT_DATE_AGOL",
+      "EVENT_UNIQUE_ID",
+      "DIVISION",
+      "PREMISES_TYPE",
+      "HOUR",
+      "CRIME_TYPE",
+      "HOOD_158",
+      "NEIGHBOURHOOD_158",
+      "HOOD_140",
+      "NEIGHBOURHOOD_140"
+    ],
+    "sample": [
+      43.6162187957559,
+      -79.4983879275447
+    ]
+  },
+  {
+    "name": "Police_Crime_Mapping",
+    "owner": "arcgis_clb",
+    "url": "https://services6.arcgis.com/yCArG7wGXGyWLqav/arcgis/rest/services/Police_Crime_Mapping/FeatureServer/0",
+    "time_field": "ReportedDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "DR",
+      "Type",
+      "Category",
+      "CrimeType",
+      "ReportedDateTime",
+      "ReportedDateTimeDate",
+      "Address",
+      "Division",
+      "Beat",
+      "ReportingDistrict",
+      "DaysOld"
+    ],
+    "sample": [
+      33.8772478138338,
+      -118.168668343341
+    ]
+  },
+  {
+    "name": "YEAR_END_CRIME_WM",
+    "owner": "TorontoPoliceService",
+    "url": "https://services.arcgis.com/S9th0jAJ7bqgIRjw/arcgis/rest/services/YEAR_END_CRIME_WM/FeatureServer/0",
+    "time_field": "DATE",
+    "geocoded": true,
+    "fields": [
+      "EVENT_UNIQUE_ID",
+      "DATE",
+      "OCC_DATE",
+      "OCC_HOUR",
+      "LOCATION_TYPE",
+      "PREMISES_TYPE",
+      "DIVISION",
+      "HOOD_158",
+      "NEIGHBOURHOOD_158",
+      "COUNT_",
+      "LONG_WGS84",
+      "LAT_WGS84"
+    ],
+    "sample": [
+      43.809911366,
+      -79.257690854
+    ]
+  },
+  {
+    "name": "LVMPD Reported NIBRS Crimes",
+    "owner": "LVMPD_GIS_ADMIN",
+    "url": "https://services.arcgis.com/jjSk6t82vIntwDbs/arcgis/rest/services/Weekly_Public_Crimes/FeatureServer/0",
+    "time_field": "ReportedOn",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Event_Number",
+      "ReportedOn",
+      "Location",
+      "CSZ",
+      "Area_Command",
+      "Beat",
+      "OffenseGroup",
+      "CrimeAgainst",
+      "OffenseCategory",
+      "Offense",
+      "NIBRSOffenseCode"
+    ],
+    "sample": [
+      36.1962695798835,
+      -115.08929305199
+    ]
+  },
+  {
+    "name": "CrimeArcade",
+    "owner": "barker_jsapi",
+    "url": "https://services.arcgis.com/V6ZHFr6zdgNZuVG0/arcgis/rest/services/CrimeArcade/FeatureServer/0",
+    "time_field": "offendate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "offenseid",
+      "callid",
+      "officer",
+      "fulladdr",
+      "municipality",
+      "lawdistrict",
+      "neighborhood",
+      "localdistrict",
+      "zip5",
+      "offendate",
+      "offentime"
+    ],
+    "sample": [
+      41.7500827981227,
+      -88.1150432950026
+    ]
+  },
+  {
+    "name": "Crimes Intersections",
+    "owner": "madison.schettig@Allentownpa.gov_AllentownPA",
+    "url": "https://services1.arcgis.com/WUqVDRuvIiIiH2Pl/arcgis/rest/services/Crimes_Intersections/FeatureServer/0",
+    "time_field": "reportdate",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "callid",
+      "nibrscode",
+      "nibrsoffense",
+      "nibrsdesc",
+      "beat",
+      "district",
+      "division",
+      "reportdate",
+      "reportyear",
+      "reportmonth",
+      "reportdow"
+    ],
+    "sample": [
+      40.6070425996945,
+      -75.4792317996096
+    ]
+  },
+  {
+    "name": "Spatial Incident Review Database (beta) from the Lessons Learned Center PublicView",
+    "owner": "FLA.Owner_nifc",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/HistomapPublicView/FeatureServer/0",
+    "time_field": "incidentdate",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "LLIncidentName",
+      "incidentdate",
+      "Year",
+      "Month",
+      "incidenttime",
+      "GACC",
+      "State",
+      "National_PlanningLevel",
+      "GACC_PlanningLevel",
+      "EventKind"
+    ],
+    "sample": [
+      38.3088639999987,
+      -104.643308999996
+    ]
+  },
+  {
+    "name": "CA Prescribed Fires Public View",
+    "owner": "ITS.CALFIRE",
+    "url": "https://services5.arcgis.com/bz1uwWPKUInZBK94/arcgis/rest/services/CA_Prescribed_Fires_view/FeatureServer/0",
+    "time_field": "start_date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "name",
+      "status",
+      "start_date",
+      "managing_agency",
+      "burn_type",
+      "source",
+      "acres",
+      "approved_on"
+    ],
+    "sample": [
+      38.520694,
+      -121.403502
+    ]
+  },
+  {
+    "name": "CA Consolidated Prescribed Fires public view",
+    "owner": "ITS.GIS.CALFIRE",
+    "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/CA_Consolidated_Prescribed_Fires_public_view/FeatureServer/0",
+    "time_field": "start_date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "name",
+      "status",
+      "start_date",
+      "managing_agency",
+      "burn_type",
+      "source",
+      "acres",
+      "approved_on"
+    ],
+    "sample": [
+      38.520694,
+      -121.403502
+    ]
+  },
+  {
+    "name": "Carlsbad Fire Incidents",
+    "owner": "bchau_carlsbad",
+    "url": "https://services.arcgis.com/ay9ePoQ2UfAX3U38/arcgis/rest/services/CarlsbadFireIncidents/FeatureServer/0",
+    "time_field": "Response_Date_Year",
+    "geocoded": true,
+    "fields": [
+      "Master_Incident_ID",
+      "Master_Incident_Number",
+      "Response_Date_Year",
+      "Response_Date_Month",
+      "Response_Date_Hour",
+      "Response_Date_Hour24",
+      "Incident_City",
+      "Jurisdiction",
+      "CBD_Responded",
+      "Incident_Category",
+      "Incident_Type",
+      "Station_Area"
+    ],
+    "sample": [
+      33.1752375042431,
+      -117.365932208714
+    ]
+  },
+  {
+    "name": "Incident Symbology - Feature Service",
+    "owner": "ltrogers4",
+    "url": "https://services.arcgis.com/0ZRg6WRC7mxSLyKX/arcgis/rest/services/ISWG3/FeatureServer/0",
+    "time_field": "Time_OOS_Start",
+    "geocoded": true,
+    "fields": [
+      "SUBTYPEFIELD",
+      "FEATURECODE",
+      "Name",
+      "STAFFING",
+      "LocStatus",
+      "Planned",
+      "FLOOR",
+      "INTERFLOOR",
+      "SEVERITY",
+      "LABEL",
+      "Agency",
+      "Contact"
+    ],
+    "sample": [
+      35.2284512632137,
+      -80.8399974081068
+    ]
+  },
+  {
+    "name": "COMM - Public Safety - Fire Incident Runs",
+    "owner": "chace.carpenter@westerville.org_Westerville",
+    "url": "https://webgis.westerville.org/public/rest/services/TransparencyHub/FireIncidentRuns/FeatureServer/0",
+    "time_field": "INCIDENT_DATE",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "INCIDENT_TYPE",
+      "KPI_GROUP",
+      "INCIDENT_DATE",
+      "INCIDENT_YEAR",
+      "FIRE_STATION_NUMBER",
+      "INCIDENT_MONTH",
+      "X_COORD",
+      "Y_COORD",
+      "ADDRESS",
+      "INCIDENT_TYPE_COUNT",
+      "INCIDENT_NUMBER_TYPE"
+    ],
+    "sample": [
+      40.104605330664775,
+      -82.90109925092716
+    ]
+  },
+  {
+    "name": "Naperville 2017-2021 Fire Incident Calls",
+    "owner": "Esri_Tutorials",
+    "url": "https://services2.arcgis.com/j80Jz20at6Bi0thr/arcgis/rest/services/GXAsi/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "objectId",
+      "excel_row_id",
+      "FIELD_NAME_A",
+      "FIELD_NAME_B",
+      "FIELD_NAME_C",
+      "FIELD_NAME_D",
+      "FIELD_NAME_E",
+      "FIELD_NAME_F",
+      "FIELD_NAME_G",
+      "FIELD_NAME_H",
+      "FIELD_NAME_I",
+      "FIELD_NAME_J"
+    ],
+    "sample": [
+      41.7889989899986,
+      -88.152921029997
+    ]
+  },
+  {
+    "name": "Ohio EMA Incident Reporting System - Watch Office",
+    "owner": "watchoffice_oema",
+    "url": "https://services6.arcgis.com/zxOMWqh0yAD6mMsJ/arcgis/rest/services/service_e5b0df56254f4dca9d9b3a88b1b3fa9a/FeatureServer/0",
+    "time_field": "datetime_of_report",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "datetime_of_report",
+      "real_world_exercise_admin",
+      "reporting_regional_office",
+      "which_county_are_you_from",
+      "reporting_county_region",
+      "type_of_report",
+      "admin_report_type",
+      "exercise_report_type",
+      "state_eoc_status",
+      "datetime_of_incident"
+    ],
+    "sample": [
+      39.9017210924459,
+      -82.9350418176927
+    ]
+  },
+  {
+    "name": "Hanover_Fire_EMS_Incidents_(Public_View)",
+    "owner": "rivero0106",
+    "url": "https://services8.arcgis.com/009gTsDOw2lLZcaU/arcgis/rest/services/Hanover_Fire_EMS_Incidents_(Public_View)/FeatureServer/0",
+    "time_field": "IncidentDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "GlobalID",
+      "RecordID",
+      "AgencyState",
+      "AgencyFDID",
+      "IncidentDateTime",
+      "DistrictFromReport",
+      "StationFromReport",
+      "IncJurisdictionCalculated",
+      "StationCalcualted",
+      "IncidentDistrictCalculated",
+      "IncidentNumber"
+    ],
+    "sample": [
+      37.69189,
+      -77.40301
+    ]
+  },
+  {
+    "name": "EMS_Calls",
+    "owner": "jfitzl",
+    "url": "https://services3.arcgis.com/1Hl2oykyquCQFgHM/arcgis/rest/services/EMS_Calls/FeatureServer/0",
+    "time_field": null,
+    "geocoded": true,
+    "fields": [
+      "OBJECTID_1",
+      "OBJECTID",
+      "Damage_Area"
+    ],
+    "sample": [
+      45.3287829339946,
+      -91.4392861952475
+    ]
+  },
+  {
+    "name": "Fire Incidents",
+    "owner": "OpenData_ral",
+    "url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Fire_Incidents_Public/FeatureServer/0",
+    "time_field": "arrive_date_time",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "incident_number",
+      "incident_type",
+      "incident_type_description",
+      "arrive_date_time",
+      "cleared_date_time",
+      "dispatch_date_time",
+      "exposure",
+      "platoon",
+      "station",
+      "address",
+      "GlobalID"
+    ],
+    "sample": [
+      35.8702128576755,
+      -78.6266045238583
+    ]
+  },
+  {
+    "name": "Louisville Metro KY - Fire Incident",
+    "owner": "LouisvilleMetro",
+    "url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/Fire_Incident_test1/FeatureServer/0",
+    "time_field": "inci_date",
+    "geocoded": true,
+    "fields": [
+      "inci_no",
+      "inci_date",
+      "exp_no",
+      "inci_address",
+      "latitude",
+      "longtitude",
+      "zip",
+      "census_tract",
+      "category",
+      "inci_type",
+      "fpu_category",
+      "fpu"
+    ],
+    "sample": [
+      0,
+      0
+    ]
+  },
+  {
+    "name": "DSS SB County Emergency Site Survey- Summary (editable - for internal use only)",
+    "owner": "eoc_em_sbcoem",
+    "url": "https://services9.arcgis.com/ztLwtMXzJMy86yJE/arcgis/rest/services/DSS_SB_COUNTY_EMERGENCY_SITE_SURVEY_SUMMARY_Geocoded/FeatureServer/0",
+    "time_field": "CreationDate",
+    "geocoded": true,
+    "fields": [
+      "FID",
+      "Status",
+      "Score",
+      "Match_addr",
+      "USER_Facil",
+      "USER_Use_T",
+      "USER_Use_1",
+      "USER_Use_2",
+      "USER_Use_3",
+      "USER_Gener",
+      "USER_Medic",
+      "USER_Use_A"
+    ],
+    "sample": [
+      34.4294709920001,
+      -119.697559001
+    ]
+  },
+  {
+    "name": "BC Gov Wildfire Fire_Locations_Current",
+    "owner": "ThompsonNicolaRegionalDistrict",
+    "url": "https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0",
+    "time_field": "IGNITION_DATE",
+    "geocoded": true,
+    "fields": [
+      "FIRE_YEAR",
+      "IGNITION_DATE",
+      "FIRE_STATUS",
+      "FIRE_CENTRE",
+      "ZONE",
+      "FIRE_ID",
+      "LATITUDE",
+      "LONGITUDE",
+      "CURRENT_SIZE",
+      "FEATURE_CODE",
+      "OBJECTID",
+      "GlobalID"
+    ],
+    "sample": [
+      55.9910830001047,
+      -120.597216999507
+    ]
+  },
+  {
+    "name": "IncidentFacilities_dashboard",
+    "owner": "ericqueller",
+    "url": "https://services2.arcgis.com/Rj8QhN9Wb2hxHgpN/arcgis/rest/services/IncidentFacilities_dashboard_913eb0fb75d849f5aceff5fe6ffcf4bd/FeatureServer/0",
+    "time_field": "opendate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "facilityid",
+      "name",
+      "factype",
+      "agency",
+      "municipality",
+      "pocname",
+      "pocemail",
+      "pocphone",
+      "capacity",
+      "accessres",
+      "opendate"
+    ],
+    "sample": [
+      33.3239750696761,
+      -105.634169484164
+    ]
+  },
+  {
+    "name": "KYTC - Incident Management AVL",
+    "owner": "KYTCBigData",
+    "url": "https://services2.arcgis.com/CcI36Pduqd0OR4W9/arcgis/rest/services/avl_incidentmanagement_2020/FeatureServer/0",
+    "time_field": "avlDatestamp",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "kytcDistrict",
+      "kytcCountyName",
+      "kytcRouteLbl",
+      "kytcRdName",
+      "kytcMPInitial",
+      "avlDatestamp",
+      "avlDirection",
+      "avlSpeed",
+      "avlVehicleId",
+      "avlVehicleName",
+      "latest_rec"
+    ],
+    "sample": [
+      26.3144120529133,
+      -100.547114541431
+    ]
+  },
+  {
+    "name": "EFire_2_Production_Public_view",
+    "owner": "a052881@wv.gov_WVDOF",
+    "url": "https://services6.arcgis.com/iQxzOWEp1MXm2FTa/arcgis/rest/services/EFire_2_Production_Public_view/FeatureServer/0",
+    "time_field": "FireDiscoveryDateTime",
+    "geocoded": true,
+    "fields": [
+      "objectid",
+      "globalid",
+      "IncidentTypeCategory",
+      "DiscoveryAcres",
+      "DOF_District",
+      "LocalIncidentIdentifier",
+      "FinalAcres",
+      "POOCounty",
+      "FireDiscoveryDateTime",
+      "ControlDateTime",
+      "FinalStrategyAttainedDateTime",
+      "WeekDay"
+    ],
+    "sample": [
+      38.2847183118588,
+      -82.149621280398
+    ]
+  },
+  {
+    "name": "NCDOT_TIMSIncidentsByLanesAffected",
+    "owner": "TIMSApp.NCDOT.GOV",
+    "url": "https://services.arcgis.com/NuWFvHYDMVmmxMeM/arcgis/rest/services/NCDOT_TIMSIncidentsBySeverity/FeatureServer/0",
+    "time_field": "StartDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Id",
+      "Road",
+      "Division",
+      "Reason",
+      "Condition",
+      "Detour",
+      "DriveNCLink",
+      "Latitude",
+      "Longitude",
+      "EventName",
+      "LanesAffected"
+    ],
+    "sample": [
+      35.775562,
+      -83.097257
+    ]
+  },
+  {
+    "name": "NPS Wildfire Risk Assessment (Public)",
+    "owner": "NPSadmin_nifc",
+    "url": "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/NPS_Wildfire_Risk_Assessment_v2023_(Public)/FeatureServer/0",
+    "time_field": "LastSiteVisitDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Unit_ID",
+      "Fire_Bldg_ID",
+      "Building_ID",
+      "FMSS_ID",
+      "Community_ID",
+      "AssessScale",
+      "Common_Name",
+      "MapLabel",
+      "Owner",
+      "FaciltyType",
+      "FacilityUse"
+    ],
+    "sample": [
+      38.9538824150143,
+      -77.0766888547985
+    ]
+  },
+  {
+    "name": "Active Incidents Public",
+    "owner": "gis_ccpa",
+    "url": "https://services1.arcgis.com/1Cfo0re3un0w6a30/arcgis/rest/services/Active_Incidents_Public/FeatureServer/0",
+    "time_field": "EventDateTime",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "EventDateTime",
+      "CaseNumber",
+      "StationID",
+      "StationName",
+      "station",
+      "unid",
+      "UnitDesc",
+      "Incident",
+      "StreetName",
+      "BoxNumber",
+      "Municipality"
+    ],
+    "sample": [
+      40.0499062584684,
+      -77.5224368080809
+    ]
+  },
+  {
+    "name": "Shots_Fired_Last7Days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_Last7Days/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      45.0140075470397,
+      -93.2880280126416
+    ]
+  },
+  {
+    "name": "Shots_Fired_Last30Days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_Last30Days/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      45.0140075470397,
+      -93.2880280126416
+    ]
+  },
+  {
+    "name": "Shots_Fired_Last14Days",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_Last14Days/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      45.0140075470397,
+      -93.2880280126416
+    ]
+  },
+  {
+    "name": "Shots Fired 2020",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_2020/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.9573333690961,
+      -93.2835881435387
+    ]
+  },
+  {
+    "name": "Shots_Fired_2019",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_2019/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.9821445737249,
+      -93.2690206728056
+    ]
+  },
+  {
+    "name": "Shots_Fired",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.9573333690961,
+      -93.2835881435387
+    ]
+  },
+  {
+    "name": "Shots_Fired_2018",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_CurrentYear/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      45.0336649524791,
+      -93.2510090147898
+    ]
+  },
+  {
+    "name": "Shots_Fired_2021",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_2021/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.9573333690961,
+      -93.2835881435387
+    ]
+  },
+  {
+    "name": "Shots_Fired_2023",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_2023/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.998077414084,
+      -93.2971794830491
+    ]
+  },
+  {
+    "name": "Shots_Fired_2022",
+    "owner": "City_of_Minneapolis",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Shots_Fired_2022/FeatureServer/0",
+    "time_field": "Response_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "longitude",
+      "latitude",
+      "Jurisdiction",
+      "Master_Incident_Number",
+      "Division",
+      "Problem",
+      "Response_Date",
+      "Time",
+      "DayOfWeek",
+      "Day",
+      "Month"
+    ],
+    "sample": [
+      44.9483715097293,
+      -93.2556900043386
+    ]
+  },
+  {
+    "name": "CHCQ Tracked Fires (View Only)",
+    "owner": "Matthew.Thomas@cdph.ca.gov_CDPHDATA",
+    "url": "https://services2.arcgis.com/wi1yEacfYjH5viqb/arcgis/rest/services/CHCQ_Tracked_Fires_(View_Only)/FeatureServer/0",
+    "time_field": "Date__Fire_Incident_Reported_to_EPDR",
+    "geocoded": true,
+    "fields": [
+      "Date__Fire_Incident_Reported_to_EPDR",
+      "Time__Fire_Incident_Reported_to_EPDR",
+      "Name_of_Fire_Incident_",
+      "Type_of_Fire_Incident",
+      "Acreage_Burned",
+      "Latitude",
+      "Longitude",
+      "EPDR__Actions_Taken",
+      "District_Office",
+      "City",
+      "County",
+      "Were_any_Licensed_CHCQ_Healthcare_Facilities_Impacted_"
+    ],
+    "sample": [
+      33.7476348635779,
+      -116.443793842803
+    ]
+  },
+  {
+    "name": "Shots Fired_PubView",
+    "owner": "jskinner_boston",
+    "url": "https://services.arcgis.com/sFnw0xNflSi8J0uh/arcgis/rest/services/Shots_Fired_PubView/FeatureServer/0",
+    "time_field": "Incident_Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Incident_Num",
+      "Incident_Date",
+      "Address",
+      "District",
+      "Ballistics_Evidence",
+      "LATITUDE",
+      "LONGITUDE",
+      "HOUR_OF_DAY",
+      "DAY_OF_WEEK",
+      "YEAR",
+      "QUARTER"
+    ],
+    "sample": [
+      42.2739655775762,
+      -71.0768843386376
+    ]
+  },
+  {
+    "name": "Jackson_County_COMBAT_Crime_Public_View_Layer",
+    "owner": "UJCho@JACKSONGOV.ORG_jacksoncomo",
+    "url": "https://services3.arcgis.com/4LOAHoFXfea6Y3Et/arcgis/rest/services/Jackson_County_COMBAT_Crime_Public_View_Layer/FeatureServer/0",
+    "time_field": "report_date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "reporting_agency",
+      "report_date",
+      "incident_date_time",
+      "ucr_code_text",
+      "nibrs_mibrs_code",
+      "city",
+      "state",
+      "municipality_calc",
+      "strivin_area_calc",
+      "weapon_used",
+      "shots_fired"
+    ],
+    "sample": [
+      39.1424048999108,
+      -94.345240000279
+    ]
+  },
+  {
+    "name": "ShotsFired",
+    "owner": "cowgis",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/a84c763f9f7a4daf9d5ff021176af0e4/rest/services/Police/ShotsFired/FeatureServer/0",
+    "time_field": "Date",
+    "geocoded": true,
+    "fields": [
+      "UID",
+      "CaseNumber",
+      "Date",
+      "PCViolations",
+      "CallDescription",
+      "caseSummary",
+      "LinkToCase",
+      "LinkToCall",
+      "FirearmReference",
+      "ShootShotReference",
+      "FireRoundReference",
+      "GunRiflePistolReference"
+    ],
+    "sample": [
+      38.672339,
+      -121.792687
+    ]
+  },
+  {
+    "name": "All Shooting Incidents in Columbia Missouri Since 2015",
+    "owner": "djamtgaard_amerigeoss",
+    "url": "https://services3.arcgis.com/80SCmgj6pZGiNLhd/arcgis/rest/services/All_Shooting_Incidents_in_Columbia_Missouri_Since_2015/FeatureServer/0",
+    "time_field": "Date",
+    "geocoded": true,
+    "fields": [
+      "CAD_id",
+      "Report_num",
+      "Date",
+      "Latitude",
+      "Longitude",
+      "Cad_address",
+      "GeoBeat",
+      "Naturecode",
+      "Nature",
+      "Nature_Group",
+      "ObjectId"
+    ],
+    "sample": [
+      38.97255929,
+      -92.26677721
+    ]
+  },
+  {
+    "name": "Green_Fire_Hunt_Log_v2",
+    "owner": "GreenFire",
+    "url": "https://services6.arcgis.com/euyVsHCVo4GkUUaJ/arcgis/rest/services/Green_Fire_Hunt_Log_v2/FeatureServer/0",
+    "time_field": "Reported_by",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Reported_by",
+      "Obs_Date",
+      "Obs_Time",
+      "Numb_Deer",
+      "Hunt_Method",
+      "Tree_Stand",
+      "Number_Shots",
+      "Number_Hit",
+      "Deer_Retrieved",
+      "Deer_chest_circumf",
+      "Points"
+    ],
+    "sample": [
+      38.8954274146133,
+      -77.2856075257004
+    ]
+  },
+  {
+    "name": "Shots Fired View Layer 3",
+    "owner": "tagree2",
+    "url": "https://services.arcgis.com/lqsw3Y2lFZx0ifEV/arcgis/rest/services/Shots_Fired_View_Layer_3/FeatureServer/0",
+    "time_field": "Date_Time",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "Address",
+      "Day_Of_Week",
+      "Date_Time",
+      "Incident_Number",
+      "Confirmed",
+      "Report_Taken",
+      "Location",
+      "Victim_Complainant",
+      "Homicide",
+      "Suspect_Involved",
+      "Arrest"
+    ],
+    "sample": [
+      41.5182882164921,
+      -90.426894566861
+    ]
+  },
+  {
+    "name": "shots fired incidents",
+    "owner": "gis_management1",
+    "url": "https://services2.arcgis.com/zPFLSOZ5HzUzzTQb/arcgis/rest/services/shots_fired_incidents/FeatureServer/0",
+    "time_field": "Date_And_Time",
+    "geocoded": true,
+    "fields": [
+      "Address",
+      "City",
+      "State",
+      "Date_And_Time",
+      "Incident_Number",
+      "Incident_Type",
+      "ObjectId"
+    ],
+    "sample": [
+      32.7809250001069,
+      -83.7078030001468
+    ]
+  },
+  {
+    "name": "SHOTS_FIRED_SINCE_2015",
+    "owner": "djamtgaard_amerigeoss",
+    "url": "https://services3.arcgis.com/80SCmgj6pZGiNLhd/arcgis/rest/services/SHOTS_FIRED_SINCE_2015/FeatureServer/0",
+    "time_field": "Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "CAD_id",
+      "Report_num",
+      "Date",
+      "Latitude",
+      "Longitude",
+      "Cad_address",
+      "GeoBeat",
+      "Naturecode",
+      "Nature",
+      "Nature_Group"
+    ],
+    "sample": [
+      38.960894080173,
+      -92.3495676304439
+    ]
+  },
+  {
+    "name": "ALLSHOTSFIRED",
+    "owner": "djamtgaard_amerigeoss",
+    "url": "https://services3.arcgis.com/80SCmgj6pZGiNLhd/arcgis/rest/services/ALLSHOTSFIRED/FeatureServer/0",
+    "time_field": "calltime",
+    "geocoded": true,
+    "fields": [
+      "CAD_id",
+      "report_num",
+      "calltime",
+      "latitude",
+      "longitude",
+      "cad_address",
+      "geoBeat",
+      "naturecode",
+      "nature",
+      "Nature_Group",
+      "mmm_yy",
+      "hour"
+    ],
+    "sample": [
+      38.97026187,
+      -92.27133662
+    ]
+  },
+  {
+    "name": "shots_fired",
+    "owner": "hay18019_connecticut",
+    "url": "https://services1.arcgis.com/6ItOFXGFmdtfeOZb/arcgis/rest/services/shots_fired/FeatureServer/0",
+    "time_field": "Date",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID_1",
+      "X",
+      "Y",
+      "OBJECTID",
+      "Case_Number",
+      "Date",
+      "Time_24HR",
+      "Address",
+      "UCR_1_Category",
+      "UCR_1_Description",
+      "UCR_1_Code",
+      "UCR_2_Category"
+    ],
+    "sample": [
+      41.755815369801,
+      -72.6764527401957
+    ]
+  },
+  {
+    "name": "JacksonShotsFires",
+    "owner": "msp.seocgis",
+    "url": "https://services5.arcgis.com/ZqUZ99cjRiEOyN05/arcgis/rest/services/JacksonShotsFires/FeatureServer/0",
+    "time_field": "DATE_",
+    "geocoded": true,
+    "fields": [
+      "FID",
+      "OBJECTID",
+      "DATE_",
+      "TIME_",
+      "TYPE_",
+      "INCIDENT__",
+      "LOCATION_",
+      "VICTIMS_",
+      "D_B_",
+      "Address",
+      "Long",
+      "lat"
+    ],
+    "sample": [
+      42.237947088734,
+      -84.4166978230121
+    ]
+  },
+  {
+    "name": "Illinois Roadway Incidents",
+    "owner": "IDOTAdmin",
+    "url": "https://services2.arcgis.com/aIrBD8yn1TDTEXoz/arcgis/rest/services/Illinois_Roadway_Incidents/FeatureServer/0",
+    "time_field": "START_TIME",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "TRAFFIC_ITEM_TYPE_DESC",
+      "START_TIME",
+      "END_TIME",
+      "CRITICALITY_DESC",
+      "VERIFIED",
+      "DESCRIPTION",
+      "ROAD_CLOSED",
+      "TRAFFIC_ITEM_DESCRIPTION_NO_EX",
+      "ORIGIN",
+      "LOCATION_DEFINED_ORIGIN_RDWY",
+      "TRAFFIC_ITEM_DESCRIPTION"
+    ],
+    "sample": [
+      42.49045,
+      -87.86269
+    ]
+  },
+  {
+    "name": "OHGO Incidents",
+    "owner": "DavidShueyOKI",
+    "url": "https://services1.arcgis.com/AeX7yhXqx2UBQyL7/arcgis/rest/services/OHGOIncidents/FeatureServer/0",
+    "time_field": "StartDate",
+    "geocoded": true,
+    "fields": [
+      "OBJECTID",
+      "IncidentID",
+      "Location",
+      "Description",
+      "Category",
+      "Direction",
+      "District",
+      "RouteName",
+      "RoadStatus",
+      "RoadClosureDetails",
+      "StartDate",
+      "EndDate"
+    ],
+    "sample": [
+      39.349907,
+      -82.996957
+    ]
+  },
+  {
+    "name": "Homicide Incidents Persons",
+    "owner": "rpdny.pub",
+    "url": "https://services7.arcgis.com/wMvCpnbQEKXZsPSQ/arcgis/rest/services/Homicide_Incidents_Persons/FeatureServer/0",
+    "time_field": "OccurredDate",
+    "geocoded": true,
+    "fields": [
+      "IncidentID",
+      "CaseNumber",
+      "OccurredDate",
+      "OccurredMonth",
+      "OccurredYear",
+      "DateOfDeath",
+      "DateOfDeathMonth",
+      "DateOfDeathYear",
+      "DaysToDeath",
+      "CaseStatus",
+      "Address",
+      "Latitude"
+    ],
+    "sample": [
+      43.174434,
+      -77.597481
+    ]
+  },
+  {
+    "name": "Police Arrests Made",
+    "owner": "Andre.Masnari_townofchapelhill",
+    "url": "https://services2.arcgis.com/7KRXAKALbBGlCW77/arcgis/rest/services/Police_Arrests_Made_New/FeatureServer/0",
+    "time_field": "Date_of_Arrest",
+    "geocoded": true,
+    "fields": [
+      "Incident_Id",
+      "Primary_Charge",
+      "Street",
+      "City",
+      "State",
+      "Zipcode",
+      "Date_of_Arrest",
+      "Age",
+      "Race",
+      "Gender",
+      "Ethnicity",
+      "Type_of_Arrest"
+    ],
+    "sample": [
+      35.91099157,
+      -79.06122832
+    ]
+  },
+  {
+    "name": "Crime Data 2022 - Part 1 Offenses (With Lat / Long Info)",
+    "owner": "admin_syr",
+    "url": "https://services6.arcgis.com/bdPqSfflsdgFRVVM/arcgis/rest/services/2022_Part_1_Crimes_Geocoded_Locator/FeatureServer/0",
+    "time_field": "USER_DATEEND",
+    "geocoded": true,
+    "fields": [
+      "ObjectID",
+      "Loc_name",
+      "Status",
+      "Score",
+      "Match_type",
+      "Match_addr",
+      "LongLabel",
+      "ShortLabel",
+      "Addr_type",
+      "Type",
+      "PlaceName",
+      "Place_addr"
+    ],
+    "sample": [
+      43.0679610000907,
+      -76.1737230000891
+    ]
+  },
+  {
+    "name": "Seattle Police Department 911 Calls for Service",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/5dc6326b7a0149979ab447a57cda8d67/rest/services/secure/911IncidentResponses/MapServer/0",
+    "geocoded": true,
+    "time_field": "ORIG_TIME_QUEUED"
+  },
+  {
+    "name": "Princeton Calls For Service 2026",
+    "url": "https://services6.arcgis.com/KL1aiRJt0tw3BM7h/arcgis/rest/services/Princeton_Calls_For_Service_2026/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Received"
+  },
+  {
+    "name": "911 Calls",
+    "url": "https://services1.arcgis.com/AXaYBvnJsB5Q7sDF/arcgis/rest/services/RegressionAnalysis911CallsHot_Spot/FeatureServer/6",
+    "geocoded": true,
+    "time_field": "DATE_"
+  },
+  {
+    "name": "Recent CAD Calls",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/0d13800e1d5b4caea57fc81c1e4a78ad/rest/services/CAD/CADAVL/MapServer/3",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "Active PD CAD Calls",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/0d13800e1d5b4caea57fc81c1e4a78ad/rest/services/CAD/CADAVL/MapServer/4",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "Tucson Police Incidents - Last 45 Days - Open Data",
+    "url": "https://gis.tucsonaz.gov/public/rest/services/PublicMaps/PublicSafety/MapServer/49",
+    "geocoded": true,
+    "time_field": "DATE_REPT"
+  },
+  {
+    "name": "Fire Incidents Past Month",
+    "url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Fire_Incidents_Past_Month/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "arrive_date_time"
+  },
+  {
+    "name": "LARAP Park Rangers Fire Incidents",
+    "url": "https://services7.arcgis.com/DSSF7DFVxfZsz379/arcgis/rest/services/LARAP_ParkRangers_FireIncidentsReporting_v1)_View/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DateIncident"
+  },
+  {
+    "name": "WFTIIC Initial Attack Incidents Past Month Public View",
+    "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/WFTIIC_IA_Incidents_Past_Year_Public_View/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreatedOnDateTime"
+  },
+  {
+    "name": "Fire Incidents 2026",
+    "url": "https://services3.arcgis.com/GJeZXOPygZAo5bHm/arcgis/rest/services/Fire_Incidents_2026/FeatureServer/70",
+    "geocoded": true,
+    "time_field": "USER_Alarm_Date_Time"
+  },
+  {
+    "name": "Crime Incidents - Locations",
+    "url": "https://mapviewer.lynchburgva.gov/arcgis/rest/services/OpenData/ODPDynamic/MapServer/6",
+    "geocoded": true,
+    "time_field": "date_occu"
+  },
+  {
+    "name": "Crime Incidents in 2026",
+    "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/FeatureServer/41",
+    "geocoded": true,
+    "time_field": "START_DATE"
+  },
+  {
+    "name": "Crime Incidents",
+    "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/Philadelphia_Crime_Map_WFL1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DISPATCH_DATE_TIME"
+  },
+  {
+    "name": "Crime Related Incidents",
+    "url": "https://gis.skagitcountywa.gov/arcgis/rest/services/Sheriff/CrimeRelatedIncidentsForAGOL/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "TimeDate"
+  },
+  {
+    "name": "Crime Incidents in the Last 30 Days",
+    "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/FeatureServer/39",
+    "geocoded": true,
+    "time_field": "START_DATE"
+  },
+  {
+    "name": "FireEMSIncidents ProdA",
+    "url": "https://services3.arcgis.com/TsynfzBSE6sXfoLq/arcgis/rest/services/FireEMSIncidents_ProdA/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "RecordDate"
+  },
+  {
+    "name": "Sheriff Incidents",
+    "url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Sheriff_Incidents/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "date_time"
+  },
+  {
+    "name": "Dispatch Assignments",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/323f52c8c2f447c79715e658484fb060/rest/services/HCTRAMaintenance/DispatchAssignments/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Start_Date"
+  },
+  {
+    "name": "Dispatch Assignments (All)",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/323f52c8c2f447c79715e658484fb060/rest/services/HCTRAMaintenance/DispatchAssignments/FeatureServer/5",
+    "geocoded": true,
+    "time_field": "Start_Date"
+  },
+  {
+    "name": "HEC Active Incidents Feature Layer",
+    "url": "https://mycity2.houstontx.gov/gisweb01/rest/services/HEC/HEC_Active_Incidents/MapServer/0",
+    "geocoded": true,
+    "time_field": "CALL_TIME"
+  },
+  {
+    "name": "Dispatch Cache Outages 13",
+    "url": "https://services5.arcgis.com/eGcz6v4vGAUxtmgH/arcgis/rest/services/Dispatch_Cache_Outages_13/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "ActualFinishDate"
+  },
+  {
+    "name": "Dispatch Assignments (Complete last 30 days)",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/323f52c8c2f447c79715e658484fb060/rest/services/HCTRAMaintenance/DispatchAssignments/FeatureServer/4",
+    "geocoded": true,
+    "time_field": "Start_Date"
+  },
+  {
+    "name": "Shots Fired",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/c27bbee35abc4832866231e2d4bf3c5e/rest/services/Maps/AGOPrivate/MapServer/1",
+    "geocoded": true,
+    "time_field": "Date"
+  },
+  {
+    "name": "Shots Fired (last 30 days)",
+    "url": "https://maps.evansvillegis.com/arcgis_server/rest/services/CRIMES/SHOTS/MapServer/1",
+    "geocoded": true,
+    "time_field": "CallTime"
+  },
+  {
+    "name": "Shots Fired (last 180 days)",
+    "url": "https://maps.evansvillegis.com/arcgis_server/rest/services/CRIMES/SHOTS/MapServer/2",
+    "geocoded": true,
+    "time_field": "CallTime"
+  },
+  {
+    "name": "Shots Fired (last 365 days)",
+    "url": "https://maps.evansvillegis.com/arcgis_server/rest/services/CRIMES/SHOTS/MapServer/3",
+    "geocoded": true,
+    "time_field": "CallTime"
+  },
+  {
+    "name": "Shots Fired (last 7 days)",
+    "url": "https://maps.evansvillegis.com/arcgis_server/rest/services/CRIMES/SHOTS/MapServer/0",
+    "geocoded": true,
+    "time_field": "CallTime"
+  },
+  {
+    "name": "Emergency Shelter Facilities",
+    "url": "https://services2.arcgis.com/G5vR3cOjh6g2Ed8E/arcgis/rest/services/Emergency/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "CREATIONDATE"
+  },
+  {
+    "name": "City of Sioux Falls - Police Calls for Service",
+    "url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Safety/MapServer/16",
+    "geocoded": true,
+    "time_field": "Date_Time"
+  },
+  {
+    "name": "Calls for Service GIS - Public",
+    "url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Public_Calls/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreateDateTime"
+  },
+  {
+    "name": "911 Calls",
+    "url": "https://services6.arcgis.com/WXQyaFovsjw3xuqW/arcgis/rest/services/Julian_Elliott_Emergency_Calls_1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DATE_"
+  },
+  {
+    "name": "911 Calls",
+    "url": "https://services6.arcgis.com/WXQyaFovsjw3xuqW/arcgis/rest/services/Emergency_Calls_1beaverton/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DATE_"
+  },
+  {
+    "name": "911 Calls",
+    "url": "https://services6.arcgis.com/WXQyaFovsjw3xuqW/arcgis/rest/services/Emergency_Callsss/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DATE_"
+  },
+  {
+    "name": "911 Calls",
+    "url": "https://services6.arcgis.com/WXQyaFovsjw3xuqW/arcgis/rest/services/Emergency_CallsSarah/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DATE_"
+  },
+  {
+    "name": "E 911 Addresses",
+    "url": "https://services.arcgis.com/iPiPjILCMYxPZWTc/arcgis/rest/services/E_911_Addresses/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DateUpdate"
+  },
+  {
+    "name": "VFD Response Calls",
+    "url": "https://services.arcgis.com/fOr4AY8t0ujnJsua/arcgis/rest/services/VFD_Response_Calls/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "USER_Date"
+  },
+  {
+    "name": "Police Incidents Current Year to 10 Days before the Current Date",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/4bc28c820ebd45df8a62feae6dc8822d/rest/services/OpenData_PublicSafety/FeatureServer/21",
+    "geocoded": true,
+    "time_field": "Date"
+  },
+  {
+    "name": "Baton Rouge Traffic Crash Incidents",
+    "url": "https://maps.brla.gov/gis/rest/services/Transportation/Traffic_Crash/MapServer/0",
+    "geocoded": true,
+    "time_field": "CRASH_DATE"
+  },
+  {
+    "name": "Police Incidents",
+    "url": "https://services1.arcgis.com/nywZ4uQSE9YyefnQ/arcgis/rest/services/PoliceIncidents_upload/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "ReportedDate"
+  },
+  {
+    "name": "Incidents - Crimes Against Persons",
+    "url": "https://gismaps.fayettevillenc.gov/cofopendatagis/rest/services/Police/IncidentsCrimesAgainstPersons/MapServer/0",
+    "geocoded": true,
+    "time_field": "Date_Incident"
+  },
+  {
+    "name": "Incidents - Crimes Against Property",
+    "url": "https://gismaps.fayettevillenc.gov/cofopendatagis/rest/services/Police/IncidentsCrimesAgainstProperty/MapServer/0",
+    "geocoded": true,
+    "time_field": "Date_Incident"
+  },
+  {
+    "name": "Incidents - Crimes Against Society",
+    "url": "https://gismaps.fayettevillenc.gov/cofopendatagis/rest/services/Police/IncidentsCrimesAgainstSociety/MapServer/0",
+    "geocoded": true,
+    "time_field": "Date_Incident"
+  },
+  {
+    "name": "Police Incidents Last 90 Days",
+    "url": "https://services.arcgis.com/v400IkDOw1ad7Yad/arcgis/rest/services/Police_Incidents_Last_90_Days/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Police Incidents 2026",
+    "url": "https://services3.arcgis.com/GJeZXOPygZAo5bHm/arcgis/rest/services/Police_Incidents_2026/FeatureServer/75",
+    "geocoded": true,
+    "time_field": "DateReported"
+  },
+  {
+    "name": "Incidents",
+    "url": "https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/FTER_Public_Dashboard_View/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DiscoveryDateTime"
+  },
+  {
+    "name": "Fire Incidents Public",
+    "url": "https://map.westfargond.gov/arcgis/rest/services/FireDepartment/PublicIncidentMap/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "Alarm_DateTime"
+  },
+  {
+    "name": "WFTIIC IA INCIDENTS V1 PublicView 2",
+    "url": "https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/WFTIIC_IA_INCIDENTS_V1_PublicView_2/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreatedOnDateTime"
+  },
+  {
+    "name": "RMS Crime Incidents 2026",
+    "url": "https://services2.arcgis.com/qvkbeam7Wirps6zC/arcgis/rest/services/RMS_Crime_Incidents_2026/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "incident_occurred_at"
+  },
+  {
+    "name": "Crime Data Layer",
+    "url": "https://mapit.fortworthtexas.gov/ags/rest/services/CIVIC/Crime_Data/MapServer/0",
+    "geocoded": true,
+    "time_field": "Reported_Date"
+  },
+  {
+    "name": "Wichita Crime Incidents 90 Days",
+    "url": "https://gismaps.wichita.gov/ageweb/rest/services/OpenData/Crime/MapServer/0",
+    "geocoded": true,
+    "time_field": "STARTDATETIME"
+  },
+  {
+    "name": "Property Crime",
+    "url": "https://services2.arcgis.com/hWD7wpkvPnl9EogF/arcgis/rest/services/Property_Crime/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DATE"
+  },
+  {
+    "name": "GPS Shots",
+    "url": "https://services2.arcgis.com/8xg0ntvPHd0DEjki/arcgis/rest/services/Watermain_System_view/FeatureServer/14",
+    "geocoded": true,
+    "time_field": "ESRIGNSS_FIXDATETIME"
+  },
+  {
+    "name": "Police Events",
+    "url": "https://alphagis.alpharetta.ga.us/arcgis/rest/services/OpenData/OpenData_PS_Full/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "calltime"
+  },
+  {
+    "name": "CallsforService",
+    "url": "https://services.arcgis.com/eSGO1QW0lYo90eNU/arcgis/rest/services/CallsforService/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CALLID"
+  },
+  {
+    "name": "TPW Autonomous Vehicle Incident Reports - Public View",
+    "url": "https://services.arcgis.com/0L95CJ0VTaxqcmED/arcgis/rest/services/TPW_AV_Incidents_Reports_view/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Date"
+  },
+  {
+    "name": "Incident Report 1",
+    "url": "https://services.arcgis.com/xYjDUN35YwdCEcMm/arcgis/rest/services/Incident_Report_1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Date"
+  },
+  {
+    "name": "MDOT SHA CHART Active Incident Events",
+    "url": "https://chartimap1.sha.maryland.gov/arcgis/rest/services/CHART/Incidents/MapServer/0",
+    "geocoded": true,
+    "time_field": "Created"
+  },
+  {
+    "name": "Incident Reports",
+    "url": "https://services3.arcgis.com/8YIgE6UDOzHb5gjd/arcgis/rest/services/survey123_9855ce53243041faa54bc2c2f25b87e2/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Crime Data Public Cfs",
+    "url": "https://services2.arcgis.com/kXGqZY4GIOcEYxoF/arcgis/rest/services/Crime_Data_vw_crimes_public_cfs/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "Crime Data",
+    "url": "https://arcgis.roanokecountyva.gov/arcgisweb/rest/services/AGOL_OpenData/OpenData_Community/FeatureServer/6",
+    "geocoded": true,
+    "time_field": "CreateDateTime"
+  },
+  {
+    "name": "Crime Data",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Reported_Date"
+  },
+  {
+    "name": "Crime",
+    "url": "https://services2.arcgis.com/11XBiaBYA9Ep0yNJ/arcgis/rest/services/Crime/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "evt_date"
+  },
+  {
+    "name": "Crime Data",
+    "url": "https://services2.arcgis.com/1UvBaQ5y1ubjUPmd/arcgis/rest/services/Crime_Data/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "OccurredOn"
+  },
+  {
+    "name": "crime data",
+    "url": "https://gis-dev.sccmo.org/scc_gis/rest/services/datashare/crime_data/MapServer/0",
+    "geocoded": true,
+    "time_field": "DATE"
+  },
+  {
+    "name": "Fire Calls All 6 Months",
+    "url": "https://gismaps.wichita.gov/ageweb/rest/services/OpenData/Fire/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "AlarmDate"
+  },
+  {
+    "name": "Fire Calls No Medical 6 Months",
+    "url": "https://gismaps.wichita.gov/ageweb/rest/services/OpenData/Fire/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "AlarmDate"
+  },
+  {
+    "name": "Opioid EMS Calls",
+    "url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/Opioid_Calls/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Incident_Date"
+  },
+  {
+    "name": "Chaska Police Crime Activties",
+    "url": "https://gis.co.carver.mn.us/arcgis_ca/rest/services/Chaska/Chaska_Police_CrimeMapper/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "First_Reported_Date"
+  },
+  {
+    "name": "Public Crime Map Points (Public)",
+    "url": "https://services6.arcgis.com/StepKrWd3Rx3tD1a/arcgis/rest/services/Public_Crime_Map_Points_Public/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "RepDate"
+  },
+  {
+    "name": "Oakland crime geocoded",
+    "url": "https://services.arcgis.com/7CRlmWNEbeCqEJ6a/arcgis/rest/services/Oakland_crime_geocoded/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "datetime"
+  },
+  {
+    "name": "COMM - Public Safety - Crime Offenses",
+    "url": "https://webgis.westerville.org/public/rest/services/TransparencyHub/CrimeOffenses/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "OFFENSE_DATE"
+  },
+  {
+    "name": "Calls For Service",
+    "url": "https://services1.arcgis.com/wKWg6g7Ozgov9sfw/arcgis/rest/services/CallsForService_WFL1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CALLID"
+  },
+  {
+    "name": "Calls For Service",
+    "url": "https://services1.arcgis.com/wKWg6g7Ozgov9sfw/arcgis/rest/services/CallsForService_Naperville_WFL1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CALLID"
+  },
+  {
+    "name": "Calls For Service",
+    "url": "https://services1.arcgis.com/wKWg6g7Ozgov9sfw/arcgis/rest/services/Llamadas_de_servicio_Naperville_WFL1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CALLID"
+  },
+  {
+    "name": "Calls for Service",
+    "url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/CFS_SAPD_7Days/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "ResponseDate"
+  },
+  {
+    "name": "Calls For Service Public",
+    "url": "https://map.westfargond.gov/arcgis/rest/services/PoliceDepartment/NewWorldDataPublic/FeatureServer/3",
+    "geocoded": true,
+    "time_field": "ReceivedDatetime"
+  },
+  {
+    "name": "MFD Calls For Service",
+    "url": "https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/MFD_Calls_For_Service/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "alarm_date"
+  },
+  {
+    "name": "NOFD Active Calls for Service",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/74697a2718c34ed999afe232d4e85fb1/rest/services/COP/ActiveCAD/MapServer/1",
+    "geocoded": true,
+    "time_field": "TimeCreate"
+  },
+  {
+    "name": "Boulder PD Calls For Service",
+    "url": "https://services.arcgis.com/ePKBjXrBZ2vEEgWd/arcgis/rest/services/Boulder_PD_Calls_For_Service/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "LVMPD Calls For Service 2026",
+    "url": "https://services.arcgis.com/jjSk6t82vIntwDbs/arcgis/rest/services/LVMPD_Calls_For_Service_2026/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "IncidentDate"
+  },
+  {
+    "name": "Police 911 Call for Service Current Year to 10 Days before the Current Date",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/e9d1dd08762b4de9a774c2777abade35/rest/services/OpenData_PublicSafety/FeatureServer/24",
+    "geocoded": true,
+    "time_field": "Date"
+  },
+  {
+    "name": "Police Events Public AGO VIEW ONLY",
+    "url": "https://services3.arcgis.com/LKgpy6JJatlcMHWR/arcgis/rest/services/Police_Events_Public_AGO_VIEW_ONLY/FeatureServer/10",
+    "geocoded": true,
+    "time_field": "Event_Date"
+  },
+  {
+    "name": "Police Patrols",
+    "url": "https://alphagis.alpharetta.ga.us/arcgis/rest/services/OpenData/OpenData_PS_Full/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "calltime"
+  },
+  {
+    "name": "Municipal 911 Address",
+    "url": "https://services1.arcgis.com/Nl1VlZHemqspPW1n/arcgis/rest/services/Municipal_911_Address/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DateUpdate"
+  },
+  {
+    "name": "Medical Calls 6 Months",
+    "url": "https://gismaps.wichita.gov/ageweb/rest/services/OpenData/Fire/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "AlarmDate"
+  },
+  {
+    "name": "LCSO CADView Active Incidents All",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/fd3fafe51c7246858a94c39c2cf3f04e/rest/services/MapServices/LCSO_OverlayCADIncidentsActive_D_WM/MapServer/0",
+    "geocoded": true,
+    "time_field": "IncidentDate"
+  },
+  {
+    "name": "Active Williamson County Calls",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/0d13800e1d5b4caea57fc81c1e4a78ad/rest/services/CAD/CADAVL/MapServer/5",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "Police Incidents Public 2026",
+    "url": "https://services3.arcgis.com/GJeZXOPygZAo5bHm/arcgis/rest/services/Police_Incidents_Public_2026/FeatureServer/76",
+    "geocoded": true,
+    "time_field": "DateReported"
+  },
+  {
+    "name": "CMPD Incidents",
+    "url": "https://gis.charlottenc.gov/arcgis/rest/services/CMPD/CMPDIncidents/MapServer/0",
+    "geocoded": true,
+    "time_field": "DATE_REPORTED"
+  },
+  {
+    "name": "Incidents",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/e85993c26dd04a9caa4dcd3bcfc05c0d/rest/services/LawEnforcementOperations/Incidents/MapServer/0",
+    "geocoded": true,
+    "time_field": "Date_Incident"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services2.arcgis.com/527XtFVf9JKOTqu5/arcgis/rest/services/SiteConsiderations_f7fa0e4ccfd646738f67a18dc190531e/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services1.arcgis.com/YZc1OyqL6jbIOeOv/arcgis/rest/services/SiteConsiderations_mobile_30085b7eecce4b88a1a1802635c1fd7f/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services8.arcgis.com/deR2GmCznCnyAVvu/arcgis/rest/services/SiteConsiderations_dashboard_cf7cbbfbbd134212910ae4fbd98351d8/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services2.arcgis.com/527XtFVf9JKOTqu5/arcgis/rest/services/SiteConsiderations_mobile_f7fa0e4ccfd646738f67a18dc190531e/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services8.arcgis.com/deR2GmCznCnyAVvu/arcgis/rest/services/SiteConsiderations_mobile_cf7cbbfbbd134212910ae4fbd98351d8/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services1.arcgis.com/YZc1OyqL6jbIOeOv/arcgis/rest/services/SiteConsiderations_dashboard_30085b7eecce4b88a1a1802635c1fd7f/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services1.arcgis.com/YZc1OyqL6jbIOeOv/arcgis/rest/services/SiteConsiderations_30085b7eecce4b88a1a1802635c1fd7f/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Fire Suppression Systems",
+    "url": "https://services8.arcgis.com/deR2GmCznCnyAVvu/arcgis/rest/services/SiteConsiderations_cf7cbbfbbd134212910ae4fbd98351d8/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Crime Incidents   2026",
+    "url": "https://services7.arcgis.com/JEwYeAy2cc8qOe3o/arcgis/rest/services/Crime_Incidents___2026/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "START_DATE"
+  },
+  {
+    "name": "DCSO Crime Incidents Public",
+    "url": "https://services.arcgis.com/pDAi2YK0L0QxVJHj/arcgis/rest/services/DCSO_Crime_Incidents_Public/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "OccurredOn"
+  },
+  {
+    "name": "Response Times For Boulder Fire-Rescue",
+    "url": "https://maps.bouldercolorado.gov/arcgis/rest/services/fire/FireResponseTimesOpenData/MapServer/0",
+    "geocoded": true,
+    "time_field": "RESPONSEDATE"
+  },
+  {
+    "name": "Unit Response For Boulder Fire-Rescue",
+    "url": "https://maps.bouldercolorado.gov/arcgis/rest/services/fire/FireUnitResponseOpenData/MapServer/0",
+    "geocoded": true,
+    "time_field": "RESPONSEDATE"
+  },
+  {
+    "name": "Incidents pointKN",
+    "url": "https://services2.arcgis.com/j80Jz20at6Bi0thr/arcgis/rest/services/Incidents_point/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "ODOT Traffic Incidents",
+    "url": "https://services.arcgis.com/uUvqNMGPm7axC2dD/arcgis/rest/services/ODOT_Traffic_Incidents/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "attributes_lastUpdated"
+  },
+  {
+    "name": "QFES ESCAD Current Incidents (Live)",
+    "url": "https://services1.arcgis.com/vkTwD8kHw2woKBqV/ArcGIS/rest/services/ESCAD_Current_Incidents_Public/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Response_Date"
+  },
+  {
+    "name": "Current Incidents",
+    "url": "https://services9.arcgis.com/RHVPKKiFTONKtxq3/ArcGIS/rest/services/USA_Wildfires_v1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "ICS209ReportDateTime"
+  },
+  {
+    "name": "Crimes",
+    "url": "https://services.arcgis.com/su8ic9KbA7PYVxPS/arcgis/rest/services/Crimes_22c32392df454eb9adf5b7bd1464a7d8/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "callid"
+  },
+  {
+    "name": "Crimes (Public)",
+    "url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Crimes_public_67c0535145c14baf897e47a8d4986539/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "reportdate"
+  },
+  {
+    "name": "FEMS Service Requests in Last 30 Days",
+    "url": "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_APPS/SR_30days_Open/MapServer/37",
+    "geocoded": true,
+    "time_field": "GDB_FROM_DATE"
+  },
+  {
+    "name": "DOTI 311 Service Request Calls",
+    "url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/DOTI_311_Calls/FeatureServer/10",
+    "geocoded": true,
+    "time_field": "CreatedDate"
+  },
+  {
+    "name": "Sacramento 311 Calls View (Current)",
+    "url": "https://services5.arcgis.com/54falWtcpty3V47Z/arcgis/rest/services/SalesForce311_View/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DateCreated"
+  },
+  {
+    "name": "311 Open Service Calls",
+    "url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/311_Open_Service_Calls/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CREATE_DATE"
+  },
+  {
+    "name": "SOC Incident Reports",
+    "url": "https://services.arcgis.com/JyZag7oO4NteHGiq/arcgis/rest/services/survey123_ef82a5e0fb4c43a9b761abc8865a88f4/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "SafeCity Incident Reports",
+    "url": "https://services1.arcgis.com/qN3V93cYGMKQCOxL/arcgis/rest/services/SafeCity_Incident_Reports/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "date"
+  },
+  {
+    "name": "SOC Incident Reports results",
+    "url": "https://services.arcgis.com/JyZag7oO4NteHGiq/arcgis/rest/services/survey123_ef82a5e0fb4c43a9b761abc8865a88f4_results/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Police Incident Reports Written",
+    "url": "https://services2.arcgis.com/7KRXAKALbBGlCW77/arcgis/rest/services/Recoded_Incidents_New/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Date_of_Report"
+  },
+  {
+    "name": "OSDH - EPRS Incident Reports",
+    "url": "https://services9.arcgis.com/QeqGrHRDFO8mPwTf/arcgis/rest/services/survey123_ae2ace976bf74426814ceb36cde43abf/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Incident Locations",
+    "url": "https://services.arcgis.com/hLRlshaEMEYQG5A8/arcgis/rest/services/Incident_Locations/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "CreationDate"
+  },
+  {
+    "name": "Crime Data",
+    "url": "https://geodata.sarpy.gov/arcgis/rest/services/PublicSafety/PublicCrimeMap/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "IncidentDate"
+  },
+  {
+    "name": "Fire Departments",
+    "url": "https://maps.commerce.alaska.gov/server/rest/services/Services/CDO_PublicSafety/MapServer/3",
+    "geocoded": true,
+    "time_field": "AsOfDate"
+  },
+  {
+    "name": "Santa Rosa Fire Department Homeless Related Incidents (View)",
+    "url": "https://services2.arcgis.com/BhTdzxiJkq4oXsPh/arcgis/rest/services/Santa_Rosa_Fire_Department_HRI_All_1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Incident_Date"
+  },
+  {
+    "name": "Seattle Police Department Crimes",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/ce3fc769ee474ea88c8c2a53b86be02e/rest/services/secure/SPD_Reports/MapServer/0",
+    "geocoded": true,
+    "time_field": "Report_Date_PST"
+  },
+  {
+    "name": "mqstl crime arrests",
+    "url": "https://services2.arcgis.com/yL7v93RXrxlqkeDx/arcgis/rest/services/mqstl_all_layers/FeatureServer/10",
+    "geocoded": true,
+    "time_field": "StartDate"
+  },
+  {
+    "name": "Police Events",
+    "url": "https://alphagis.alpharetta.ga.us/arcgis/rest/services/OpenData/OpenData_PS/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "calltime"
+  },
+  {
+    "name": "Police Patrols",
+    "url": "https://alphagis.alpharetta.ga.us/arcgis/rest/services/OpenData/OpenData_PS/FeatureServer/2",
+    "geocoded": true,
+    "time_field": "calltime"
+  },
+  {
+    "name": "Fire Events",
+    "url": "https://alphagis.alpharetta.ga.us/arcgis/rest/services/OpenData/OpenData_PS/FeatureServer/1",
+    "geocoded": true,
+    "time_field": "calltime"
+  },
+  {
+    "name": "COH FIRE DEPT COMMUNITY INTERACTION",
+    "url": "https://mycity2.houstontx.gov/pubgis02/rest/services/HoustonMap/Public_safety/MapServer/7",
+    "geocoded": true,
+    "time_field": "EventDate"
+  }
+]

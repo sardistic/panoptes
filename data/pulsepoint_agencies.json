@@ -1,0 +1,4394 @@
+[
+  {
+    "agencyid": "EMS1",
+    "name": "Franklin County E911",
+    "city": "Benton",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 37.9967163,
+    "lon": -88.9200685
+  },
+  {
+    "agencyid": "EMS1001",
+    "name": "Gundersen Tri-State Ambulance",
+    "city": "La Crosse",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 43.8013556,
+    "lon": -91.2395807
+  },
+  {
+    "agencyid": "EMS1003",
+    "name": "Romeoville Fire Department",
+    "city": "Romeoville",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 41.6475306,
+    "lon": -88.0895061
+  },
+  {
+    "agencyid": "EMS1005",
+    "name": "Montclair Ambulance Unit",
+    "city": "Montclair",
+    "state": "NJ",
+    "type": "EMS",
+    "lat": 40.8259007,
+    "lon": -74.2090053
+  },
+  {
+    "agencyid": "EMS1010",
+    "name": "Suffolk County Fire, Rescue & Emergency Services",
+    "city": "Yaphank",
+    "state": "NY",
+    "type": "EMS",
+    "lat": 40.8367653,
+    "lon": -72.9170487
+  },
+  {
+    "agencyid": "EMS1011",
+    "name": "St. Johns County Fire Rescue",
+    "city": "St. Augustine",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 29.8942639,
+    "lon": -81.3132083
+  },
+  {
+    "agencyid": "EMS1013",
+    "name": "Mobile Medical Response, Inc.",
+    "city": "Saginaw",
+    "state": "MI",
+    "type": "EMS",
+    "lat": 43.4194699,
+    "lon": -83.9508068
+  },
+  {
+    "agencyid": "EMS1016",
+    "name": "Harrison County Hospital",
+    "city": "Corydon",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 38.2120121,
+    "lon": -86.1219155
+  },
+  {
+    "agencyid": "EMS1020",
+    "name": "Clark County, Washington - CRESA",
+    "city": "Vancouver",
+    "state": "WA",
+    "type": "EMS",
+    "lat": 45.6387281,
+    "lon": -122.6614861
+  },
+  {
+    "agencyid": "EMS1022",
+    "name": "Charlestown EMS",
+    "city": "Charlestown",
+    "state": "RI",
+    "type": "EMS",
+    "lat": 41.383216,
+    "lon": -71.64187
+  },
+  {
+    "agencyid": "EMS1024",
+    "name": "SouthBridge EMS",
+    "city": "Bridgeville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.356178,
+    "lon": -80.110052
+  },
+  {
+    "agencyid": "EMS1026",
+    "name": "Calhoun County Iowa EMS",
+    "city": "Rockwell City",
+    "state": "IA",
+    "type": "EMS",
+    "lat": 42.395255,
+    "lon": -94.633866
+  },
+  {
+    "agencyid": "EMS1031",
+    "name": "Mountain Ambulance Service",
+    "city": "Mountain",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 45.184696,
+    "lon": -88.473715
+  },
+  {
+    "agencyid": "EMS1032",
+    "name": "Merced County (PULSE)",
+    "city": "Merced",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.302165,
+    "lon": -120.482967
+  },
+  {
+    "agencyid": "EMS1033",
+    "name": "West Tennessee Medical Center EMS",
+    "city": "Jackson",
+    "state": "TN",
+    "type": "EMS",
+    "lat": 35.614514,
+    "lon": -88.813948
+  },
+  {
+    "agencyid": "EMS1034",
+    "name": "Chagrin Valley Dispatch",
+    "city": "Bedford",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 41.447832,
+    "lon": -81.427615
+  },
+  {
+    "agencyid": "EMS1035",
+    "name": "Cleveland Emergency Medical Service",
+    "city": "Cleveland",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 41.499494,
+    "lon": -81.695408
+  },
+  {
+    "agencyid": "EMS1037",
+    "name": "Vail Public Safety Communications Center",
+    "city": "Vail",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 39.640155,
+    "lon": -106.374353
+  },
+  {
+    "agencyid": "EMS1039",
+    "name": "MCVRS Deltaville Rescue",
+    "city": "Topping",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 37.588202,
+    "lon": -76.474458
+  },
+  {
+    "agencyid": "EMS1040",
+    "name": "Life Medical Response",
+    "city": "Portsmouth",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 38.731529,
+    "lon": -82.998288
+  },
+  {
+    "agencyid": "EMS1042",
+    "name": "Union Ambulance Service",
+    "city": "Union",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.211558,
+    "lon": -69.274393
+  },
+  {
+    "agencyid": "EMS1043",
+    "name": "Mount Laurel Township EMS",
+    "city": "Mount Laurel",
+    "state": "NJ",
+    "type": "EMS",
+    "lat": 39.937201,
+    "lon": -74.8913
+  },
+  {
+    "agencyid": "EMS1055",
+    "name": "Lexington Park Volunteer Rescue Squad",
+    "city": "Lexington Park",
+    "state": "MD",
+    "type": "EMS",
+    "lat": 38.259119,
+    "lon": -76.450456
+  },
+  {
+    "agencyid": "EMS1056",
+    "name": "Decatur County Hospital",
+    "city": "Leon",
+    "state": "IA",
+    "type": "EMS",
+    "lat": 40.739704,
+    "lon": -93.747803
+  },
+  {
+    "agencyid": "EMS1058",
+    "name": "Waldoboro EMS",
+    "city": "Waldoboro",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.095086,
+    "lon": -69.377765
+  },
+  {
+    "agencyid": "EMS1061",
+    "name": "UNH EMS Club",
+    "city": "West Haven",
+    "state": "CT",
+    "type": "EMS",
+    "lat": 41.291187,
+    "lon": -72.961833
+  },
+  {
+    "agencyid": "EMS1063",
+    "name": "Winona County - Winona Area Ambulance Service",
+    "city": "Winona",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.049765,
+    "lon": -91.633966
+  },
+  {
+    "agencyid": "EMS1064",
+    "name": "Union College EMS",
+    "city": "Schenectady",
+    "state": "NY",
+    "type": "EMS",
+    "lat": 42.817504,
+    "lon": -73.93059
+  },
+  {
+    "agencyid": "EMS1067",
+    "name": "University Volunteer Ambulance",
+    "city": "Orono",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.88314,
+    "lon": -68.672079
+  },
+  {
+    "agencyid": "EMS1069",
+    "name": "Safety Response Service",
+    "city": "Ottawa",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 45.42159,
+    "lon": -75.697158
+  },
+  {
+    "agencyid": "EMS1071",
+    "name": "Lucas County EMS - PSAP",
+    "city": "Toledo",
+    "state": "OH",
+    "type": "PSAP",
+    "lat": 41.663929,
+    "lon": -83.555232
+  },
+  {
+    "agencyid": "EMS1078",
+    "name": "Burlington County",
+    "city": "Westampton",
+    "state": "NJ",
+    "type": "EMS",
+    "lat": 40.020586,
+    "lon": -74.792255
+  },
+  {
+    "agencyid": "EMS1087",
+    "name": "Hardin County Emergency Medical Services",
+    "city": "Elizabethtown",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 37.703022,
+    "lon": -85.865025
+  },
+  {
+    "agencyid": "EMS1091",
+    "name": "Medical Center EMS",
+    "city": "Bowling Green",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 36.968513,
+    "lon": -86.480812
+  },
+  {
+    "agencyid": "EMS1093",
+    "name": "Chatham Emergency Services",
+    "city": "Savannah",
+    "state": "GA",
+    "type": "EMS",
+    "lat": 32.083542,
+    "lon": -81.099874
+  },
+  {
+    "agencyid": "EMS1094",
+    "name": "Whatcom County Fire and EMS",
+    "city": "Bellingham",
+    "state": "WA",
+    "type": "EMS",
+    "lat": 48.749051,
+    "lon": -122.478169
+  },
+  {
+    "agencyid": "EMS1095",
+    "name": "New Castle County (DE) Emergency Medical Services",
+    "city": "New Castle",
+    "state": "DE",
+    "type": "EMS",
+    "lat": 39.662051,
+    "lon": -75.566976
+  },
+  {
+    "agencyid": "EMS1103",
+    "name": "Dearborn County Communications",
+    "city": "Lawrenceburg",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 39.090888,
+    "lon": -84.85007
+  },
+  {
+    "agencyid": "EMS1105",
+    "name": "Kenton County Emergency Communications Center",
+    "city": "Independence",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 38.943065,
+    "lon": -84.544022
+  },
+  {
+    "agencyid": "EMS1107",
+    "name": "Saratoga County",
+    "city": "Ballston Spa",
+    "state": "NY",
+    "type": "EMS",
+    "lat": 42.854239,
+    "lon": -73.770739
+  },
+  {
+    "agencyid": "EMS1110",
+    "name": "Allegheny County Emergency Services",
+    "city": "Coraopolis",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.440597,
+    "lon": -79.995934
+  },
+  {
+    "agencyid": "EMS1119",
+    "name": "Yolo County EMS Agency",
+    "city": "Woodland",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 38.687544,
+    "lon": -121.795045
+  },
+  {
+    "agencyid": "EMS1122",
+    "name": "Campbell County Consolidated Dispatch Center",
+    "city": "Newport",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 39.091448,
+    "lon": -84.495822
+  },
+  {
+    "agencyid": "EMS1123",
+    "name": "Test PSAP (EMS1123)",
+    "city": "Bois Blanc Township",
+    "state": "MI",
+    "type": "PSAP",
+    "lat": 45.7249072441,
+    "lon": -84.4233331198
+  },
+  {
+    "agencyid": "EMS1124",
+    "name": "Advanced Medical Transport of Central IL",
+    "city": "Peoria",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 40.693648,
+    "lon": -89.588989
+  },
+  {
+    "agencyid": "EMS1127",
+    "name": "Kern County",
+    "city": "Bakersfield",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 35.373221,
+    "lon": -119.018758
+  },
+  {
+    "agencyid": "EMS1130",
+    "name": "Rockland County Sheriff's Communications Division",
+    "city": "Pomona",
+    "state": "NY",
+    "type": "EMS",
+    "lat": 41.191182,
+    "lon": -74.056419
+  },
+  {
+    "agencyid": "EMS1140",
+    "name": "Napa 911 Dispatch",
+    "city": "Napa",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 38.297545,
+    "lon": -122.286879
+  },
+  {
+    "agencyid": "EMS1152",
+    "name": "Greenville County EMS",
+    "city": "Greenville",
+    "state": "SC",
+    "type": "EMS",
+    "lat": 35.61265,
+    "lon": -77.366471
+  },
+  {
+    "agencyid": "EMS1157",
+    "name": "Honolulu EMS",
+    "city": "Honolulu",
+    "state": "HI",
+    "type": "EMS",
+    "lat": 21.306899,
+    "lon": -157.85848
+  },
+  {
+    "agencyid": "EMS1161",
+    "name": "Boone County PSCC",
+    "city": "Florence",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 38.998918,
+    "lon": -84.626628
+  },
+  {
+    "agencyid": "EMS1163",
+    "name": "iBeat Network",
+    "city": "San Francisco",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.781696,
+    "lon": -122.394115
+  },
+  {
+    "agencyid": "EMS1168",
+    "name": "Sussex County Department of Public Safety",
+    "city": "Georgetown",
+    "state": "DE",
+    "type": "EMS",
+    "lat": 38.690053,
+    "lon": -75.385865
+  },
+  {
+    "agencyid": "EMS1169",
+    "name": "Boise / Ada County-City Emergency Services System",
+    "city": "Boise",
+    "state": "ID",
+    "type": "EMS",
+    "lat": 43.618746,
+    "lon": -116.214702
+  },
+  {
+    "agencyid": "EMS1174",
+    "name": "Champaign County - OSF East Central Illinois EMS",
+    "city": "Urbana",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 40.110649,
+    "lon": -88.207292
+  },
+  {
+    "agencyid": "EMS1175",
+    "name": "Vermilion County - OSF East Central Illinois EMS",
+    "city": "Urbana",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 40.124027,
+    "lon": -87.628672
+  },
+  {
+    "agencyid": "EMS1176",
+    "name": "Williamson County EMS",
+    "city": "Georgetown",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 30.633237,
+    "lon": -97.677985
+  },
+  {
+    "agencyid": "EMS1178",
+    "name": "Utah County (PARENT PSAP)",
+    "city": "Spanish Fork",
+    "state": "UT",
+    "type": "PSAP",
+    "lat": 40.114997,
+    "lon": -111.654916
+  },
+  {
+    "agencyid": "EMS1179",
+    "name": "Montgomery County Dept. of Public Safety",
+    "city": "Eagleville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.159613,
+    "lon": -75.40825
+  },
+  {
+    "agencyid": "EMS1180",
+    "name": "Gold Cross Ambulance Service, Inc.",
+    "city": "Menasha",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 44.202145,
+    "lon": -88.446467
+  },
+  {
+    "agencyid": "EMS1186",
+    "name": "Johnson County",
+    "city": "Olathe",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 38.881395,
+    "lon": -94.819094
+  },
+  {
+    "agencyid": "EMS1189",
+    "name": "Putnam County 911",
+    "city": "Cookeville",
+    "state": "TN",
+    "type": "EMS",
+    "lat": 36.162856,
+    "lon": -85.501617
+  },
+  {
+    "agencyid": "EMS1192",
+    "name": "Chester County Emergency Services",
+    "city": "West Chester",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 39.960629,
+    "lon": -75.605383
+  },
+  {
+    "agencyid": "EMS1194",
+    "name": "Geauga County Sheriffs Office",
+    "city": "Chardon",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 41.578649,
+    "lon": -81.213343
+  },
+  {
+    "agencyid": "EMS1198",
+    "name": "American Medical Response- Josephine County",
+    "city": "Grants Pass",
+    "state": "OR",
+    "type": "EMS",
+    "lat": 42.4309764,
+    "lon": -123.3387601
+  },
+  {
+    "agencyid": "EMS1200",
+    "name": "Huntsville-Madison County 9-1-1 Center",
+    "city": "Huntsville",
+    "state": "AL",
+    "type": "EMS",
+    "lat": 34.73047,
+    "lon": -86.586153
+  },
+  {
+    "agencyid": "EMS1201",
+    "name": "BCEHS",
+    "city": "Vancouver",
+    "state": "BC",
+    "type": "EMS",
+    "lat": 49.261091,
+    "lon": -123.041937
+  },
+  {
+    "agencyid": "EMS1203",
+    "name": "Manatee County Department of Public Safety",
+    "city": "Bradenton",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 27.498836,
+    "lon": -82.575008
+  },
+  {
+    "agencyid": "EMS1204",
+    "name": "Erie County",
+    "city": "Erie",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 42.13065,
+    "lon": -80.093929
+  },
+  {
+    "agencyid": "EMS1205",
+    "name": "DC Fire / Office of Unified Communications",
+    "city": "Washington",
+    "state": "DC",
+    "type": "EMS",
+    "lat": 38.907245,
+    "lon": -77.036566
+  },
+  {
+    "agencyid": "EMS1206",
+    "name": "Escambia County EMS",
+    "city": "Pensacola",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 30.421251,
+    "lon": -87.217047
+  },
+  {
+    "agencyid": "EMS1209",
+    "name": "Wake County EMS",
+    "city": "Raleigh",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.7777799784,
+    "lon": -78.6427089222
+  },
+  {
+    "agencyid": "EMS1210",
+    "name": "Hancock County 911",
+    "city": "Greenfield",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 39.785046,
+    "lon": -85.769511
+  },
+  {
+    "agencyid": "EMS1225",
+    "name": "Metro Area Ambulance Service",
+    "city": "Bismarck",
+    "state": "ND",
+    "type": "EMS",
+    "lat": 46.801299,
+    "lon": -100.818516
+  },
+  {
+    "agencyid": "EMS1226",
+    "name": "Elk County Emergency Services",
+    "city": "Ridgway",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.42028,
+    "lon": -78.728768
+  },
+  {
+    "agencyid": "EMS1228",
+    "name": "Sudbury Paramedic Services",
+    "city": "Azilda",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 46.491723,
+    "lon": -80.993046
+  },
+  {
+    "agencyid": "EMS1232",
+    "name": "Bloomington, IN",
+    "city": "Bloomington",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 39.16526,
+    "lon": -86.52642
+  },
+  {
+    "agencyid": "EMS1234",
+    "name": "Pitt County Emergency Managment",
+    "city": "Greenville",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.612652,
+    "lon": -77.366344
+  },
+  {
+    "agencyid": "EMS1236",
+    "name": "Brevard County Fire Rescue",
+    "city": "Titusville",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 28.612189,
+    "lon": -80.807628
+  },
+  {
+    "agencyid": "EMS1239",
+    "name": "Warren County Public Safety",
+    "city": "Youngsville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.8357303,
+    "lon": -79.1479134
+  },
+  {
+    "agencyid": "EMS1241",
+    "name": "Cox Health and Mercy EMS - Southwest/Central Missouri",
+    "city": "Springfield",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 37.208974,
+    "lon": -93.292257
+  },
+  {
+    "agencyid": "EMS1247",
+    "name": "Hamilton County Emergency Communications District",
+    "city": "Chattanooga",
+    "state": "TN",
+    "type": "EMS",
+    "lat": 35.045629,
+    "lon": -85.309703
+  },
+  {
+    "agencyid": "EMS1252",
+    "name": "Cameron County Office of Emergency Services",
+    "city": "Emporium",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.50506,
+    "lon": -78.23321
+  },
+  {
+    "agencyid": "EMS1255",
+    "name": "Crawford County Department of Public Safety",
+    "city": "Meadville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.616429,
+    "lon": -80.167814
+  },
+  {
+    "agencyid": "EMS1258",
+    "name": "Clarion County Department of Public Safety",
+    "city": "Shippenville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.222564,
+    "lon": -79.389049
+  },
+  {
+    "agencyid": "EMS1264",
+    "name": "Virginia Beach Department of EMS",
+    "city": "Virginia Beach",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 36.852949,
+    "lon": -75.978319
+  },
+  {
+    "agencyid": "EMS1265",
+    "name": "McKean County Department of Emergency Services",
+    "city": "Smethport",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.80304,
+    "lon": -78.44428
+  },
+  {
+    "agencyid": "EMS1284",
+    "name": "REMSA Health",
+    "city": "Reno",
+    "state": "NV",
+    "type": "EMS",
+    "lat": 39.649073,
+    "lon": -119.707438
+  },
+  {
+    "agencyid": "EMS1295",
+    "name": "Verde Valley Ambulance Company",
+    "city": "Cottonwood",
+    "state": "AZ",
+    "type": "EMS",
+    "lat": 34.695,
+    "lon": -111.982249
+  },
+  {
+    "agencyid": "EMS1296",
+    "name": "Alachua County and Gainesville",
+    "city": "Gainesville",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 29.651694,
+    "lon": -82.324939
+  },
+  {
+    "agencyid": "EMS1304",
+    "name": "Kent County Department of Public Safety",
+    "city": "Dover",
+    "state": "DE",
+    "type": "EMS",
+    "lat": 39.158163,
+    "lon": -75.524393
+  },
+  {
+    "agencyid": "EMS1305",
+    "name": "Sonoma County",
+    "city": "santa rosa",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 38.440425,
+    "lon": -122.713972
+  },
+  {
+    "agencyid": "EMS1311",
+    "name": "Leon County Emergency Medical Services",
+    "city": "Tallahassee",
+    "state": "FL",
+    "type": "EMS",
+    "lat": 30.438225,
+    "lon": -84.280733
+  },
+  {
+    "agencyid": "EMS1312",
+    "name": "Wicomico County Dept. of Emergency Services",
+    "city": "Salisbury",
+    "state": "MD",
+    "type": "EMS",
+    "lat": 38.3670815,
+    "lon": -75.6055081
+  },
+  {
+    "agencyid": "EMS1315",
+    "name": "Clark County",
+    "city": "Jeffersonville",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 38.34844,
+    "lon": -85.699921
+  },
+  {
+    "agencyid": "EMS1316",
+    "name": "Mecklenburg EMS Agency",
+    "city": "Charlotte",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.227011,
+    "lon": -80.843325
+  },
+  {
+    "agencyid": "EMS1318",
+    "name": "Portage County EMS",
+    "city": "Stevens Point",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 44.5268367,
+    "lon": -89.5886511
+  },
+  {
+    "agencyid": "EMS1321",
+    "name": "Boone County",
+    "city": "Lebanon",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 40.0596586,
+    "lon": -86.463625
+  },
+  {
+    "agencyid": "EMS1328",
+    "name": "Meramec Ambulance District",
+    "city": "Villa Ridge",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 38.472519,
+    "lon": -90.886852
+  },
+  {
+    "agencyid": "EMS1329",
+    "name": "Ramsey County Emergency Communications",
+    "city": "St. Paul",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.9547296,
+    "lon": -93.0885264
+  },
+  {
+    "agencyid": "EMS1337",
+    "name": "Oklahoma City - Emergency Medical Services Authority - West",
+    "city": "Oklahoma City",
+    "state": "OK",
+    "type": "EMS",
+    "lat": 35.4538367,
+    "lon": -97.5281947
+  },
+  {
+    "agencyid": "EMS1338",
+    "name": "Tulsa - Emergency Medical Services Authority - East",
+    "city": "Tulsa",
+    "state": "OK",
+    "type": "EMS",
+    "lat": 36.1375252,
+    "lon": -95.9992138
+  },
+  {
+    "agencyid": "EMS1340",
+    "name": "Livingston County Fire and EMS",
+    "city": "Brighton",
+    "state": "MI",
+    "type": "EMS",
+    "lat": 42.51924,
+    "lon": -83.797746
+  },
+  {
+    "agencyid": "EMS1344",
+    "name": "Douglas County 911 Emergency Services (Parent PSAP)",
+    "city": "Minden",
+    "state": "NV",
+    "type": "PSAP",
+    "lat": 38.9568571,
+    "lon": -119.774683
+  },
+  {
+    "agencyid": "EMS1347",
+    "name": "Fairbanks Emergency Communications Center",
+    "city": "Fairbanks",
+    "state": "AK",
+    "type": "EMS",
+    "lat": 64.837747,
+    "lon": -147.716583
+  },
+  {
+    "agencyid": "EMS1355",
+    "name": "Anoka County Central Communications",
+    "city": "Anoka",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.207338,
+    "lon": -93.395894
+  },
+  {
+    "agencyid": "EMS1363",
+    "name": "Madison County Central Dispatch",
+    "city": "Anderson",
+    "state": "IN",
+    "type": "EMS",
+    "lat": 40.0989219,
+    "lon": -85.6574959
+  },
+  {
+    "agencyid": "EMS1365",
+    "name": "Forest County",
+    "city": "Tionesta",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.495122,
+    "lon": -79.451376
+  },
+  {
+    "agencyid": "EMS1366",
+    "name": "Westcom Emergency Communications",
+    "city": "West Des Moines",
+    "state": "IA",
+    "type": "EMS",
+    "lat": 41.5479514,
+    "lon": -93.757075
+  },
+  {
+    "agencyid": "EMS1372",
+    "name": "North Texas Emergency Communications Center",
+    "city": "Carrollton",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 32.9756415,
+    "lon": -96.8899636
+  },
+  {
+    "agencyid": "EMS1375",
+    "name": "Canyon County Emergency Service System",
+    "city": "Caldwell",
+    "state": "ID",
+    "type": "EMS",
+    "lat": 43.6787,
+    "lon": -116.69601
+  },
+  {
+    "agencyid": "EMS1376",
+    "name": "Montgomery County Hospital District",
+    "city": "Conroe",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 30.3118769,
+    "lon": -95.4560512
+  },
+  {
+    "agencyid": "EMS1377",
+    "name": "Nor-Cal EMS",
+    "city": "Redding",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 40.5865396,
+    "lon": -122.3916754
+  },
+  {
+    "agencyid": "EMS1379",
+    "name": "South Sound 911",
+    "city": "Tacoma",
+    "state": "WA",
+    "type": "EMS",
+    "lat": 47.2528768,
+    "lon": -122.4442906
+  },
+  {
+    "agencyid": "EMS1382",
+    "name": "St. Michaels Hospital",
+    "city": "Toronto",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 43.653226,
+    "lon": -79.3831843
+  },
+  {
+    "agencyid": "EMS1383",
+    "name": "Ruston Fire Department",
+    "city": "Ruston",
+    "state": "WA",
+    "type": "EMS",
+    "lat": 47.2528768,
+    "lon": -122.4442906
+  },
+  {
+    "agencyid": "EMS1384",
+    "name": "San Francisco EMS",
+    "city": "San Francisco",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.774888,
+    "lon": -122.418888
+  },
+  {
+    "agencyid": "EMS1385",
+    "name": "Brainerd Fire and Crow Wing County Fire & EMS",
+    "city": "BRAINERD",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.3526733,
+    "lon": -94.2020084
+  },
+  {
+    "agencyid": "EMS1386",
+    "name": "Fulton County 911",
+    "city": "Wauseon",
+    "state": "OH",
+    "type": "PSAP",
+    "lat": 41.5492182,
+    "lon": -84.1416147
+  },
+  {
+    "agencyid": "EMS1389",
+    "name": "Ohio Emergency Management Agency",
+    "city": "Circleville",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 39.600618,
+    "lon": -82.9460133
+  },
+  {
+    "agencyid": "EMS1391",
+    "name": "Stearns County",
+    "city": "Sartell",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.6216318,
+    "lon": -94.2069365
+  },
+  {
+    "agencyid": "EMS1393",
+    "name": "Bonner County",
+    "city": "Sandpoint",
+    "state": "ID",
+    "type": "EMS",
+    "lat": 48.276577,
+    "lon": -116.553465
+  },
+  {
+    "agencyid": "EMS1394",
+    "name": "Clearfield County 911",
+    "city": "Clearfield",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.988979,
+    "lon": -78.4224005
+  },
+  {
+    "agencyid": "EMS1395",
+    "name": "Aurora Fire - Falck Rocky Mountain",
+    "city": "Aurora",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 39.7294319,
+    "lon": -104.8319195
+  },
+  {
+    "agencyid": "EMS1396",
+    "name": "Waukesha County 911",
+    "city": "Waukesha",
+    "state": "WI",
+    "type": "PSAP",
+    "lat": 43.0116784,
+    "lon": -88.2314813
+  },
+  {
+    "agencyid": "EMS1398",
+    "name": "Jefferson Parish Government",
+    "city": "Gretna",
+    "state": "LA",
+    "type": "EMS",
+    "lat": 29.9146493,
+    "lon": -90.0539603
+  },
+  {
+    "agencyid": "EMS1402",
+    "name": "Chesterfield County Emergency Communications",
+    "city": "Chesterfield",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 37.3770935,
+    "lon": -77.5049863
+  },
+  {
+    "agencyid": "EMS1404",
+    "name": "Osage Ambulance District / Osage County",
+    "city": "Linn",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 38.4858749,
+    "lon": -91.8504515
+  },
+  {
+    "agencyid": "EMS1406",
+    "name": "Community Care Ambulance",
+    "city": "Ashtabula",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 41.8650534,
+    "lon": -80.7898089
+  },
+  {
+    "agencyid": "EMS1407",
+    "name": "Bozeman Fire Department / Gallatin County 911",
+    "city": "BOZEMAN",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 45.6769979,
+    "lon": -111.0429339
+  },
+  {
+    "agencyid": "EMS1410",
+    "name": "Trinity EMS",
+    "city": "Lowell",
+    "state": "MA",
+    "type": "EMS",
+    "lat": 42.6334247,
+    "lon": -71.3161718
+  },
+  {
+    "agencyid": "EMS1424",
+    "name": "Boone County Joint Communications",
+    "city": "Columbia",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 38.9517053,
+    "lon": -92.3340724
+  },
+  {
+    "agencyid": "EMS1430",
+    "name": "Ruston Police and Fire Departments",
+    "city": "Ruston",
+    "state": "LA",
+    "type": "EMS",
+    "lat": 32.5232053,
+    "lon": -92.637927
+  },
+  {
+    "agencyid": "EMS1435",
+    "name": "Mineral County - Upper San Juan Health Serv.",
+    "city": "Creede",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 37.8491662,
+    "lon": -106.9264345
+  },
+  {
+    "agencyid": "EMS1437",
+    "name": "Winnebago County Communications",
+    "city": "FOREST CITY",
+    "state": "IA",
+    "type": "EMS",
+    "lat": 43.3679527,
+    "lon": -93.7743749
+  },
+  {
+    "agencyid": "EMS1438",
+    "name": "Yamhill County Communications Agency",
+    "city": "McMinnville",
+    "state": "OR",
+    "type": "EMS",
+    "lat": 45.2101162,
+    "lon": -123.1987163
+  },
+  {
+    "agencyid": "EMS1439",
+    "name": "Dallas County",
+    "city": "Dallas",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 32.7766642,
+    "lon": -96.7969879
+  },
+  {
+    "agencyid": "EMS1440",
+    "name": "Tarrant County",
+    "city": "Dallas",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 32.7766642,
+    "lon": -96.7969879
+  },
+  {
+    "agencyid": "EMS1444",
+    "name": "Hocking County EMS",
+    "city": "Logan",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 39.5400672,
+    "lon": -82.4070986
+  },
+  {
+    "agencyid": "EMS1445",
+    "name": "Southeastern Massachusetts Regional 911 District",
+    "city": "Foxborough",
+    "state": "MA",
+    "type": "EMS",
+    "lat": 42.0653812,
+    "lon": -71.2478251
+  },
+  {
+    "agencyid": "EMS1446",
+    "name": "Fairfield County",
+    "city": "Carroll",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 39.7989528,
+    "lon": -82.7010016
+  },
+  {
+    "agencyid": "EMS1448",
+    "name": "Greater Monadnock Public Health Network",
+    "city": "Keene",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 42.933692,
+    "lon": -72.2781409
+  },
+  {
+    "agencyid": "EMS1454",
+    "name": "The Genesis Group",
+    "city": "Tyler",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 32.3512601,
+    "lon": -95.3010624
+  },
+  {
+    "agencyid": "EMS1457",
+    "name": "Snohomish County 911 (PARENT PSAP)",
+    "city": "Everett",
+    "state": "WA",
+    "type": "PSAP",
+    "lat": 47.9789848,
+    "lon": -122.2020795
+  },
+  {
+    "agencyid": "EMS1462",
+    "name": "Charlottesville-UVA-Albemarle County Emergency Communications Center (PARENT PSAP)",
+    "city": "Charlottesville",
+    "state": "VA",
+    "type": "PSAP",
+    "lat": 38.0293059,
+    "lon": -78.4766781
+  },
+  {
+    "agencyid": "EMS1464",
+    "name": "Delaware County 9-1-1",
+    "city": "Delaware",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 40.2986724,
+    "lon": -83.067965
+  },
+  {
+    "agencyid": "EMS1465",
+    "name": "Stanly County Emergency Services",
+    "city": "Albemarle",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.3501426,
+    "lon": -80.2000578
+  },
+  {
+    "agencyid": "EMS1467",
+    "name": "RCT - Dr. Brooks",
+    "city": "Kingston",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 44.2311717,
+    "lon": -76.4859544
+  },
+  {
+    "agencyid": "EMS1471",
+    "name": "Code Bluu",
+    "city": "Columbia",
+    "state": "MD",
+    "type": "EMS",
+    "lat": 39.2037144,
+    "lon": -76.8610462
+  },
+  {
+    "agencyid": "EMS1472",
+    "name": "Comtech Telecommunications",
+    "city": "Annapolis",
+    "state": "MD",
+    "type": "EMS",
+    "lat": 38.9784453,
+    "lon": -76.4921829
+  },
+  {
+    "agencyid": "EMS1476",
+    "name": "CAL FIRE Nevada-Yuba-Placer (PARENT PSAP)",
+    "city": "Auburn",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 38.8965654,
+    "lon": -121.0768901
+  },
+  {
+    "agencyid": "EMS1477",
+    "name": "Sauk County",
+    "city": "Reedsburg",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 43.5324809,
+    "lon": -90.0026259
+  },
+  {
+    "agencyid": "EMS1478",
+    "name": "Benton County",
+    "city": "Sartell",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.6216318,
+    "lon": -94.2069365
+  },
+  {
+    "agencyid": "EMS1479",
+    "name": "Sherburne County",
+    "city": "Sartell",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.6216318,
+    "lon": -94.2069365
+  },
+  {
+    "agencyid": "EMS1480",
+    "name": "Lawrence Douglas County (PARENT PSAP)",
+    "city": "Lawrence",
+    "state": "KS",
+    "type": "PSAP",
+    "lat": 37.6604484,
+    "lon": -121.8757968
+  },
+  {
+    "agencyid": "EMS1481",
+    "name": "Erie County Fire Fighters Association",
+    "city": "Milan",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 41.2975519,
+    "lon": -82.6054547
+  },
+  {
+    "agencyid": "EMS1482",
+    "name": "ValleyCom - South King County (PARENT PSAP)",
+    "city": "Kent",
+    "state": "WA",
+    "type": "PSAP",
+    "lat": 47.3809335,
+    "lon": -122.2348432
+  },
+  {
+    "agencyid": "EMS1483",
+    "name": "Milwaukee County/Greenfield (PARENT PSAP)",
+    "city": "Greenfield",
+    "state": "WI",
+    "type": "PSAP",
+    "lat": 42.9614039,
+    "lon": -88.0125865
+  },
+  {
+    "agencyid": "EMS1484",
+    "name": "Belknap County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1486",
+    "name": "Coos County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1487",
+    "name": "Grafton County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1488",
+    "name": "Merrimack County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1489",
+    "name": "Rockingham County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1490",
+    "name": "Strafford County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1491",
+    "name": "Sullivan County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1492",
+    "name": "Hillsborough County",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1494",
+    "name": "Gunnison Valley Health",
+    "city": "Gunnison",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 38.5458246,
+    "lon": -106.9253207
+  },
+  {
+    "agencyid": "EMS1496",
+    "name": "Community Health Education Foundation",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1497",
+    "name": "Craighead County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1498",
+    "name": "Clay County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1499",
+    "name": "Greene County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1500",
+    "name": "Independence County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1501",
+    "name": "Jackson County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1502",
+    "name": "Lawrence County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1503",
+    "name": "Mississippi County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1504",
+    "name": "Poinseth County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1505",
+    "name": "Randolf County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1506",
+    "name": "Sharp County",
+    "city": "Jonesboro",
+    "state": "AR",
+    "type": "EMS",
+    "lat": 35.8422967,
+    "lon": -90.704279
+  },
+  {
+    "agencyid": "EMS1507",
+    "name": "Fresno County (PARENT PSAP)",
+    "city": "Clovis",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 36.8252277,
+    "lon": -119.7029194
+  },
+  {
+    "agencyid": "EMS1508",
+    "name": "Washington County Consolidated Communications (PARENT PSAP)",
+    "city": "Beaverton",
+    "state": "OR",
+    "type": "PSAP",
+    "lat": 37.6604484,
+    "lon": -121.8757968
+  },
+  {
+    "agencyid": "EMS1509",
+    "name": "Franklin County Emergency Communications",
+    "city": "Louisburg",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 36.0990393,
+    "lon": -78.301106
+  },
+  {
+    "agencyid": "EMS1510",
+    "name": "Beaverhead County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1511",
+    "name": "Big Horn County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1512",
+    "name": "Blaine County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1513",
+    "name": "Broadwater County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1514",
+    "name": "Carbon County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1515",
+    "name": "Carter County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1516",
+    "name": "Cascade County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1517",
+    "name": "Chouteau County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1518",
+    "name": "Custer County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1519",
+    "name": "Daniels County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1520",
+    "name": "Dawson County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1521",
+    "name": "Deer Lodge County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1522",
+    "name": "Fallon County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1523",
+    "name": "Fergus County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1524",
+    "name": "Flathead County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1525",
+    "name": "Garfield County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1526",
+    "name": "Glacier County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1527",
+    "name": "Golden Valley County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1528",
+    "name": "Granite County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1529",
+    "name": "Hill County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1530",
+    "name": "Jefferson County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1531",
+    "name": "Judith Basin County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1532",
+    "name": "Lake County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1533",
+    "name": "Lewis and Clark County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1534",
+    "name": "Liberty County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1535",
+    "name": "Lincoln County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1536",
+    "name": "McCone County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1537",
+    "name": "Madison County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1539",
+    "name": "Meagher County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1540",
+    "name": "Mineral County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1541",
+    "name": "Missoula County 911 (PSAP)",
+    "city": "Helena",
+    "state": "MT",
+    "type": "Fire_Department",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1542",
+    "name": "Musselshell County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1543",
+    "name": "Park County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1544",
+    "name": "Petroleum County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1545",
+    "name": "Phillips County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1546",
+    "name": "Pondera County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1547",
+    "name": "Powder River County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1548",
+    "name": "Powell County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1549",
+    "name": "Prairie County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1550",
+    "name": "Ravalli County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1551",
+    "name": "Richland County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1552",
+    "name": "Roosevelt County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1553",
+    "name": "Rosebud County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1554",
+    "name": "Sanders County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1555",
+    "name": "Sheridan County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1556",
+    "name": "Silver Bow County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1557",
+    "name": "Stillwater County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1558",
+    "name": "Sweet Grass County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1559",
+    "name": "Teton County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1560",
+    "name": "Toole County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1561",
+    "name": "Treasure County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1562",
+    "name": "Valley County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1563",
+    "name": "Wheatland County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1564",
+    "name": "Wibaux County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1565",
+    "name": "Yellowstone County",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.5891452,
+    "lon": -112.0391057
+  },
+  {
+    "agencyid": "EMS1566",
+    "name": "Ashland Fire Division",
+    "city": "Ashland",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 40.8686675,
+    "lon": -82.3182178
+  },
+  {
+    "agencyid": "EMS1568",
+    "name": "PowerPhone",
+    "city": "Madison",
+    "state": "CT",
+    "type": "EMS",
+    "lat": 41.2959908,
+    "lon": -72.5754149
+  },
+  {
+    "agencyid": "EMS1570",
+    "name": "Northeast King County Com Center (NORCOM) PARENT PSAP",
+    "city": "Bellevue",
+    "state": "WA",
+    "type": "PSAP",
+    "lat": 47.6101497,
+    "lon": -122.2015159
+  },
+  {
+    "agencyid": "EMS1571",
+    "name": "Wayne County Communications 911",
+    "city": "Wooster",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 40.8050565,
+    "lon": -81.935143
+  },
+  {
+    "agencyid": "EMS1572",
+    "name": "Oshawa Fire Service Communications Center (PARENT PSAP)",
+    "city": "Oshawa",
+    "state": "ON",
+    "type": "PSAP",
+    "lat": 43.8970929,
+    "lon": -78.8657912
+  },
+  {
+    "agencyid": "EMS1573",
+    "name": "EK",
+    "city": "Livermore",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.6818688,
+    "lon": -121.7684732
+  },
+  {
+    "agencyid": "EMS1574",
+    "name": "Santa Clara County (Parent PSAP)",
+    "city": "San Jose",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 37.8502032,
+    "lon": -122.032184
+  },
+  {
+    "agencyid": "EMS1577",
+    "name": "Whitby Fire Service",
+    "city": "Whitby",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 43.8975446,
+    "lon": -78.9429329
+  },
+  {
+    "agencyid": "EMS1578",
+    "name": "Clarington Fire Service",
+    "city": "Bowmanville",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 43.9126042,
+    "lon": -78.688019
+  },
+  {
+    "agencyid": "EMS1579",
+    "name": "Scugog Fire Service",
+    "city": "Caesarea",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 44.1582477,
+    "lon": -78.8320442
+  },
+  {
+    "agencyid": "EMS1580",
+    "name": "Uxbridge Fire Service",
+    "city": "Uxbridge",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 44.1170249535,
+    "lon": -79.1880144484
+  },
+  {
+    "agencyid": "EMS1581",
+    "name": "Brock Fire Service",
+    "city": "Cannington",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 44.3502163,
+    "lon": -79.0386639
+  },
+  {
+    "agencyid": "EMS1583",
+    "name": "Putnam County EMS",
+    "city": "Winfield",
+    "state": "WV",
+    "type": "EMS",
+    "lat": 38.5331448,
+    "lon": -81.8934675
+  },
+  {
+    "agencyid": "EMS1584",
+    "name": "Lancaster County 911",
+    "city": "Manheim",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.1634279,
+    "lon": -76.3949614
+  },
+  {
+    "agencyid": "EMS1585",
+    "name": "Sacramento Regional FIRE/EMS Communications Center (PARENT PSAP)",
+    "city": "Sacramento",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 38.5815719,
+    "lon": -121.4943996
+  },
+  {
+    "agencyid": "EMS1586",
+    "name": "Norman Emergency Communications",
+    "city": "Norman",
+    "state": "OK",
+    "type": "EMS",
+    "lat": 35.2225668,
+    "lon": -97.4394777
+  },
+  {
+    "agencyid": "EMS1587",
+    "name": "Aitkin County",
+    "city": "Aitkin",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.5330129,
+    "lon": -93.7102493
+  },
+  {
+    "agencyid": "EMS1591",
+    "name": "St Louis County",
+    "city": "Duluth",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.7866719,
+    "lon": -92.1004852
+  },
+  {
+    "agencyid": "EMS1593",
+    "name": "Beltrami County",
+    "city": "Bemidji",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.471573,
+    "lon": -94.8826861
+  },
+  {
+    "agencyid": "EMS1595",
+    "name": "Big Stone County",
+    "city": "Ortonville",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.3047822,
+    "lon": -96.4450624
+  },
+  {
+    "agencyid": "EMS1596",
+    "name": "Blue Earth County",
+    "city": "Mankato",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.1635775,
+    "lon": -93.9993996
+  },
+  {
+    "agencyid": "EMS1598",
+    "name": "Cass County",
+    "city": "Walker",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.1013462,
+    "lon": -94.5872162
+  },
+  {
+    "agencyid": "EMS1599",
+    "name": "Chippewa County",
+    "city": "Montevideo",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.9410447,
+    "lon": -95.7236136
+  },
+  {
+    "agencyid": "EMS1602",
+    "name": "Clay County",
+    "city": "Moorhead",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.8737648,
+    "lon": -96.7678039
+  },
+  {
+    "agencyid": "EMS1603",
+    "name": "Clearwater County",
+    "city": "Bagley",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.5216231,
+    "lon": -95.3983491
+  },
+  {
+    "agencyid": "EMS1605",
+    "name": "Dakota County",
+    "city": "Hastings",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.7443293,
+    "lon": -92.8513706
+  },
+  {
+    "agencyid": "EMS1606",
+    "name": "Minnesota State Registry",
+    "city": "Minneapolis",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.977753,
+    "lon": -93.2650108
+  },
+  {
+    "agencyid": "EMS1607",
+    "name": "Montana, State of",
+    "city": "Helena",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 43.9291325,
+    "lon": -95.9472411
+  },
+  {
+    "agencyid": "EMS1608",
+    "name": "Dodge County",
+    "city": "Mantorville",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.0691307,
+    "lon": -92.7557456
+  },
+  {
+    "agencyid": "EMS1609",
+    "name": "Douglas County",
+    "city": "Alexandria",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.8848164,
+    "lon": -95.3776663
+  },
+  {
+    "agencyid": "EMS1610",
+    "name": "Scott County",
+    "city": "Shakopee",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.7973962,
+    "lon": -93.5272861
+  },
+  {
+    "agencyid": "EMS1627",
+    "name": "Isanti County",
+    "city": "Cambridge",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.5656755,
+    "lon": -93.2258999
+  },
+  {
+    "agencyid": "EMS1628",
+    "name": "Jackson County",
+    "city": "Jackson",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.6207915,
+    "lon": -94.9886022
+  },
+  {
+    "agencyid": "EMS1629",
+    "name": "Kanabec County",
+    "city": "Mora",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.8769031,
+    "lon": -93.2938352
+  },
+  {
+    "agencyid": "EMS1630",
+    "name": "Kandiyohi County",
+    "city": "Willmar",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.1223711,
+    "lon": -95.048659
+  },
+  {
+    "agencyid": "EMS1631",
+    "name": "Kittson County",
+    "city": "Hallock",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 48.7744263,
+    "lon": -96.946447
+  },
+  {
+    "agencyid": "EMS1632",
+    "name": "Lac qui Parle County",
+    "city": "Madison",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.0113787,
+    "lon": -96.1932176
+  },
+  {
+    "agencyid": "EMS1633",
+    "name": "Lake of the Woods County",
+    "city": "Baudette",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 48.7124736,
+    "lon": -94.5999299
+  },
+  {
+    "agencyid": "EMS1635",
+    "name": "Lincoln County",
+    "city": "Ivanhoe",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.4632981,
+    "lon": -96.247263
+  },
+  {
+    "agencyid": "EMS1644",
+    "name": "Sibley County",
+    "city": "Gaylord",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.5544276,
+    "lon": -94.2208132
+  },
+  {
+    "agencyid": "EMS1645",
+    "name": "Steele County",
+    "city": "Owatonna",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.0879297,
+    "lon": -93.2260184
+  },
+  {
+    "agencyid": "EMS1646",
+    "name": "Stevens County",
+    "city": "Morris",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.5919444,
+    "lon": -95.9188889
+  },
+  {
+    "agencyid": "EMS1647",
+    "name": "Swift County",
+    "city": "Benson",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.3149603,
+    "lon": -95.6000349
+  },
+  {
+    "agencyid": "EMS1649",
+    "name": "Traverse County",
+    "city": "Wheaton",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.8044052,
+    "lon": -96.499233
+  },
+  {
+    "agencyid": "EMS1651",
+    "name": "Wadena County",
+    "city": "Wadena",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.4424614,
+    "lon": -95.1361386
+  },
+  {
+    "agencyid": "EMS1652",
+    "name": "Waseca County",
+    "city": "Waseca",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.0770411,
+    "lon": -93.5083843
+  },
+  {
+    "agencyid": "EMS1654",
+    "name": "Wilkin County",
+    "city": "Breckenridge",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.2627778,
+    "lon": -96.5869443
+  },
+  {
+    "agencyid": "EMS1656",
+    "name": "Lyon County",
+    "city": "Marshall",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.448423,
+    "lon": -95.7911916
+  },
+  {
+    "agencyid": "EMS1657",
+    "name": "McLeod County",
+    "city": "Glencoe",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.7690437,
+    "lon": -94.1517524
+  },
+  {
+    "agencyid": "EMS1658",
+    "name": "Mahnomen County",
+    "city": "Mahnomen",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.3172749,
+    "lon": -95.9655384
+  },
+  {
+    "agencyid": "EMS1659",
+    "name": "Marshall County",
+    "city": "Warren",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 48.1966421,
+    "lon": -96.7728401
+  },
+  {
+    "agencyid": "EMS1660",
+    "name": "Martin County",
+    "city": "Fairmont",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.6521775,
+    "lon": -94.4610832
+  },
+  {
+    "agencyid": "EMS1661",
+    "name": "Mille Lacs County",
+    "city": "Milaca",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.755799,
+    "lon": -93.6544079
+  },
+  {
+    "agencyid": "EMS1663",
+    "name": "Meeker County",
+    "city": "Litchfield",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.1258332,
+    "lon": -94.5283333
+  },
+  {
+    "agencyid": "EMS1664",
+    "name": "Mower County",
+    "city": "Austin",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.6666296,
+    "lon": -92.9746367
+  },
+  {
+    "agencyid": "EMS1665",
+    "name": "Murray County",
+    "city": "Slayton",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.9877419,
+    "lon": -95.7558464
+  },
+  {
+    "agencyid": "EMS1666",
+    "name": "Nobles County",
+    "city": "Worthington",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.6210985,
+    "lon": -95.5941436
+  },
+  {
+    "agencyid": "EMS1667",
+    "name": "Norman County",
+    "city": "Ada",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.299689,
+    "lon": -96.5153463
+  },
+  {
+    "agencyid": "EMS1668",
+    "name": "Olmsted County",
+    "city": "Rochester",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.0121221,
+    "lon": -92.4801989
+  },
+  {
+    "agencyid": "EMS1671",
+    "name": "Pipestone County",
+    "city": "Pipestone",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.9985815,
+    "lon": -96.3128117
+  },
+  {
+    "agencyid": "EMS1672",
+    "name": "Polk County",
+    "city": "Crookston",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 47.7745617,
+    "lon": -96.6093911
+  },
+  {
+    "agencyid": "EMS1673",
+    "name": "Pope County",
+    "city": "Glenwood",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 45.6502392,
+    "lon": -95.3900419
+  },
+  {
+    "agencyid": "EMS1676",
+    "name": "Renville County",
+    "city": "Olivia",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 44.7764314,
+    "lon": -94.9956593
+  },
+  {
+    "agencyid": "EMS1677",
+    "name": "Rock County",
+    "city": "Luverne",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 43.6555249,
+    "lon": -96.2025289
+  },
+  {
+    "agencyid": "EMS1678",
+    "name": "Roseau County",
+    "city": "Roseau",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 48.8460926,
+    "lon": -95.762766
+  },
+  {
+    "agencyid": "EMS1680",
+    "name": "Oshawa Fire Service",
+    "city": "Oshawa",
+    "state": "ON",
+    "type": "EMS",
+    "lat": 43.8970929,
+    "lon": -78.8657912
+  },
+  {
+    "agencyid": "EMS1681",
+    "name": "Iredell Emergency Communications",
+    "city": "Statesville",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.7846045,
+    "lon": -80.8883072
+  },
+  {
+    "agencyid": "EMS1682",
+    "name": "Northborough",
+    "city": "Northborough",
+    "state": "MA",
+    "type": "EMS",
+    "lat": 42.3195556,
+    "lon": -71.6411997
+  },
+  {
+    "agencyid": "EMS1684",
+    "name": "Washington County",
+    "city": null,
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.729553,
+    "lon": -94.6858998
+  },
+  {
+    "agencyid": "EMS1685",
+    "name": "Somerset County Department of Emergency Services",
+    "city": "Somerset",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.008411,
+    "lon": -79.0780831
+  },
+  {
+    "agencyid": "EMS1686",
+    "name": "Ray County",
+    "city": "Richmond",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 39.278622,
+    "lon": -93.9768876
+  },
+  {
+    "agencyid": "EMS1687",
+    "name": "Taney County Ambulance District/ Taney County",
+    "city": "Hollister",
+    "state": "MO",
+    "type": "EMS",
+    "lat": 36.6211735,
+    "lon": -93.2154587
+  },
+  {
+    "agencyid": "EMS1690",
+    "name": "Weber Area Dispatch 911",
+    "city": "Ogden",
+    "state": "UT",
+    "type": "EMS",
+    "lat": 41.223,
+    "lon": -111.9738304
+  },
+  {
+    "agencyid": "EMS1803",
+    "name": "Santo Domingo Colonial City",
+    "city": "Santo Domingo",
+    "state": null,
+    "type": "EMS",
+    "lat": 33.4734978,
+    "lon": -82.0105148
+  },
+  {
+    "agencyid": "EMS1805",
+    "name": "Denco Area 9-1-1 District",
+    "city": "Lewisville",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 33.0463292,
+    "lon": -96.9941903
+  },
+  {
+    "agencyid": "EMS1806",
+    "name": "University of Maine Orono/Penobscot County",
+    "city": "Orono",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.8831125,
+    "lon": -68.6719411
+  },
+  {
+    "agencyid": "EMS1807",
+    "name": "Harris County Emergency Corps",
+    "city": "Houston",
+    "state": "TX",
+    "type": "EMS",
+    "lat": 29.7604267,
+    "lon": -95.3698028
+  },
+  {
+    "agencyid": "EMS1808",
+    "name": "Jessamine County",
+    "city": "Nicholasville",
+    "state": "KY",
+    "type": "EMS",
+    "lat": 38.0405837,
+    "lon": -84.5037164
+  },
+  {
+    "agencyid": "EMS1809",
+    "name": "Kansas, State of",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1816",
+    "name": "Clear Creek County EMS",
+    "city": "Dumont",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 39.7662054,
+    "lon": -105.5980035
+  },
+  {
+    "agencyid": "EMS1819",
+    "name": "Ashland County",
+    "city": "Ashland",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 40.8686675,
+    "lon": -82.3182178
+  },
+  {
+    "agencyid": "EMS1820",
+    "name": "Alpharetta NG911 Center (Parent PSAP)",
+    "city": "Alpharetta",
+    "state": "GA",
+    "type": "PSAP",
+    "lat": 34.0753762,
+    "lon": -84.2940899
+  },
+  {
+    "agencyid": "EMS1822",
+    "name": "Eastside Fire & Rescue (Battalion 3)",
+    "city": "Issaquah",
+    "state": "WA",
+    "type": "EMS",
+    "lat": 47.5301011,
+    "lon": -122.0326191
+  },
+  {
+    "agencyid": "EMS1823",
+    "name": "Rice County EMS",
+    "city": "Lyons",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 38.3450104,
+    "lon": -98.2017268
+  },
+  {
+    "agencyid": "EMS1824",
+    "name": "Tyler Technologies",
+    "city": "Troy",
+    "state": "MI",
+    "type": "EMS",
+    "lat": 42.6064095,
+    "lon": -83.1497751
+  },
+  {
+    "agencyid": "EMS1825",
+    "name": "Columbia County - Wisconsin Integrated Team Heart United (WITH U)",
+    "city": "Poynette",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 43.3902644,
+    "lon": -89.4028963
+  },
+  {
+    "agencyid": "EMS1842",
+    "name": "Kent County Office of Emergency Services",
+    "city": "Chestertown",
+    "state": "MD",
+    "type": "EMS",
+    "lat": 39.2188663,
+    "lon": -76.0690036
+  },
+  {
+    "agencyid": "EMS1843",
+    "name": "Clermont County 911",
+    "city": "Batavia",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 39.0770072,
+    "lon": -84.1768795
+  },
+  {
+    "agencyid": "EMS1848",
+    "name": "Candor Emergency Squad",
+    "city": "Candor",
+    "state": "NY",
+    "type": "EMS",
+    "lat": 42.2328518,
+    "lon": -76.3424357
+  },
+  {
+    "agencyid": "EMS1849",
+    "name": "Milwaukee Fire Department (New CAD)",
+    "city": "Pleasanton",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.6604484,
+    "lon": -121.8757968
+  },
+  {
+    "agencyid": "EMS1850",
+    "name": "Buncombe County Public Safety Communications",
+    "city": "Asheville",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.5950581,
+    "lon": -82.5514869
+  },
+  {
+    "agencyid": "EMS1852",
+    "name": "Norwalk Hospital EMS",
+    "city": "Norwalk",
+    "state": "CT",
+    "type": "EMS",
+    "lat": 41.117744,
+    "lon": -73.4081575
+  },
+  {
+    "agencyid": "EMS1853",
+    "name": "BASF Corporation",
+    "city": "Geismar",
+    "state": "LA",
+    "type": "EMS",
+    "lat": 30.2193468,
+    "lon": -91.0065088
+  },
+  {
+    "agencyid": "EMS1856",
+    "name": "Ontario Emergency Communications (Parent PSAP)",
+    "city": "Ontario",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 34.0633443,
+    "lon": -117.6508876
+  },
+  {
+    "agencyid": "EMS1857",
+    "name": "Cardio Partners",
+    "city": "Dublin",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 40.0992294,
+    "lon": -83.1140771
+  },
+  {
+    "agencyid": "EMS1858",
+    "name": "Saline County / Salina Fire",
+    "city": "Salina",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 38.8402805,
+    "lon": -97.6114237
+  },
+  {
+    "agencyid": "EMS1859",
+    "name": "McPherson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1860",
+    "name": "Sedgwick County EMS",
+    "city": "Wichita",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 37.6871761,
+    "lon": -97.330053
+  },
+  {
+    "agencyid": "EMS1862",
+    "name": "Anderson County EMS/ Anderson County",
+    "city": "Garnett",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 38.2805772,
+    "lon": -95.2419192
+  },
+  {
+    "agencyid": "EMS1863",
+    "name": "Cheyenne County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1864",
+    "name": "Allen County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1866",
+    "name": "Barber County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1867",
+    "name": "Barton County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1868",
+    "name": "Bourbon County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1869",
+    "name": "Brown County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1870",
+    "name": "Butler County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1871",
+    "name": "Chase County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1872",
+    "name": "Chautauqua County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1873",
+    "name": "Cherokee County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1874",
+    "name": "Clark County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1875",
+    "name": "Clay County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1876",
+    "name": "Cloud County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1877",
+    "name": "Coffey County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1878",
+    "name": "Comanche County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1879",
+    "name": "Cowley County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1880",
+    "name": "Wallace County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1881",
+    "name": "Atchison County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1882",
+    "name": "Crawford County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1883",
+    "name": "Decatur County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1884",
+    "name": "Dickinson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1886",
+    "name": "Doniphan County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1887",
+    "name": "Woodson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1888",
+    "name": "Douglas County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1889",
+    "name": "Wilson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1890",
+    "name": "Edwards County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1891",
+    "name": "Elk County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1892",
+    "name": "Wichita County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1893",
+    "name": "Ellis County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1894",
+    "name": "Ellsworth County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1895",
+    "name": "Finney County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1896",
+    "name": "Ford County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1897",
+    "name": "Franklin County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1899",
+    "name": "Washington County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1900",
+    "name": "Gove County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1901",
+    "name": "Wabaunsee County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1902",
+    "name": "Graham County Emergency Services",
+    "city": "Hill City",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1903",
+    "name": "Grant County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1904",
+    "name": "Trego County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1905",
+    "name": "Gray County",
+    "city": "Cimatton",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1906",
+    "name": "Thomas County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1907",
+    "name": "Greeley County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1908",
+    "name": "Sumner County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1909",
+    "name": "Greenwood County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1910",
+    "name": "Stevens County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1911",
+    "name": "Hamilton County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1912",
+    "name": "West Central Joint ETSB",
+    "city": "Jacksonville",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 39.733936,
+    "lon": -90.2290098
+  },
+  {
+    "agencyid": "EMS1913",
+    "name": "Stanton County Ambulance Service",
+    "city": "Johnson",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1914",
+    "name": "HarperCounty",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1915",
+    "name": "Harvey County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1916",
+    "name": "Stafford County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1917",
+    "name": "Haskell County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1918",
+    "name": "Smith County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1919",
+    "name": "Sherman County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1920",
+    "name": "Hodgeman County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1921",
+    "name": "Sheridan County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1922",
+    "name": "Jackson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1923",
+    "name": "Jefferson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1925",
+    "name": "Seward County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1926",
+    "name": "Jewell County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1928",
+    "name": "Scott County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1929",
+    "name": "Kearny County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1930",
+    "name": "Russell County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1931",
+    "name": "Kingman County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1932",
+    "name": "Kiowa County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1933",
+    "name": "Rush County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1934",
+    "name": "Labette County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1935",
+    "name": "Lane County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1936",
+    "name": "Rooks County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1937",
+    "name": "Leavenworth County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1938",
+    "name": "Riley County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1939",
+    "name": "Lincoln County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1940",
+    "name": "Linn County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1941",
+    "name": "Logan County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1942",
+    "name": "Lyon County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1943",
+    "name": "Marion County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1944",
+    "name": "Marshall County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1945",
+    "name": "McPherson County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1946",
+    "name": "Montgomery County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1947",
+    "name": "Morris County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1948",
+    "name": "Morton County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1949",
+    "name": "Nemaha County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1950",
+    "name": "Neosho County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1951",
+    "name": "Ness County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1954",
+    "name": "Republic County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1955",
+    "name": "Osage County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1956",
+    "name": "Reno County/Hutchinson EMS",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1957",
+    "name": "Rawlins County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1958",
+    "name": "Pratt County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1959",
+    "name": "Pottawatomie County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1960",
+    "name": "Phillips County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1961",
+    "name": "Pawnee County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1962",
+    "name": "Ottawa County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1963",
+    "name": "Osbourne County",
+    "city": "Topeka",
+    "state": "KS",
+    "type": "EMS",
+    "lat": 39.0473451,
+    "lon": -95.6751576
+  },
+  {
+    "agencyid": "EMS1964",
+    "name": "Linn County Sheriff/Corvallis Regional CC (Parent PSAP)",
+    "city": "Corvallis",
+    "state": "OR",
+    "type": "PSAP",
+    "lat": 44.5645659,
+    "lon": -123.2620435
+  },
+  {
+    "agencyid": "EMS1967",
+    "name": "JeffCom 911 (PARENT PSAP)",
+    "city": "Lakewood",
+    "state": "CO",
+    "type": "PSAP",
+    "lat": 39.7047095,
+    "lon": -105.0813734
+  },
+  {
+    "agencyid": "EMS1968",
+    "name": "Waynesboro Department of Emergency Management",
+    "city": "Waynesboro",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 38.0684692,
+    "lon": -78.8894682
+  },
+  {
+    "agencyid": "EMS1970",
+    "name": "Caliber Public Safety (CAD VENDOR)",
+    "city": "Winston-Salem",
+    "state": "NC",
+    "type": "CAD",
+    "lat": 36.0998596,
+    "lon": -80.244216
+  },
+  {
+    "agencyid": "EMS1971",
+    "name": "Cowlitz 911 (PSAP)",
+    "city": "Kelso",
+    "state": "WA",
+    "type": "PSAP",
+    "lat": 46.146779,
+    "lon": -122.9084445
+  },
+  {
+    "agencyid": "EMS1972",
+    "name": "LogiSYS",
+    "city": "Missoula",
+    "state": "MT",
+    "type": "EMS",
+    "lat": 46.8721284,
+    "lon": -113.9940314
+  },
+  {
+    "agencyid": "EMS1973",
+    "name": "Willamette Valley Communications Center (PARENT PSAP)",
+    "city": "Salem",
+    "state": "OR",
+    "type": "PSAP",
+    "lat": 44.9428975,
+    "lon": -123.0350963
+  },
+  {
+    "agencyid": "EMS1975",
+    "name": "New Hampshire, State",
+    "city": "Laconia",
+    "state": "NH",
+    "type": "EMS",
+    "lat": 43.5278546,
+    "lon": -71.4703509
+  },
+  {
+    "agencyid": "EMS1976",
+    "name": "Thompson Valley EMS",
+    "city": "Loveland",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 40.3977612,
+    "lon": -105.0749801
+  },
+  {
+    "agencyid": "EMS1977",
+    "name": "Arlo Safe",
+    "city": "Milpitas",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.4323341,
+    "lon": -121.8995741
+  },
+  {
+    "agencyid": "EMS1979",
+    "name": "Suffield Volunteer Ambulance Association",
+    "city": "Suffield",
+    "state": "CT",
+    "type": "EMS",
+    "lat": 41.9915062,
+    "lon": -72.7017741
+  },
+  {
+    "agencyid": "EMS1980",
+    "name": "Dane County 911 (Parent PSAP)",
+    "city": "Madison",
+    "state": "WI",
+    "type": "PSAP",
+    "lat": 43.0721661,
+    "lon": -89.4007501
+  },
+  {
+    "agencyid": "EMS1981",
+    "name": "Eight One Eight",
+    "city": "PLEASANTON",
+    "state": "CA",
+    "type": "EMS",
+    "lat": 37.6604484,
+    "lon": -121.8757968
+  },
+  {
+    "agencyid": "EMS1982",
+    "name": "Grayson County Emergency Services",
+    "city": "Independence",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 36.6223478,
+    "lon": -81.150923
+  },
+  {
+    "agencyid": "EMS1983",
+    "name": "KGA Creative Agency",
+    "city": "Atlanta",
+    "state": "GA",
+    "type": "EMS",
+    "lat": 33.748752,
+    "lon": -84.3876845
+  },
+  {
+    "agencyid": "EMS1985",
+    "name": "Carlton County 911",
+    "city": "Carlton",
+    "state": "MN",
+    "type": "EMS",
+    "lat": 46.6640011,
+    "lon": -92.4248827
+  },
+  {
+    "agencyid": "EMS1987",
+    "name": "Durham Emergency Communications Center",
+    "city": "Durham",
+    "state": "NC",
+    "type": "EMS",
+    "lat": 35.9940329,
+    "lon": -78.898619
+  },
+  {
+    "agencyid": "EMS1988",
+    "name": "Bethlehem EMS",
+    "city": "Bethlehem",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 40.6259316,
+    "lon": -75.3704579
+  },
+  {
+    "agencyid": "EMS1989",
+    "name": "Yolo Emergency Communications Agency (PARENT PSAP)",
+    "city": "WOODLAND",
+    "state": "CA",
+    "type": "PSAP",
+    "lat": 38.6785157,
+    "lon": -121.7732971
+  },
+  {
+    "agencyid": "EMS1990",
+    "name": "Horizon Health EMS/ Edgar County",
+    "city": "Paris",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 39.611146,
+    "lon": -87.6961374
+  },
+  {
+    "agencyid": "EMS1991",
+    "name": "Van Buren County EMS",
+    "city": "Farmington",
+    "state": "IA",
+    "type": "EMS",
+    "lat": 40.6403124,
+    "lon": -91.7429429
+  },
+  {
+    "agencyid": "EMS1992",
+    "name": "Santa Rosa County 9-1-1",
+    "city": "Milton",
+    "state": "Fl",
+    "type": "EMS",
+    "lat": 30.6324149,
+    "lon": -87.0396881
+  },
+  {
+    "agencyid": "EMS1993",
+    "name": "Bexley Police Department",
+    "city": "Bexley",
+    "state": "OH",
+    "type": "EMS",
+    "lat": 39.9689532,
+    "lon": -82.9376804
+  },
+  {
+    "agencyid": "EMS1994",
+    "name": "Denver 9-1-1",
+    "city": "Denver",
+    "state": "CO",
+    "type": "EMS",
+    "lat": 39.7392358,
+    "lon": -104.990251
+  },
+  {
+    "agencyid": "EMS1996",
+    "name": "DuPage Public Safety Communications",
+    "city": "Wheaton",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 41.8661403,
+    "lon": -88.1070127
+  },
+  {
+    "agencyid": "EMS1997",
+    "name": "Madison County Emergency Medical Services",
+    "city": "Madison",
+    "state": "VA",
+    "type": "EMS",
+    "lat": 38.3804062,
+    "lon": -78.2575035
+  },
+  {
+    "agencyid": "EMS2000",
+    "name": "Hamilton County 911 Communications (PARENT PSAP)",
+    "city": "Noblesville",
+    "state": "IN",
+    "type": "PSAP",
+    "lat": 40.0455917,
+    "lon": -86.0085955
+  },
+  {
+    "agencyid": "EMS2002",
+    "name": "METCOM 911 OR (Parent PSAP)",
+    "city": "Woodburn",
+    "state": "OR",
+    "type": "PSAP",
+    "lat": 45.143731,
+    "lon": -122.8553725
+  },
+  {
+    "agencyid": "EMS2005",
+    "name": "Milton Fire Department",
+    "city": "Milton",
+    "state": "GA",
+    "type": "EMS",
+    "lat": 34.0891899,
+    "lon": -84.3428857
+  },
+  {
+    "agencyid": "EMS2006",
+    "name": "Lycoming County DPS",
+    "city": "Montoursville",
+    "state": "PA",
+    "type": "EMS",
+    "lat": 41.2542459,
+    "lon": -76.9205199
+  },
+  {
+    "agencyid": "EMS2008",
+    "name": "Washington County",
+    "city": "West Bend",
+    "state": "WI",
+    "type": "EMS",
+    "lat": 43.2286174,
+    "lon": -88.1103691
+  },
+  {
+    "agencyid": "EMS2009",
+    "name": "Maine EMS",
+    "city": "Augusta",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.3106241,
+    "lon": -69.7794897
+  },
+  {
+    "agencyid": "EMS2011",
+    "name": "Biddeford Public Safety Communications Center",
+    "city": "Biddeford",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.4925843,
+    "lon": -70.4533844
+  },
+  {
+    "agencyid": "EMS2012",
+    "name": "Brunswick Police Department Communications Division",
+    "city": "Brunswick",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.9140162,
+    "lon": -69.9669961
+  },
+  {
+    "agencyid": "EMS2013",
+    "name": "Dept of Public Safety-Augusta",
+    "city": "Augusta",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.3106241,
+    "lon": -69.7794897
+  },
+  {
+    "agencyid": "EMS2014",
+    "name": "Cumberland County Regional Communications Center",
+    "city": "Windham",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.7588577,
+    "lon": -70.398706
+  },
+  {
+    "agencyid": "EMS2015",
+    "name": "Department of Public Safety - Bangor",
+    "city": "Bangor",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.8016128,
+    "lon": -68.7712257
+  },
+  {
+    "agencyid": "EMS2016",
+    "name": "Franklin County Regional Communications Center",
+    "city": "Farmington",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.6704998,
+    "lon": -70.1512169
+  },
+  {
+    "agencyid": "EMS2018",
+    "name": "Houlton Regional Communications Center",
+    "city": "Houlton",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 46.1261806,
+    "lon": -67.8402316
+  },
+  {
+    "agencyid": "EMS2019",
+    "name": "Knox Regional Communications Center",
+    "city": "Rockland",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.1036914,
+    "lon": -69.1089293
+  },
+  {
+    "agencyid": "EMS2020",
+    "name": "Lewiston-Auburn 911",
+    "city": "Auburn",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.0978509,
+    "lon": -70.2311655
+  },
+  {
+    "agencyid": "EMS2021",
+    "name": "Lincoln County 911",
+    "city": "Wiscasset",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.0028921,
+    "lon": -69.665583
+  },
+  {
+    "agencyid": "EMS2023",
+    "name": "Penobscot Regional Communications Center",
+    "city": "Bangor",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.8016128,
+    "lon": -68.7712257
+  },
+  {
+    "agencyid": "EMS2025",
+    "name": "Portland Regional Communications Center",
+    "city": "Portland",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.6590993,
+    "lon": -70.2568189
+  },
+  {
+    "agencyid": "EMS2026",
+    "name": "Sagadahoc County Communications",
+    "city": "Bath",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.9106353,
+    "lon": -69.8206023
+  },
+  {
+    "agencyid": "EMS2027",
+    "name": "Sanford Regional Communications Center",
+    "city": "Sanford",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.4391627,
+    "lon": -70.7742804
+  },
+  {
+    "agencyid": "EMS2028",
+    "name": "Scarborough Public Safety Communications",
+    "city": "Scarborough",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.5901974,
+    "lon": -70.3344921
+  },
+  {
+    "agencyid": "EMS2029",
+    "name": "Somerset County Communications Center",
+    "city": "Skowhegan",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.7650366,
+    "lon": -69.7193803
+  },
+  {
+    "agencyid": "EMS2030",
+    "name": "Waldo County RCC",
+    "city": "Belfast",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.4259092,
+    "lon": -69.0064234
+  },
+  {
+    "agencyid": "EMS2031",
+    "name": "Washington County Regional Communications Center",
+    "city": "Machias",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.7150789,
+    "lon": -67.461376
+  },
+  {
+    "agencyid": "EMS2032",
+    "name": "Waterville Police Department",
+    "city": "Waterville",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 44.5520105,
+    "lon": -69.6317121
+  },
+  {
+    "agencyid": "EMS2033",
+    "name": "Westbrook Communications",
+    "city": "Westbrook",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.6770252,
+    "lon": -70.3711617
+  },
+  {
+    "agencyid": "EMS2034",
+    "name": "York Police Department",
+    "city": "York",
+    "state": "ME",
+    "type": "EMS",
+    "lat": 43.1617483,
+    "lon": -70.6482581
+  },
+  {
+    "agencyid": "EMS2036",
+    "name": "Kittitas County 9-1-1",
+    "city": "Ellensburg",
+    "state": "WA",
+    "type": "Fire_Department",
+    "lat": 46.9965144,
+    "lon": -120.5478474
+  },
+  {
+    "agencyid": "EMS2037",
+    "name": "Emergency Medical Services Authority (Parent PSAP)",
+    "city": "Tulsa",
+    "state": "OK",
+    "type": "PSAP",
+    "lat": 36.1539816,
+    "lon": -95.992775
+  },
+  {
+    "agencyid": "EMS2039",
+    "name": "York Poquoson Williamsburg 911 Center (Parent PSAP)",
+    "city": "Yorktown",
+    "state": "VA",
+    "type": "PSAP",
+    "lat": 37.2387556,
+    "lon": -76.5096731
+  },
+  {
+    "agencyid": "EMS2040",
+    "name": "Converse County Joint Communications Center",
+    "city": "Douglas",
+    "state": "WY",
+    "type": "EMS",
+    "lat": 42.7596897,
+    "lon": -105.3822069
+  },
+  {
+    "agencyid": "EMS2044",
+    "name": "Middletown Central Communications",
+    "city": "Middletown",
+    "state": "Connecticut",
+    "type": "EMS",
+    "lat": 41.5623209,
+    "lon": -72.6506488
+  },
+  {
+    "agencyid": "EMS2045",
+    "name": "Marion County 911/ETSB",
+    "city": "Salem",
+    "state": "IL",
+    "type": "EMS",
+    "lat": 38.6269929,
+    "lon": -88.9456158
+  }
+]

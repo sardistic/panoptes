@@ -1,0 +1,15 @@
+# Railway deploy config for Panoptes (panoptes.run).
+# Build from the Dockerfile (lean web image); health-gate on /health.
+[build]
+builder = "dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# No secrets required in prod. Source discovery (Google CSE dorking) is a BUILD-TIME step
+# that generates the data/*.json catalogs locally; prod just serves those + keyless
+# correlation (GDELT, BigDataCloud). GOOGLE_API_KEY/GOOGLE_CX are NOT needed here.
+# Optional only if you later enable the Postgres-backed endpoints: APB_DATABASE_URL.

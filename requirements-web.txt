@@ -1,0 +1,11 @@
+# Lean runtime deps for the Panoptes web service (Railway).
+# The live map + correlation API needs only these — NOT the transcription/inference
+# pipeline (faster-whisper/torch, anthropic) or the Postgres stack (sqlalchemy/psycopg),
+# which are in requirements.txt for local pipeline work.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+httpx>=0.27
+cryptography>=42.0          # PulsePoint feed AES decrypt (apb/ingest/pulsepoint.py)
+pyyaml>=6.0
+pydantic>=2.6
+pydantic-settings>=2.2

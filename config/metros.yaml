@@ -1,0 +1,39 @@
+# Major-metro radio systems to ingest.
+# broadcastify_system_id: numeric id from the Broadcastify Calls system page URL.
+# talkgroups: subset of talkgroup ids to include (omit/empty for all decoded).
+# centroid: [lat, lon] used as fallback location when a transcript names no place.
+#
+# NOTE: the ids below are placeholders. Look each system up at
+# https://www.broadcastify.com/calls/ and replace before running.
+
+nyc:
+  - name: "NYPD Citywide (Calls)"
+    broadcastify_system_id: 0
+    talkgroups: []
+    centroid: [40.7128, -74.0060]
+    bbox: [-74.2591, 40.4774, -73.7004, 40.9176]
+    # trunk_recorder_dir: "D:/sdr/nyc"   # own-node ingest (anti-Broadcastify path)
+
+la:
+  - name: "LAPD / LA County (Calls)"
+    broadcastify_system_id: 0
+    talkgroups: []
+    centroid: [34.0522, -118.2437]
+
+chicago:
+  - name: "Chicago OEMC (Calls)"
+    broadcastify_system_id: 0
+    talkgroups: []
+    centroid: [41.8781, -87.6298]
+
+houston:
+  - name: "Houston Regional Radio System"
+    broadcastify_system_id: 0
+    talkgroups: []
+    centroid: [29.7604, -95.3698]
+
+phoenix:
+  - name: "Phoenix Regional Wireless (RWC)"
+    broadcastify_system_id: 0
+    talkgroups: []
+    centroid: [33.4484, -112.0740]

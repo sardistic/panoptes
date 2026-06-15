@@ -1,0 +1,1606 @@
+{
+  "assist other agency": [
+    "other",
+    0.3
+  ],
+  "contempt of court:disobey court order/etc": [
+    "other",
+    0.3
+  ],
+  "domvja": [
+    "domestic",
+    0.8
+  ],
+  "driving under the influence": [
+    "traffic",
+    0.6
+  ],
+  "event - special event": [
+    "other",
+    0.3
+  ],
+  "sc unexplained death": [
+    "medical",
+    0.9
+  ],
+  "urgent assist": [
+    "other",
+    0.8
+  ],
+  "water job minor": [
+    "other",
+    0.1
+  ],
+  "-": [
+    "other",
+    0.0
+  ],
+  "0403": [
+    "other",
+    0.0
+  ],
+  "0501": [
+    "other",
+    0.0
+  ],
+  "0502": [
+    "other",
+    0.0
+  ],
+  "0603": [
+    "other",
+    0.0
+  ],
+  "0701": [
+    "other",
+    0.0
+  ],
+  "0804": [
+    "other",
+    0.0
+  ],
+  "0911": [
+    "other",
+    0.0
+  ],
+  "0912": [
+    "other",
+    0.0
+  ],
+  "1103": [
+    "other",
+    0.0
+  ],
+  "1402": [
+    "other",
+    0.0
+  ],
+  "1412": [
+    "other",
+    0.0
+  ],
+  "1705": [
+    "other",
+    0.0
+  ],
+  "1801": [
+    "other",
+    0.0
+  ],
+  "1803": [
+    "other",
+    0.0
+  ],
+  "1red 1 unit": [
+    "other",
+    0.0
+  ],
+  "2 - 12 y/o males walking in the road": [
+    "suspicious",
+    0.3
+  ],
+  "2 car pda": [
+    "traffic",
+    0.3
+  ],
+  "2 loose dogs in the area": [
+    "suspicious",
+    0.3
+  ],
+  "2026": [
+    "other",
+    0.0
+  ],
+  "2026-00051280": [
+    "other",
+    0.0
+  ],
+  "2026-00051281": [
+    "other",
+    0.0
+  ],
+  "2026-00051282": [
+    "other",
+    0.0
+  ],
+  "2026-00051283": [
+    "other",
+    0.0
+  ],
+  "2026-00051284": [
+    "other",
+    0.0
+  ],
+  "2026-00051285": [
+    "other",
+    0.0
+  ],
+  "2026-00051286": [
+    "other",
+    0.0
+  ],
+  "2026-00051287": [
+    "other",
+    0.0
+  ],
+  "2026-00051288": [
+    "other",
+    0.0
+  ],
+  "2026-00051290": [
+    "other",
+    0.0
+  ],
+  "2026-00051291": [
+    "other",
+    0.0
+  ],
+  "2026-00051292": [
+    "other",
+    0.0
+  ],
+  "2026-00051293": [
+    "other",
+    0.0
+  ],
+  "2026-00051294": [
+    "other",
+    0.0
+  ],
+  "2026-00051295": [
+    "other",
+    0.0
+  ],
+  "2026-00051296": [
+    "other",
+    0.0
+  ],
+  "2026-00051297": [
+    "other",
+    0.0
+  ],
+  "2026-00051298": [
+    "other",
+    0.0
+  ],
+  "2026-00051299": [
+    "other",
+    0.0
+  ],
+  "2026-00051300": [
+    "other",
+    0.0
+  ],
+  "2026-00051301": [
+    "other",
+    0.0
+  ],
+  "2026-00051302": [
+    "other",
+    0.0
+  ],
+  "2026-00051303": [
+    "other",
+    0.0
+  ],
+  "2026-00051304": [
+    "other",
+    0.0
+  ],
+  "2026-00051305": [
+    "other",
+    0.0
+  ],
+  "2026-00051306": [
+    "other",
+    0.0
+  ],
+  "2026-00051307": [
+    "other",
+    0.0
+  ],
+  "2026-00051308": [
+    "other",
+    0.0
+  ],
+  "2026-00051309": [
+    "other",
+    0.0
+  ],
+  "2026-00051310": [
+    "other",
+    0.0
+  ],
+  "2026-00051311": [
+    "other",
+    0.0
+  ],
+  "2026-00051312": [
+    "other",
+    0.0
+  ],
+  "2026-00051313": [
+    "other",
+    0.0
+  ],
+  "2026-00051314": [
+    "other",
+    0.0
+  ],
+  "2026-00051315": [
+    "other",
+    0.0
+  ],
+  "2026-00051316": [
+    "other",
+    0.0
+  ],
+  "2026-00051317": [
+    "other",
+    0.0
+  ],
+  "2026-00051318": [
+    "other",
+    0.0
+  ],
+  "2026-00051319": [
+    "other",
+    0.0
+  ],
+  "2026-00051320": [
+    "other",
+    0.0
+  ],
+  "2026-00051321": [
+    "other",
+    0.3
+  ],
+  "2026-00051322": [
+    "other",
+    0.3
+  ],
+  "2026-00051323": [
+    "other",
+    0.3
+  ],
+  "2026-00051324": [
+    "other",
+    0.3
+  ],
+  "2026-00051325": [
+    "other",
+    0.3
+  ],
+  "2026-00051326": [
+    "other",
+    0.3
+  ],
+  "2026-00051327": [
+    "other",
+    0.3
+  ],
+  "2026-00051330": [
+    "other",
+    0.3
+  ],
+  "2026-00051331": [
+    "other",
+    0.3
+  ],
+  "2026-00051332": [
+    "other",
+    0.3
+  ],
+  "2026-00051333": [
+    "other",
+    0.3
+  ],
+  "2026-00051334": [
+    "other",
+    0.3
+  ],
+  "2026-00051336": [
+    "other",
+    0.3
+  ],
+  "2026-00051337": [
+    "other",
+    0.3
+  ],
+  "2026-00051338": [
+    "other",
+    0.3
+  ],
+  "2026-00051339": [
+    "other",
+    0.3
+  ],
+  "2026-00051340": [
+    "other",
+    0.3
+  ],
+  "2026-00051341": [
+    "other",
+    0.3
+  ],
+  "2026-00051342": [
+    "other",
+    0.3
+  ],
+  "2026-00051343": [
+    "other",
+    0.3
+  ],
+  "2026-00051344": [
+    "other",
+    0.3
+  ],
+  "2026-00051345": [
+    "other",
+    0.3
+  ],
+  "2026-00051346": [
+    "other",
+    0.3
+  ],
+  "2026-00051347": [
+    "other",
+    0.3
+  ],
+  "2026-00051348": [
+    "other",
+    0.3
+  ],
+  "2026-00051349": [
+    "other",
+    0.3
+  ],
+  "2026-00051350": [
+    "other",
+    0.3
+  ],
+  "2026-00051351": [
+    "other",
+    0.3
+  ],
+  "2026-00051352": [
+    "other",
+    0.3
+  ],
+  "2026-00051353": [
+    "other",
+    0.3
+  ],
+  "2026-00051354": [
+    "other",
+    0.3
+  ],
+  "2026-00051356": [
+    "other",
+    0.3
+  ],
+  "2026-00051357": [
+    "other",
+    0.3
+  ],
+  "2026-00051358": [
+    "other",
+    0.3
+  ],
+  "2026-00051359": [
+    "other",
+    0.3
+  ],
+  "2026-00051360": [
+    "other",
+    0.3
+  ],
+  "2026-00051361": [
+    "other",
+    0.3
+  ],
+  "2026-00051362": [
+    "other",
+    0.3
+  ],
+  "2026-00051365": [
+    "other",
+    0.3
+  ],
+  "2401": [
+    "other",
+    0.3
+  ],
+  "2411": [
+    "other",
+    0.3
+  ],
+  "2604": [
+    "other",
+    0.3
+  ],
+  "2nd deg domes aslt": [
+    "assault",
+    0.95
+  ],
+  "30+ people in the area intox": [
+    "suspicious",
+    0.5
+  ],
+  "3102": [
+    "other",
+    0.3
+  ],
+  "36yo fem poss stroke left side facial numbness": [
+    "medical",
+    0.8
+  ],
+  "4002": [
+    "other",
+    0.3
+  ],
+  "422-chem. spill/leak": [
+    "other",
+    0.9
+  ],
+  "5103": [
+    "other",
+    0.3
+  ],
+  "5203": [
+    "other",
+    0.3
+  ],
+  "522-water/steam leak": [
+    "other",
+    0.3
+  ],
+  "561-unauthorized burning": [
+    "fire",
+    0.7
+  ],
+  "5704": [
+    "other",
+    0.3
+  ],
+  "6101": [
+    "other",
+    0.3
+  ],
+  "611-dispatched and cancelled": [
+    "other",
+    0.3
+  ],
+  "622-no incident found": [
+    "other",
+    0.3
+  ],
+  "64 y/o fem diff breathing": [
+    "medical",
+    0.7
+  ],
+  "68 yo fem coughing up blood, diff breathing": [
+    "medical",
+    0.9
+  ],
+  "69 y/o male poss cva aloc": [
+    "medical",
+    0.9
+  ],
+  "736-co detector malfunction": [
+    "other",
+    0.5
+  ],
+  "746-co detector / no co": [
+    "other",
+    0.2
+  ],
+  "900-cfd test case": [
+    "other",
+    0.1
+  ],
+  "911": [
+    "other",
+    0.5
+  ],
+  "911 disconnect / unknown": [
+    "other",
+    0.4
+  ],
+  "911 hangup call": [
+    "other",
+    0.4
+  ],
+  "911 wireless": [
+    "other",
+    0.5
+  ],
+  "a": [
+    "other",
+    0.1
+  ],
+  "abc2": [
+    "other",
+    0.1
+  ],
+  "administrative (document, lost or found property, messages,": [
+    "other",
+    0.1
+  ],
+  "advised": [
+    "other",
+    0.1
+  ],
+  "agec": [
+    "other",
+    0.1
+  ],
+  "ageg": [
+    "other",
+    0.1
+  ],
+  "agency assist - by sheriff's dept": [
+    "other",
+    0.3
+  ],
+  "agency assist - by windsor pd": [
+    "other",
+    0.3
+  ],
+  "air patrol": [
+    "other",
+    0.2
+  ],
+  "alc": [
+    "other",
+    0.1
+  ],
+  "all": [
+    "other",
+    0.1
+  ],
+  "alley": [
+    "other",
+    0.1
+  ],
+  "alr": [
+    "other",
+    0.1
+  ],
+  "als ambulance only": [
+    "medical",
+    0.6
+  ],
+  "ani": [
+    "other",
+    0.1
+  ],
+  "animal control call": [
+    "other",
+    0.2
+  ],
+  "apartment": [
+    "other",
+    0.1
+  ],
+  "apartment complex": [
+    "other",
+    0.1
+  ],
+  "ard1": [
+    "other",
+    0.1
+  ],
+  "arson": [
+    "fire",
+    0.8
+  ],
+  "assisted": [
+    "other",
+    0.1
+  ],
+  "assisted citizen": [
+    "other",
+    0.1
+  ],
+  "assisted other unit": [
+    "other",
+    0.1
+  ],
+  "after": [
+    "other",
+    0.1
+  ],
+  "agency assistance": [
+    "other",
+    0.3
+  ],
+  "all other - criminal": [
+    "other",
+    0.5
+  ],
+  "all other - non-criminal": [
+    "other",
+    0.2
+  ],
+  "all other offenses": [
+    "other",
+    0.5
+  ],
+  "all other/all other offenses": [
+    "other",
+    0.5
+  ],
+  "all other/damage to property (minor)": [
+    "other",
+    0.2
+  ],
+  "animal problem": [
+    "other",
+    0.2
+  ],
+  "at": [
+    "other",
+    0.1
+  ],
+  "bar, night club": [
+    "suspicious",
+    0.4
+  ],
+  "bia": [
+    "other",
+    0.1
+  ],
+  "bld1": [
+    "other",
+    0.1
+  ],
+  "blm": [
+    "other",
+    0.1
+  ],
+  "boat stop": [
+    "other",
+    0.2
+  ],
+  "brc1": [
+    "other",
+    0.1
+  ],
+  "brc3": [
+    "other",
+    0.1
+  ],
+  "brd1": [
+    "other",
+    0.1
+  ],
+  "broadcast made": [
+    "other",
+    0.1
+  ],
+  "bub1": [
+    "other",
+    0.1
+  ],
+  "burg - auto": [
+    "robbery",
+    0.6
+  ],
+  "burg - occupied resd": [
+    "robbery",
+    0.8
+  ],
+  "business": [
+    "other",
+    0.1
+  ],
+  "before": [
+    "other",
+    0.1
+  ],
+  "before,connector_ramp": [
+    "other",
+    0.1
+  ],
+  "ca": [
+    "other",
+    0.1
+  ],
+  "cancelled by caller": [
+    "other",
+    0.1
+  ],
+  "cb": [
+    "other",
+    0.1
+  ],
+  "chc2": [
+    "other",
+    0.1
+  ],
+  "chc4": [
+    "other",
+    0.3
+  ],
+  "chest pain - als1": [
+    "medical",
+    0.9
+  ],
+  "citation issued": [
+    "other",
+    0.3
+  ],
+  "citizen engagement": [
+    "other",
+    0.3
+  ],
+  "cod": [
+    "other",
+    0.3
+  ],
+  "completed (admin only)": [
+    "other",
+    0.3
+  ],
+  "computer hacking/invasion": [
+    "suspicious",
+    0.5
+  ],
+  "congestion": [
+    "traffic",
+    0.3
+  ],
+  "construction": [
+    "other",
+    0.3
+  ],
+  "convenience store": [
+    "other",
+    0.3
+  ],
+  "coroner's case": [
+    "medical",
+    0.8
+  ],
+  "credit card/atm fraud": [
+    "robbery",
+    0.4
+  ],
+  "carbon monoxide": [
+    "medical",
+    0.9
+  ],
+  "child abuse/simple": [
+    "assault",
+    0.8
+  ],
+  "civil problem": [
+    "other",
+    0.3
+  ],
+  "commercial": [
+    "other",
+    0.3
+  ],
+  "connector_ramp": [
+    "traffic",
+    0.3
+  ],
+  "controlled substance problem": [
+    "suspicious",
+    0.5
+  ],
+  "credit card/automated teller machine fraud": [
+    "robbery",
+    0.4
+  ],
+  "criminal mischief $5,000-$19,999-describe offense": [
+    "other",
+    0.4
+  ],
+  "damage to property": [
+    "other",
+    0.4
+  ],
+  "decreased loc - als1": [
+    "medical",
+    0.9
+  ],
+  "department, discount store": [
+    "other",
+    0.3
+  ],
+  "dest/dam/vand of property": [
+    "other",
+    0.4
+  ],
+  "dic1": [
+    "other",
+    0.3
+  ],
+  "dis": [
+    "other",
+    0.3
+  ],
+  "dispatch": [
+    "other",
+    0.3
+  ],
+  "disturb the peace": [
+    "noise",
+    0.4
+  ],
+  "doa - bls (pol)": [
+    "medical",
+    0.9
+  ],
+  "driving under the influence-alcohol": [
+    "traffic",
+    0.6
+  ],
+  "dru": [
+    "other",
+    0.3
+  ],
+  "dumpster": [
+    "other",
+    0.3
+  ],
+  "dupe call (cpd)": [
+    "other",
+    0.3
+  ],
+  "elderly home": [
+    "welfare",
+    0.4
+  ],
+  "elf": [
+    "other",
+    0.3
+  ],
+  "elr": [
+    "other",
+    0.3
+  ],
+  "electrical emergency": [
+    "fire",
+    0.7
+  ],
+  "emergency": [
+    "other",
+    0.9
+  ],
+  "expiration - displayed expired license plates": [
+    "traffic",
+    0.3
+  ],
+  "fab1": [
+    "other",
+    0.3
+  ],
+  "failure to register as a sex offender": [
+    "other",
+    0.4
+  ],
+  "false pretenses/swin/conf": [
+    "robbery",
+    0.4
+  ],
+  "family offenses, nonviolent": [
+    "domestic",
+    0.4
+  ],
+  "flagged down by citizen": [
+    "other",
+    0.3
+  ],
+  "foot patrol": [
+    "other",
+    0.3
+  ],
+  "found property": [
+    "other",
+    0.3
+  ],
+  "fraud - credit card / atm fraud": [
+    "robbery",
+    0.4
+  ],
+  "fraud - credit card/automatic teller machine": [
+    "robbery",
+    0.4
+  ],
+  "fraud - false pretense / scheme": [
+    "robbery",
+    0.4
+  ],
+  "fraud - false pretense / swindle / confidence game": [
+    "robbery",
+    0.4
+  ],
+  "fu": [
+    "other",
+    0.3
+  ],
+  "full": [
+    "other",
+    0.3
+  ],
+  "field initiated upgrade to als1": [
+    "medical",
+    0.9
+  ],
+  "fraud": [
+    "robbery",
+    0.4
+  ],
+  "fraud violation": [
+    "other",
+    0.1
+  ],
+  "fraud/false pretense or swindle": [
+    "other",
+    0.1
+  ],
+  "gas": [
+    "other",
+    0.2
+  ],
+  "gas station": [
+    "other",
+    0.2
+  ],
+  "gf": [
+    "other",
+    0.1
+  ],
+  "gone on arrival": [
+    "other",
+    0.1
+  ],
+  "government / public building": [
+    "other",
+    0.2
+  ],
+  "grocery, supermarket": [
+    "other",
+    0.2
+  ],
+  "hallway": [
+    "other",
+    0.1
+  ],
+  "handled by other police department": [
+    "other",
+    0.1
+  ],
+  "hec4": [
+    "other",
+    0.1
+  ],
+  "highway, road, alley": [
+    "traffic",
+    0.3
+  ],
+  "hospital": [
+    "medical",
+    0.5
+  ],
+  "hospital guard": [
+    "other",
+    0.2
+  ],
+  "hotel": [
+    "other",
+    0.2
+  ],
+  "hotel, motel, etc.": [
+    "other",
+    0.2
+  ],
+  "house": [
+    "other",
+    0.2
+  ],
+  "htc1": [
+    "other",
+    0.1
+  ],
+  "identity fraud c266.37e": [
+    "other",
+    0.1
+  ],
+  "if": [
+    "other",
+    0.1
+  ],
+  "information received": [
+    "other",
+    0.1
+  ],
+  "inv": [
+    "other",
+    0.1
+  ],
+  "investigate person": [
+    "other",
+    0.1
+  ],
+  "investigate property": [
+    "other",
+    0.1
+  ],
+  "liquor store": [
+    "other",
+    0.2
+  ],
+  "lo": [
+    "other",
+    0.1
+  ],
+  "location/building secure": [
+    "other",
+    0.1
+  ],
+  "lz": [
+    "other",
+    0.1
+  ],
+  "large capacity magazines prohibited": [
+    "other",
+    0.2
+  ],
+  "law": [
+    "other",
+    0.1
+  ],
+  "m.p.d. report compled": [
+    "other",
+    0.1
+  ],
+  "m/v - leaving scene - property damage": [
+    "traffic",
+    0.3
+  ],
+  "ma": [
+    "other",
+    0.1
+  ],
+  "misc": [
+    "other",
+    0.1
+  ],
+  "miscellaneous criminal offense": [
+    "other",
+    0.1
+  ],
+  "mu": [
+    "other",
+    0.1
+  ],
+  "mups": [
+    "other",
+    0.1
+  ],
+  "murder (general)": [
+    "assault",
+    0.95
+  ],
+  "miscellaneous/all other non-offenses": [
+    "other",
+    0.1
+  ],
+  "miscellaneous/deceased person": [
+    "other",
+    0.2
+  ],
+  "no cause": [
+    "other",
+    0.1
+  ],
+  "nps": [
+    "other",
+    0.1
+  ],
+  "natural gas odor": [
+    "other",
+    0.4
+  ],
+  "obc1": [
+    "other",
+    0.1
+  ],
+  "obstructing police": [
+    "other",
+    0.3
+  ],
+  "odc1": [
+    "other",
+    0.1
+  ],
+  "odc6": [
+    "other",
+    0.1
+  ],
+  "oi": [
+    "other",
+    0.1
+  ],
+  "one down - bls - first responder required (pol)": [
+    "medical",
+    0.9
+  ],
+  "other": [
+    "other",
+    0.1
+  ],
+  "obstructing justice": [
+    "other",
+    0.3
+  ],
+  "off_ramp": [
+    "traffic",
+    0.3
+  ],
+  "on,at": [
+    "other",
+    0.1
+  ],
+  "on_ramp": [
+    "traffic",
+    0.3
+  ],
+  "outside": [
+    "other",
+    0.1
+  ],
+  "parking citation issued": [
+    "other",
+    0.1
+  ],
+  "parking lot, garage": [
+    "other",
+    0.2
+  ],
+  "peace-standby to assure (no court ordr svc)": [
+    "other",
+    0.1
+  ],
+  "persons crime": [
+    "assault",
+    0.8
+  ],
+  "pf": [
+    "other",
+    0.3
+  ],
+  "planned event": [
+    "other",
+    0.2
+  ],
+  "ple": [
+    "other",
+    0.3
+  ],
+  "property - damage": [
+    "other",
+    0.4
+  ],
+  "ps": [
+    "other",
+    0.3
+  ],
+  "police assist": [
+    "other",
+    0.3
+  ],
+  "private": [
+    "other",
+    0.3
+  ],
+  "quiet on arrival": [
+    "other",
+    0.1
+  ],
+  "raw fem": [
+    "suspicious",
+    0.5
+  ],
+  "recreation": [
+    "other",
+    0.2
+  ],
+  "res": [
+    "other",
+    0.3
+  ],
+  "residence - yard (front / back)": [
+    "suspicious",
+    0.4
+  ],
+  "residence, home": [
+    "other",
+    0.3
+  ],
+  "residential facility": [
+    "other",
+    0.3
+  ],
+  "restaurant": [
+    "other",
+    0.3
+  ],
+  "runaway": [
+    "welfare",
+    0.5
+  ],
+  "sd": [
+    "other",
+    0.3
+  ],
+  "si": [
+    "other",
+    0.3
+  ],
+  "sidewalk": [
+    "other",
+    0.3
+  ],
+  "single family home": [
+    "other",
+    0.3
+  ],
+  "special assignment / detail": [
+    "other",
+    0.3
+  ],
+  "specialty store": [
+    "other",
+    0.3
+  ],
+  "stby": [
+    "other",
+    0.3
+  ],
+  "stc1": [
+    "other",
+    0.3
+  ],
+  "street": [
+    "other",
+    0.3
+  ],
+  "subj stop": [
+    "suspicious",
+    0.4
+  ],
+  "subject warned": [
+    "other",
+    0.3
+  ],
+  "sus": [
+    "suspicious",
+    0.5
+  ],
+  "szc3": [
+    "other",
+    0.3
+  ],
+  "szd1": [
+    "other",
+    0.3
+  ],
+  "sex offense/indecent exposure": [
+    "assault",
+    0.85
+  ],
+  "state": [
+    "other",
+    0.3
+  ],
+  "tab1": [
+    "other",
+    0.3
+  ],
+  "tab2": [
+    "other",
+    0.3
+  ],
+  "taser": [
+    "other",
+    0.7
+  ],
+  "taser_beanbag_pepperball_40mm": [
+    "other",
+    0.7
+  ],
+  "tcp": [
+    "other",
+    0.3
+  ],
+  "telephone": [
+    "other",
+    0.3
+  ],
+  "theater": [
+    "other",
+    0.3
+  ],
+  "toured area": [
+    "other",
+    0.3
+  ],
+  "trailer park": [
+    "other",
+    0.3
+  ],
+  "trb1": [
+    "other",
+    0.3
+  ],
+  "trd1": [
+    "other",
+    0.3
+  ],
+  "tre": [
+    "other",
+    0.3
+  ],
+  "trf": [
+    "other",
+    0.3
+  ],
+  "trouble breathing - als1": [
+    "medical",
+    0.9
+  ],
+  "tree down": [
+    "other",
+    0.4
+  ],
+  "tribal": [
+    "other",
+    0.3
+  ],
+  "ukd1": [
+    "other",
+    0.3
+  ],
+  "unc1": [
+    "other",
+    0.3
+  ],
+  "und1": [
+    "other",
+    0.3
+  ],
+  "und3": [
+    "other",
+    0.3
+  ],
+  "unknown - ani/ali - landline (includes open line)": [
+    "suspicious",
+    0.5
+  ],
+  "unknown - ani/ali - wrls phns (incl open line)": [
+    "suspicious",
+    0.5
+  ],
+  "unknown problem": [
+    "suspicious",
+    0.5
+  ],
+  "upgrade - high rise full": [
+    "fire",
+    0.95
+  ],
+  "usfs": [
+    "other",
+    0.3
+  ],
+  "underburn": [
+    "other",
+    0.1
+  ],
+  "val - operating w/o authorization lawful": [
+    "suspicious",
+    0.3
+  ],
+  "van": [
+    "other",
+    0.1
+  ],
+  "veh": [
+    "other",
+    0.1
+  ],
+  "veh stop": [
+    "traffic",
+    0.2
+  ],
+  "violation - restraining order (no arrest)": [
+    "domestic",
+    0.5
+  ],
+  "violation of court order": [
+    "other",
+    0.3
+  ],
+  "vagrancy": [
+    "other",
+    0.2
+  ],
+  "wa": [
+    "other",
+    0.1
+  ],
+  "wea": [
+    "other",
+    0.1
+  ],
+  "wel": [
+    "other",
+    0.1
+  ],
+  "wfa": [
+    "other",
+    0.1
+  ],
+  "wire fraud": [
+    "other",
+    0.2
+  ],
+  "wires down": [
+    "other",
+    0.4
+  ],
+  "cars parking on n park of street": [
+    "traffic",
+    0.2
+  ],
+  "comm burg": [
+    "suspicious",
+    0.4
+  ],
+  "cwb on 911 open line": [
+    "suspicious",
+    0.7
+  ],
+  "cwb on brother": [
+    "assault",
+    0.6
+  ],
+  "cwb on callers sister": [
+    "assault",
+    0.6
+  ],
+  "cwb on texter": [
+    "assault",
+    0.6
+  ],
+  "dark colored audi weaving / speeding sb": [
+    "traffic",
+    0.5
+  ],
+  "fem grey toyota highlander": [
+    "suspicious",
+    0.3
+  ],
+  "fem handed caller susp note - 1.5 hr td - tx to start": [
+    "suspicious",
+    0.4
+  ],
+  "found old black dog": [
+    "welfare",
+    0.2
+  ],
+  "fraud - tx": [
+    "other",
+    0.2
+  ],
+  "group of subjs lingering near the business": [
+    "suspicious",
+    0.3
+  ],
+  "kids on a golfcart driving erratically in the road": [
+    "traffic",
+    0.5
+  ],
+  "lost plt": [
+    "welfare",
+    0.2
+  ],
+  "loud music": [
+    "noise",
+    0.2
+  ],
+  "loud music coming from house": [
+    "noise",
+    0.2
+  ],
+  "loud music in the area": [
+    "noise",
+    0.2
+  ],
+  "low hanging wire": [
+    "other",
+    0.4
+  ],
+  "male no shirt by road": [
+    "suspicious",
+    0.3
+  ],
+  "motorcycle vs silver/tan suv - blocking": [
+    "traffic",
+    0.6
+  ],
+  "neighbor shining lasers into back yard": [
+    "suspicious",
+    0.3
+  ],
+  "people in bed of truck while traveling down the road": [
+    "traffic",
+    0.3
+  ],
+  "po to standby to get found phone": [
+    "welfare",
+    0.2
+  ],
+  "red ford four door sedan -all over road": [
+    "traffic",
+    0.5
+  ],
+  "sb in nb lanes - wht chevy truck": [
+    "traffic",
+    0.5
+  ],
+  "specialevents": [
+    "other",
+    0.1
+  ],
+  "susp incident": [
+    "suspicious",
+    0.4
+  ],
+  "tan ford pickup truck": [
+    "suspicious",
+    0.3
+  ],
+  "tx to start": [
+    "other",
+    0.1
+  ],
+  "white 2026 ford bronco vs grey 2016 mazda cx5-not blocking": [
+    "traffic",
+    0.4
+  ],
+  "white suv parked in front of the address for 20 mins": [
+    "suspicious",
+    0.2
+  ],
+  "wht jeep all over the rdway": [
+    "traffic",
+    0.5
+  ]
+}

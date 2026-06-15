@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Panoptes · live event intelligence</title>
+<link rel="icon" type="image/png" href="/assets/logo.png" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --bg:#07090d; --panel:rgba(14,18,26,.72); --line:rgba(120,150,200,.14);
+    --txt:#dfe7f2; --dim:#8493ab; --accent:#37e0c4; --hot:#ff3b6b; --warn:#ffb02e;
+    --font:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:var(--font);overflow:hidden}
+  #map{position:absolute;inset:0;background:#07090d}
+  .leaflet-container{background:#07090d}
+
+  /* HUD panels */
+  .hud{position:absolute;z-index:1000;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    box-shadow:0 8px 40px rgba(0,0,0,.5)}
+  #top{top:16px;left:16px;right:16px;display:flex;align-items:center;gap:14px;
+    padding:12px 18px;flex-wrap:wrap}
+  #logo{height:28px;width:auto;filter:drop-shadow(0 0 7px rgba(255,59,107,.55))}
+  #top .brand{font-weight:700;letter-spacing:4px;font-size:16px;
+    background:linear-gradient(90deg,var(--hot),#ff7b9c,var(--accent));-webkit-background-clip:text;
+    background-clip:text;color:transparent}
+  #top .sub{color:var(--dim);font-size:11px;letter-spacing:1px}
+  #top .spacer{flex:1}
+  .pill{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px}
+  #alertPill{cursor:pointer}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 10px var(--accent);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  label.ctl{display:flex;flex-direction:column;gap:2px;font-size:8px;color:var(--dim);
+    letter-spacing:1px}
+  select,button{font-family:var(--font);background:rgba(30,38,52,.8);color:var(--txt);
+    border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12px;
+    cursor:pointer}
+  button:hover,select:hover{border-color:var(--accent)}
+  button.on{color:var(--accent);border-color:var(--accent)}
+
+  #side{top:96px;right:16px;width:300px;max-height:calc(100% - 150px);
+    display:flex;flex-direction:column;padding:14px}
+  #side h3{margin:0 0 4px;font-size:12px;letter-spacing:2px;color:var(--dim)}
+  #count{font-size:34px;font-weight:700;line-height:1.1}
+  #count small{font-size:12px;color:var(--dim);font-weight:400;letter-spacing:1px}
+  #feed{margin-top:12px;overflow:auto;display:flex;flex-direction:column;gap:7px}
+  .row{padding:9px 11px;border:1px solid var(--line);border-radius:10px;
+    background:rgba(255,255,255,.02);cursor:pointer;transition:.15s}
+  .row:hover{border-color:var(--accent);transform:translateX(-2px)}
+  .row.recent{border-color:var(--hot);background:rgba(255,59,107,.07)}
+  .row .t{display:flex;justify-content:space-between;font-size:12px}
+  .row .ty{text-transform:uppercase;letter-spacing:1px}
+  .row .loc{color:var(--dim);font-size:10px;margin-top:3px}
+  .row .ago{color:var(--accent);font-size:9px;letter-spacing:1px}
+  .sev{font-weight:700}
+  .sev.hi{color:var(--hot)} .sev.mid{color:var(--warn)} .sev.lo{color:var(--accent)}
+  .badge{font-size:9px;padding:1px 6px;border-radius:6px;letter-spacing:1px;
+    background:var(--hot);color:#fff;margin-left:6px}
+  .badge.new{background:var(--accent);color:#04110d}
+
+  #legend{bottom:16px;left:16px;padding:11px 14px;font-size:10px;color:var(--dim)}
+  #legend .bar{height:8px;width:180px;border-radius:4px;margin:6px 0 4px;
+    background:linear-gradient(90deg,#1b3a8c,#37e0c4,#ffb02e,#ff3b6b)}
+  #legend .ends{display:flex;justify-content:space-between}
+  #legend .hint{margin-top:6px;color:var(--dim);opacity:.8}
+
+  /* footer: Sardistic credit + copyright + github */
+  #footer{bottom:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;
+    gap:11px;padding:7px 15px;font-size:10px;color:var(--dim);white-space:nowrap;letter-spacing:.5px}
+  #footer img{height:22px;width:auto;opacity:.95}
+  #footer a{color:var(--txt);text-decoration:none}
+  #footer .sep{opacity:.35}
+  #footer .gh{display:inline-flex;align-items:center;gap:4px}
+  #footer .gh:hover{color:var(--accent)}
+  #footer .gh svg{width:13px;height:13px;fill:currentColor}
+  /* sardistic.com: rainbow-cycling underline on hover */
+  .rainbow{position:relative;color:var(--txt)}
+  .rainbow::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;border-radius:2px;
+    background:linear-gradient(90deg,#ff3b6b,#ffb02e,#37e0c4,#5b8cff,#b14bff,#ff3b6b);
+    background-size:200% 100%;opacity:0;transition:opacity .2s}
+  .rainbow:hover::after{opacity:1;animation:rainbow 1.1s linear infinite}
+  @keyframes rainbow{to{background-position:200% 0}}
+  .leaflet-popup-content-wrapper{background:#0d1119;color:var(--txt);
+    border:1px solid var(--line);font-family:var(--font)}
+  .leaflet-popup-tip{background:#0d1119}
+  .pop b{color:var(--accent)} .pop .f{font-size:11px;color:var(--dim);margin-top:4px}
+  /* city aggregate bubble label */
+  .bubble-lbl span{position:absolute;transform:translate(-50%,-50%);font-size:11px;
+    font-weight:700;color:#fff;text-shadow:0 0 5px #000,0 0 3px #000;pointer-events:none}
+  .pulse-ring{animation:ring 1.8s ease-out infinite}
+  @keyframes ring{0%{stroke-opacity:.9}50%{stroke-opacity:.25}100%{stroke-opacity:.9}}
+  .ping span{position:absolute;left:0;top:0;width:14px;height:14px;
+    margin:-7px 0 0 -7px;border-radius:50%;border:2px solid var(--accent);
+    animation:ping 2s ease-out forwards;pointer-events:none}
+  .ping.hi span{border-color:var(--hot)}
+  .ping.mid span{border-color:var(--warn)}
+  @keyframes ping{0%{transform:scale(.3);opacity:.95}100%{transform:scale(5);opacity:0}}
+  @keyframes fade{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
+  .surge-ring{animation:surge 1.3s ease-out infinite}
+  @keyframes surge{0%{stroke-opacity:1;stroke-width:3}100%{stroke-opacity:.1;stroke-width:1}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="top" class="hud">
+  <img id="logo" src="/assets/logo.png" alt="Panoptes" />
+  <span class="brand">PANOPTES</span>
+  <span class="sub">ALL-SEEING · LIVE EVENT INTELLIGENCE</span>
+  <span class="spacer"></span>
+  <span class="pill"><span class="dot"></span><span id="status">LIVE</span></span>
+  <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
+    ⚠ <span id="alertCount">0</span> SURGE</span>
+  <label class="ctl">AREA<select id="metro"><option>loading feeds…</option></select></label>
+  <label class="ctl">WINDOW<select id="window" title="time window">
+    <option value="0.0833">⚡ LIVE (5m)</option>
+    <option value="0.25">15 MIN</option>
+    <option value="1" selected>1 HOUR</option>
+    <option value="6">6 HOURS</option>
+    <option value="12">12 HOURS</option>
+    <option value="24">24 HOURS</option>
+    <option value="168">1 WEEK</option>
+  </select></label>
+  <label class="ctl">TYPE<select id="type"><option value="">ALL TYPES</option></select></label>
+  <label class="ctl">SEVERITY<select id="minThreat">
+    <option value="0">ALL</option>
+    <option value="0.4">⚠ ELEVATED ≥0.40</option>
+    <option value="0.7">🔴 HIGH ≥0.70</option>
+  </select></label>
+  <label class="ctl">ALERTS<span style="display:flex;gap:6px">
+    <button id="spikesBtn" class="on" title="emerging-spike rings">⚡ SPIKES</button>
+    <button id="surgesBtn" class="on" title="surge-anomaly alerts">⚠ SURGES</button>
+  </span></label>
+  <button id="pauseBtn">⏸ PAUSE</button>
+</div>
+
+<div id="side" class="hud">
+  <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
+  <div id="count">0<small> in view</small></div>
+  <div id="feed"></div>
+</div>
+
+<div id="legend" class="hud">
+  THREAT INTENSITY
+  <div class="bar"></div>
+  <div class="ends"><span>low</span><span>critical</span></div>
+  <div class="hint">zoom in for incident detail · scoped to map view</div>
+</div>
+
+<div id="footer" class="hud">
+  <span>© 2026 Panoptes</span><span class="sep">·</span>
+  <span>built by</span>
+  <img src="/assets/liquid.gif" alt="Sardistic" />
+  <a href="https://sardistic.com" target="_blank" rel="noopener" class="rainbow">sardistic.com</a>
+  <span class="sep">·</span>
+  <a class="gh" href="https://github.com/sardistic/panoptes" target="_blank" rel="noopener" title="GitHub repository">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub
+  </a>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+const CENTERS = {};            // metro -> [lat,lon], from /live/metros
+const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
+const CITY_ZOOM = 9;           // below this -> city bubbles; at/above -> incident detail
+
+const map = L.map('map',{zoomControl:false,attributionControl:false})
+  .setView([39.5, -98.35], 4);
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  {maxZoom:19}).addTo(map);
+
+let heat = L.heatLayer([], {radius:30, blur:22, maxZoom:14, max:1.0,
+  gradient:{0.0:'#1b3a8c',0.35:'#2f8fd0',0.55:'#37e0c4',0.75:'#ffb02e',1.0:'#ff3b6b'}})
+  .addTo(map);
+let markers   = L.layerGroup().addTo(map);
+let cityLayer = L.layerGroup().addTo(map);
+let emergingLayer = L.layerGroup().addTo(map);
+let pingLayer = L.layerGroup().addTo(map);
+let alertLayer = L.layerGroup().addTo(map);
+
+let paused = false, timer = null;
+let currentData = [];          // last fetched incident set (full scope)
+let emergingClusters = [];     // last fetched emerging clusters
+let seenIds = new Set(), primed = false;
+let showSpikes = true, showSurges = true, surgeAlerts = [];
+let fitNext = false;
+const US_BOUNDS = [[24.5,-125.0],[49.5,-66.5]];
+
+const sevClass = t => t>=0.7?'hi':t>=0.4?'mid':'lo';
+const sevColor = t => t>=0.7?'#ff3b6b':t>=0.4?'#ffb02e':'#37e0c4';
+const winHours = () => document.getElementById('window').value;
+const winLabel = () => document.getElementById('window').selectedOptions[0].textContent.trim();
+const isNational = () => document.getElementById('metro').value==='__all__';
+const cityName = m => (m||'?').replace(/^(ag_|pp_|p2c_|ss_)/,'').replace(/_/g,' ').slice(0,30);
+
+function ago(ts){
+  if(!ts) return '';
+  const s = Date.now()/1000 - ts;
+  if(s<1) return 'now';                 // future/sub-second -> 'now', never '0s ago'
+  if(s<60) return Math.floor(s)+'s ago';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+
+// ── filters + viewport scoping ───────────────────────────────────────────────
+function applyFilters(arr){
+  const t = document.getElementById('type').value;
+  const mt = parseFloat(document.getElementById('minThreat').value)||0;
+  return arr.filter(d => (!t || d.type===t) && (d.threat_score>=mt));
+}
+const inView = arr => {
+  const b = map.getBounds();
+  return arr.filter(d => d.lat!=null && d.lon!=null && b.contains([d.lat,d.lon]));
+};
+
+function refreshTypeOptions(){
+  const sel = document.getElementById('type');
+  const keep = sel.value;
+  const types = [...new Set(currentData.map(d=>d.type))].sort();
+  sel.innerHTML = '<option value="">ALL TYPES</option>' +
+    types.map(t=>`<option value="${t}">${t.replace(/_/g,' ').toUpperCase()}</option>`).join('');
+  sel.value = types.includes(keep) ? keep : '';
+}
+
+// ── data load (fetch once; draw() handles filters/viewport without refetch) ───
+async function load(){
+  if(paused) return;
+  const metro = document.getElementById('metro').value;
+  const w = winHours();
+  let url, label;
+  if(metro==='__all__'){ url=`/live/overview?max_age_hours=${w}`; label=`NATIONAL · ${winLabel()}`; }
+  else if(LIVE_METROS.has(metro)){ url=`/live/incidents?metro=${metro}&max_age_hours=${w}`; label=`LIVE · ${winLabel()}`; }
+  else { return; }
+
+  let data=[];
+  try{ data = await (await fetch(url)).json(); }
+  catch(e){ document.getElementById('status').textContent='OFFLINE'; return; }
+  document.getElementById('status').textContent = label;
+  currentData = data.filter(d=>d.lat!=null && d.lon!=null);
+  refreshTypeOptions();
+  if(isNational()) await loadEmerging();
+  if(isNational()) loadAlerts(); else alertLayer.clearLayers();
+  draw();
+  pingNew(inView(applyFilters(currentData)));
+  if(fitNext && currentData.length){
+    if(isNational()) map.fitBounds(US_BOUNDS,{padding:[20,20]});
+    else map.fitBounds(currentData.map(d=>[d.lat,d.lon]),{padding:[40,40],maxZoom:14});
+    fitNext=false;
+  }
+}
+
+// ── draw: filtered + viewport-scoped render, city bubbles vs incident detail ──
+function draw(){
+  const scoped = inView(applyFilters(currentData));
+  markers.clearLayers(); cityLayer.clearLayers();
+  const zoomedOut = map.getZoom() < CITY_ZOOM;
+
+  if(zoomedOut){
+    heat.setLatLngs([]);                       // no smeary heat at country/region zoom
+    cityBubbles(scoped).forEach(renderBubble); // per-city aggregate granularity
+  } else {
+    heat.setOptions({radius:32, blur:22, max:1.0, minOpacity:0.15, maxZoom:14});
+    heat.setLatLngs(scoped.map(d=>[d.lat,d.lon,Math.max(0.08,d.threat_score)]));
+    scoped.filter(d=>d.emerging || d.threat_score>=0.8).forEach(d=>{
+      const m=L.circleMarker([d.lat,d.lon],{radius:7,color:'#ff3b6b',weight:2,
+        fillColor:'#ff3b6b',fillOpacity:.5});
+      m.on('click',()=>openIncident(d)); m.addTo(markers);
+    });
+  }
+  updateCount(scoped, zoomedOut);
+  if(isNational()) renderEmergingPanel(scoped);
+  else renderIncidentPanel(scoped);
+}
+
+function cityBubbles(pts){
+  const g = {};
+  pts.forEach(d=>{ (g[d.metro] ||= []).push(d); });
+  return Object.entries(g).map(([metro,arr])=>({
+    metro, cnt:arr.length,
+    lat: arr.reduce((s,d)=>s+d.lat,0)/arr.length,
+    lon: arr.reduce((s,d)=>s+d.lon,0)/arr.length,
+    peak: Math.max(...arr.map(d=>d.threat_score)),
+  })).sort((a,b)=>b.cnt-a.cnt);
+}
+
+function renderBubble(b){
+  const col = sevColor(b.peak);
+  const r = 7 + Math.min(30, Math.sqrt(b.cnt)*4.5);
+  const m = L.circleMarker([b.lat,b.lon],{radius:r,color:col,weight:1.5,
+    fillColor:col,fillOpacity:.16});
+  m.bindTooltip(`${cityName(b.metro)} · ${b.cnt} incidents · peak ${b.peak.toFixed(2)}`,
+    {direction:'top'});
+  m.on('click',()=>map.flyTo([b.lat,b.lon],11));
+  m.addTo(cityLayer);
+  if(b.cnt>=2){
+    L.marker([b.lat,b.lon],{interactive:false,icon:L.divIcon({className:'bubble-lbl',
+      html:`<span>${b.cnt}</span>`,iconSize:[0,0]})}).addTo(cityLayer);
+  }
+}
+
+function updateCount(scoped, zoomedOut){
+  const emg = scoped.filter(d=>d.emerging).length;
+  const scopeTxt = zoomedOut ? `${cityBubbles(scoped).length} cities · ${winLabel()}`
+                             : `in view · ${winLabel()}`;
+  document.getElementById('count').innerHTML =
+    `${scoped.length}<small> ${scopeTxt}${emg?` · ${emg} emerging`:''}</small>`;
+}
+
+// ── side panels ──────────────────────────────────────────────────────────────
+function renderIncidentPanel(scoped){
+  document.getElementById('sideTitle').textContent='ACTIVE INCIDENTS';
+  const feed=document.getElementById('feed'); feed.innerHTML='';
+  scoped.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,50).forEach(d=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="t"><span class="ty">${d.type}`
+      +`${d.emerging?'<span class="badge">EMERGING</span>':''}</span>`
+      +`<span class="sev ${sevClass(d.threat_score)}">${d.threat_score.toFixed(2)}</span></div>`
+      +`<div class="loc">${d.location||'—'} · ${d.sentiment} <span class="ago">${ago(d.ts)}</span></div>`;
+    row.onclick=()=>{ map.flyTo([d.lat,d.lon],15); openIncident(d); };
+    feed.appendChild(row);
+  });
+}
+
+function renderEmergingPanel(scoped){
+  document.getElementById('sideTitle').innerHTML='<span style="color:var(--hot)">⚠ EMERGING EVENTS</span>';
+  emergingLayer.clearLayers();
+  const b=map.getBounds();
+  // viewport-scoped + most-recent first
+  const cl = emergingClusters.filter(c=>b.contains([c.lat,c.lon]))
+    .sort((a,b)=>(b.latest_ts||0)-(a.latest_ts||0));
+  if(showSpikes) cl.slice(0,40).forEach(c=>{
+    const ring=L.circleMarker([c.lat,c.lon],{radius:8+Math.min(18,c.count/6),
+      color:'#ff3b6b',weight:2,fill:false,className:'pulse-ring'});
+    ring.bindTooltip(`${c.count} converging · peak ${c.peak_threat} · ${ago(c.latest_ts)}`,{direction:'top'});
+    ring.on('click',()=>onEmergingClick(c));
+    ring.addTo(emergingLayer);
+  });
+  const feed=document.getElementById('feed'); feed.innerHTML='';
+  if(!cl.length){ feed.innerHTML='<div class="loc" style="padding:8px">no emerging clusters in view</div>'; }
+  cl.slice(0,30).forEach((c,i)=>{
+    const row=document.createElement('div'); row.className='row'+(i===0?' recent':'');
+    const t=Object.keys(c.types).slice(0,2).join(', ');
+    row.innerHTML=`<div class="t"><span class="ty">${t}`
+      +`${i===0?'<span class="badge new">MOST RECENT</span>':''}</span>`
+      +`<span class="sev ${sevClass(c.peak_threat)}">${c.score}</span></div>`
+      +`<div class="loc">${cityName(c.metro)} · ${c.count} incidents · peak ${c.peak_threat} `
+      +`<span class="ago">${ago(c.latest_ts)}</span></div>`;
+    row.onclick=()=>onEmergingClick(c);
+    feed.appendChild(row);
+  });
+}
+
+const EMERGING_HOURS = 6;   // emerging needs incidents to accumulate/converge —
+                            // decouple its lookback from the (often short) display window
+async function loadEmerging(){
+  const w = Math.max(EMERGING_HOURS, +winHours());
+  try{ emergingClusters = await (await fetch(`/live/emerging?max_age_hours=${w}`)).json(); }
+  catch(e){ emergingClusters=[]; }
+}
+
+async function loadAlerts(){
+  let alerts=[];
+  try{ alerts = await (await fetch('/baseline/anomalies?window_hours=1&lookback_hours=72&z=2')).json(); }
+  catch(e){ return; }
+  // attach a map point + keep the strongest first so the pill jumps to the top surge
+  surgeAlerts = alerts
+    .map(a=>({...a, _c:(a.lat!=null&&a.lon!=null)?[a.lat,a.lon]:CENTERS[a.metro]}))
+    .filter(a=>a._c).sort((x,y)=>(y.zscore||0)-(x.zscore||0));
+  const pill=document.getElementById('alertPill');
+  pill.style.display = surgeAlerts.length ? 'flex' : 'none';
+  document.getElementById('alertCount').textContent = surgeAlerts.length;
+  alertLayer.clearLayers();
+  if(!showSurges) return;                       // toggled off in the ALERTS selector
+  surgeAlerts.forEach(a=>{
+    const ring=L.circleMarker(a._c,{radius:24,color:'#ff3b6b',weight:3,fill:false,className:'surge-ring'});
+    ring.bindTooltip(`⚠ SURGE · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)`,
+      {direction:'top'});
+    ring.on('click',()=>focusSurge(a)); ring.addTo(alertLayer);
+  });
+}
+const surgeName = a => (a.name||a.metro||'').replace(/^(ag_|pp_|p2c_|ss_)/,'');
+function focusSurge(a){                          // select a surge: zoom + correlate to news
+  map.flyTo(a._c,11);
+  showCorrelation(a._c[0],a._c[1],'',
+    `<div class="f">⚠ surge · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)</div>`);
+}
+
+// ── new-incident pings (scoped to view) ──────────────────────────────────────
+function pingNew(pts){
+  if(!primed){ pts.forEach(d=>seenIds.add(d.call_id)); primed=true; return; }
+  const fresh = pts.filter(d=>!seenIds.has(d.call_id));
+  fresh.forEach(d=>seenIds.add(d.call_id));
+  fresh.slice(0,80).forEach(d=>{
+    const sev=d.threat_score>=0.7?'hi':d.threat_score>=0.45?'mid':'';
+    const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'ping '+sev,
+      html:'<span></span>',iconSize:[0,0]}),interactive:false}).addTo(pingLayer);
+    setTimeout(()=>pingLayer.removeLayer(m),2100);
+  });
+  if(fresh.length){
+    const c=document.getElementById('count'), tag=document.createElement('span');
+    tag.textContent=` +${fresh.length} new`;
+    tag.style.cssText='color:var(--accent);font-size:13px;font-weight:700;'
+      +'animation:fade 3s ease-out forwards;text-shadow:0 0 8px var(--accent)';
+    c.appendChild(tag); setTimeout(()=>tag.remove(),3000);
+  }
+}
+function resetScope(){ seenIds.clear(); primed=false; pingLayer.clearLayers(); }
+
+// ── GDELT correlation (shared by spikes, surge alerts, and incidents) ────────
+function articlesHtml(arts){
+  if(!arts || !arts.length) return '<div class="f">no matching news (last 3d)</div>';
+  return arts.slice(0,4).map(a=>`<div class="f" style="margin-top:5px">`
+    +`<a href="${a.url}" target="_blank" style="color:var(--accent)">${(a.title||'(untitled)').slice(0,78)}</a>`
+    +`<div style="opacity:.7">${a.domain||''} · ${a.at?ago(new Date(a.at).getTime()/1000):''}</div></div>`).join('');
+}
+async function fetchCorrelation(lat,lon,types){
+  try{ return await (await fetch(`/correlate?lat=${lat}&lon=${lon}&types=${types||''}`)).json(); }
+  catch(e){ return {articles:[]}; }
+}
+// Open a popup that fills in "possible cause" news once GDELT responds.
+function showCorrelation(lat,lon,types,headerHtml){
+  const pop=L.popup({maxWidth:320}).setLatLng([lat,lon])
+    .setContent('<div class="pop"><b>CORRELATING…</b><div class="f">searching news near here</div></div>')
+    .openOn(map);
+  fetchCorrelation(lat,lon,types).then(r=>{
+    const place=r.place?`${r.place}${r.state?', '+r.state:''}`:'this area';
+    pop.setContent(`<div class="pop"><b>POSSIBLE CAUSE</b> · ${place}`
+      +(headerHtml||'')+articlesHtml(r.articles)+`</div>`);
+  });
+}
+
+function onEmergingClick(c){
+  map.flyTo([c.lat,c.lon],12);
+  const types=Object.keys(c.types||{}).slice(0,3).join(',');
+  showCorrelation(c.lat,c.lon,types,
+    `<div class="f">${c.count} converging · ${Object.keys(c.types||{})[0]||''}</div>`);
+}
+
+async function openIncident(d){
+  let feeds=[];
+  try{ feeds = await (await fetch(`/feeds?lat=${d.lat}&lon=${d.lon}&radius_m=1000`)).json(); }catch(e){}
+  const base=`<div class="pop"><b>${d.type.toUpperCase()}</b> · ${d.threat_score.toFixed(2)}`
+    +`<div>${d.summary||''}</div>`
+    +`<div class="f">${d.location||''} · ${d.sentiment} · ${ago(d.ts)}</div>`
+    +`<div class="f">${feeds.length?`📷 ${feeds.length} nearby feed(s)`:'no public feeds nearby'}</div>`;
+  const pop=L.popup().setLatLng([d.lat,d.lon])
+    .setContent(base+`<div class="f" style="margin-top:6px;opacity:.6">↻ checking news…</div></div>`)
+    .openOn(map);
+  fetchCorrelation(d.lat,d.lon,d.type).then(r=>{       // incident-level correlation
+    const arts=(r.articles||[]).slice(0,3);
+    pop.setContent(base+(arts.length
+      ? `<div class="f" style="margin-top:6px;color:var(--accent)">POSSIBLE CAUSE</div>`+articlesHtml(arts)
+      : `<div class="f" style="margin-top:6px;opacity:.6">no related news nearby</div>`)+`</div>`);
+  });
+}
+
+// ── controls ─────────────────────────────────────────────────────────────────
+document.getElementById('metro').onchange=e=>{
+  const v=e.target.value; resetScope();
+  if(v==='__all__') map.fitBounds(US_BOUNDS,{padding:[20,20]});
+  else if(CENTERS[v]) map.flyTo(CENTERS[v],12);
+  else fitNext=true;
+  load();
+};
+document.getElementById('window').onchange=()=>{ resetScope(); load(); };
+document.getElementById('type').onchange=draw;
+document.getElementById('minThreat').onchange=draw;
+document.getElementById('spikesBtn').onclick=e=>{
+  showSpikes=!showSpikes; e.target.classList.toggle('on',showSpikes);
+  if(!showSpikes) emergingLayer.clearLayers(); else if(isNational()) draw();
+};
+document.getElementById('surgesBtn').onclick=e=>{
+  showSurges=!showSurges; e.target.classList.toggle('on',showSurges);
+  if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
+};
+document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
+document.getElementById('pauseBtn').onclick=e=>{
+  paused=!paused; e.target.classList.toggle('on',paused);
+  e.target.textContent=paused?'▶ RESUME':'⏸ PAUSE';
+};
+
+// re-render (no refetch) when the visible area changes — keeps everything scoped to view
+let moveT=null;
+map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120); });
+
+async function loadMetros(){
+  let metros=[];
+  try{ metros = await (await fetch('/live/metros')).json(); }catch(e){}
+  const sel=document.getElementById('metro'); sel.innerHTML='';
+  const all=document.createElement('option');
+  all.value='__all__'; all.textContent=`🌎 NATIONAL OVERVIEW (${metros.length} feeds)`;
+  sel.appendChild(all);
+  metros.forEach(m=>{
+    if(m.center) CENTERS[m.metro]=m.center;
+    LIVE_METROS.add(m.metro);
+    const o=document.createElement('option');
+    o.value=m.metro; o.textContent=(m.state?`[${m.state}] `:'')+m.name.slice(0,46)+' ⚡';
+    sel.appendChild(o);
+  });
+}
+
+(async ()=>{
+  await loadMetros();
+  document.getElementById('metro').value='__all__';   // default: live national overview
+  map.fitBounds(US_BOUNDS,{padding:[20,20]});
+  await load();
+  timer=setInterval(load,15000);
+})();
+</script>
+</body>
+</html>
