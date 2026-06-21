@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc|spc|nhc|faa_delay
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -540,6 +540,33 @@ def load_ndbc() -> int:
     return 1
 
 
+def load_spc() -> int:
+    """Register the SPC storm-report feed (apb.ingest.spc) as one hidden feed."""
+    if "spc" in FEEDS:
+        return 0
+    FEEDS["spc"] = CadFeed(metro="spc", name="SPC Storm Reports",
+                           url="spc", kind="spc", hidden=True)
+    return 1
+
+
+def load_nhc() -> int:
+    """Register the NHC active-tropical-cyclone feed (apb.ingest.nhc)."""
+    if "nhc" in FEEDS:
+        return 0
+    FEEDS["nhc"] = CadFeed(metro="nhc", name="NHC Tropical Cyclones",
+                           url="nhc", kind="nhc", hidden=True)
+    return 1
+
+
+def load_faa_delays() -> int:
+    """Register the FAA airport-delay/closure feed (apb.ingest.faa_delays)."""
+    if "faa_delay" in FEEDS:
+        return 0
+    FEEDS["faa_delay"] = CadFeed(metro="faa_delay", name="FAA Airport Delays",
+                                 url="faa_delay", kind="faa_delay", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -578,6 +605,9 @@ class CadIngest:
         self._volcano = None
         self._smoke = None
         self._ndbc = None
+        self._spc = None
+        self._nhc = None
+        self._faadelay = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -647,6 +677,18 @@ class CadIngest:
                 return out
             if feed.kind == "ndbc":
                 out = self._fetch_ndbc(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "spc":
+                out = self._fetch_spc(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "nhc":
+                out = self._fetch_nhc(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "faa_delay":
+                out = self._fetch_faa_delays(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -812,6 +854,27 @@ class CadIngest:
             from apb.ingest.ndbc import NdbcIngest
             self._ndbc = NdbcIngest()
         return self._ndbc.fetch()
+
+    def _fetch_spc(self, feed: CadFeed) -> list[dict]:
+        """Fetch today's SPC tornado/hail/wind reports (rows already normalized)."""
+        if getattr(self, "_spc", None) is None:
+            from apb.ingest.spc import SpcIngest
+            self._spc = SpcIngest()
+        return self._spc.fetch()
+
+    def _fetch_nhc(self, feed: CadFeed) -> list[dict]:
+        """Fetch active tropical cyclones (rows already normalized)."""
+        if getattr(self, "_nhc", None) is None:
+            from apb.ingest.nhc import NhcIngest
+            self._nhc = NhcIngest()
+        return self._nhc.fetch()
+
+    def _fetch_faa_delays(self, feed: CadFeed) -> list[dict]:
+        """Fetch active FAA airport delays/closures (rows already normalized)."""
+        if getattr(self, "_faadelay", None) is None:
+            from apb.ingest.faa_delays import FaaDelayIngest
+            self._faadelay = FaaDelayIngest()
+        return self._faadelay.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

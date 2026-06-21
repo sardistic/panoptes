@@ -16,9 +16,10 @@ from apb.context.feeds import feeds_near
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
                             load_faa_tfr, load_fema, load_firms, load_hazard,
-                            load_hms_smoke, load_ndbc, load_odin, load_openaq, load_p2c,
-                            load_pulsepoint, load_southern, load_traffic511,
-                            load_usgs_flood, load_volcano)
+                            load_faa_delays, load_hms_smoke, load_ndbc, load_nhc,
+                            load_odin, load_openaq, load_p2c, load_pulsepoint,
+                            load_southern, load_spc, load_traffic511, load_usgs_flood,
+                            load_volcano)
 
 import os as _os
 import threading
@@ -45,10 +46,14 @@ _n = load_openaq()  # only registers when OPENAQ_KEY is set
 _o = load_volcano()
 _p = load_hms_smoke()
 _q = load_ndbc()
+_r = load_spc()
+_s = load_nhc()
+_t = load_faa_delays()
 print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
       f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
       f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k}, "
-      f"odin +{_l}, flood +{_m}, openaq +{_n}, volcano +{_o}, smoke +{_p}, ndbc +{_q})")
+      f"odin +{_l}, flood +{_m}, openaq +{_n}, volcano +{_o}, smoke +{_p}, ndbc +{_q}, "
+      f"spc +{_r}, nhc +{_s}, faa_delay +{_t})")
 
 
 def _poller(interval: float = 120.0):
@@ -350,6 +355,24 @@ def live_smoke(max_age_hours: float = 0.0):
 def live_marine(max_age_hours: float = 0.0):
     """NDBC buoys currently reporting high seas / gale-force winds."""
     return _live_feed("ndbc", max_age_hours)
+
+
+@app.get("/live/storm_reports")
+def live_storm_reports(max_age_hours: float = 0.0):
+    """SPC preliminary storm reports (observed tornado/hail/wind), today."""
+    return _live_feed("spc", max_age_hours)
+
+
+@app.get("/live/cyclones")
+def live_cyclones(max_age_hours: float = 0.0):
+    """NHC active tropical cyclones (position/intensity). Empty out of season."""
+    return _live_feed("nhc", max_age_hours)
+
+
+@app.get("/live/airport_delays")
+def live_airport_delays(max_age_hours: float = 0.0):
+    """FAA airport ground delays, ground stops, and closures with reason."""
+    return _live_feed("faa_delay", max_age_hours)
 
 
 @app.get("/db/stats")

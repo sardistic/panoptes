@@ -66,7 +66,12 @@
   button:hover,select:hover{border-color:var(--line-3);color:var(--txt)}
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
-  .hazfilter{display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:46vw}
+  .hazfilter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:52vw}
+  .hgrp{display:flex;gap:4px;align-items:center;padding-right:8px;border-right:1px solid var(--line-2)}
+  .hgrp:last-child{border-right:none}
+  .hglbl{font:700 8px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);cursor:pointer;margin-right:2px;white-space:nowrap}
+  .hglbl:hover{color:var(--txt-2)}
   .hazfilter .hchip{font:600 9px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;
     padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;
     color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45}
@@ -523,6 +528,8 @@ const HAZ_STYLE = {
   winter:     {c:'#7fb8e0', g:'*', label:'WINTER WX'},
   heat:       {c:'#e06a3a', g:'H', label:'HEAT'},
   tsunami:    {c:'#a04bd0', g:'~', label:'TSUNAMI'},
+  cyclone:    {c:'#c03a8f', g:'@', label:'TROPICAL CYCLONE'},
+  delay:      {c:'#9aa6b2', g:'D', label:'AIRPORT DELAY'},
 };
 // Split NWS alerts (source='nws') into filterable sub-families by event name.
 function nwsSub(summary){
@@ -546,6 +553,9 @@ function hazCat(d){
     case 'volcano': return 'volcano';
     case 'hms_smoke': return 'smoke';
     case 'ndbc': return 'marine';
+    case 'spc': return d.report_type==='torn'?'tornado':'severe';
+    case 'nhc': return 'cyclone';
+    case 'faa_delay': return 'delay';
     case 'firms':return 'fire';
     case '511':  return 'traffic';
     case 'adsb': return 'aircraft';
@@ -564,7 +574,7 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
@@ -577,9 +587,12 @@ async function loadHazards(){
       fetch(`/live/volcano?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/smoke?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/marine?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/storm_reports?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/cyclones?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/airport_delays?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
     ]);
     hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
-                  ...vol, ...smk, ...mrn]
+                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
@@ -734,10 +747,19 @@ document.getElementById('surgesBtn').onclick=e=>{
   showSurges=!showSurges; e.currentTarget.classList.toggle('on',showSurges);
   if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
 };
-// Per-family filter chips (built once; shown only while the HAZARDS layer is on).
+// Filter chips grouped by domain (built once; shown only while HAZARDS is on).
+// Clicking a group label toggles every chip in that group.
+const HAZ_GROUPS = [
+  ["Storm",  ["weather","severe","tornado","winter","heat","tsunami","cyclone"]],
+  ["Water",  ["flood","marine","maritime"]],
+  ["Fire/Air",["fire","smoke","airquality","volcano","quake"]],
+  ["Transport",["traffic","aircraft","tfr","delay"]],
+  ["Infra",  ["outage","declaration"]],
+];
 (function buildHazChips(){
   const bar=document.getElementById('hazFilter');
-  Object.entries(HAZ_STYLE).forEach(([cat,st])=>{
+  const chipFor=cat=>{
+    const st=HAZ_STYLE[cat]; if(!st) return null;
     const chip=document.createElement('span');
     chip.className='hchip on'; chip.dataset.cat=cat;
     chip.style.setProperty('--hcc',st.c);
@@ -748,7 +770,20 @@ document.getElementById('surgesBtn').onclick=e=>{
       chip.classList.toggle('on',hazCats.has(cat));
       drawHazards();              // filter already-loaded data, no refetch
     };
-    bar.appendChild(chip);
+    return chip;
+  };
+  HAZ_GROUPS.forEach(([name,cats])=>{
+    const grp=document.createElement('span'); grp.className='hgrp';
+    const lbl=document.createElement('span'); lbl.className='hglbl'; lbl.textContent=name;
+    const chips=cats.map(chipFor).filter(Boolean);
+    lbl.onclick=()=>{                // group toggle: all-off if any on, else all-on
+      const anyOn=cats.some(c=>hazCats.has(c));
+      cats.forEach((c,i)=>{ anyOn?hazCats.delete(c):hazCats.add(c);
+        chips[i] && chips[i].classList.toggle('on',hazCats.has(c)); });
+      drawHazards();
+    };
+    grp.appendChild(lbl); chips.forEach(c=>grp.appendChild(c));
+    bar.appendChild(grp);
   });
 })();
 document.getElementById('hazardsBtn').onclick=async e=>{
