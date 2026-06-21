@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc|spc|nhc|faa_delay
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc|spc|nhc|faa_delay|nifc_fire
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -567,6 +567,15 @@ def load_faa_delays() -> int:
     return 1
 
 
+def load_nifc_fire() -> int:
+    """Register the NIFC WFIGS active-wildfire feed (apb.ingest.nifc_fire)."""
+    if "nifc_fire" in FEEDS:
+        return 0
+    FEEDS["nifc_fire"] = CadFeed(metro="nifc_fire", name="NIFC Active Wildfires",
+                                 url="nifc_fire", kind="nifc_fire", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -608,6 +617,7 @@ class CadIngest:
         self._spc = None
         self._nhc = None
         self._faadelay = None
+        self._nifc = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -689,6 +699,10 @@ class CadIngest:
                 return out
             if feed.kind == "faa_delay":
                 out = self._fetch_faa_delays(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "nifc_fire":
+                out = self._fetch_nifc_fire(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -875,6 +889,13 @@ class CadIngest:
             from apb.ingest.faa_delays import FaaDelayIngest
             self._faadelay = FaaDelayIngest()
         return self._faadelay.fetch()
+
+    def _fetch_nifc_fire(self, feed: CadFeed) -> list[dict]:
+        """Fetch current NIFC WFIGS wildfire incidents (rows already normalized)."""
+        if getattr(self, "_nifc", None) is None:
+            from apb.ingest.nifc_fire import NifcFireIngest
+            self._nifc = NifcFireIngest()
+        return self._nifc.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

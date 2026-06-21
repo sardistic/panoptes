@@ -557,6 +557,7 @@ function hazCat(d){
     case 'nhc': return 'cyclone';
     case 'faa_delay': return 'delay';
     case 'firms':return 'fire';
+    case 'nifc_fire': return 'fire';
     case '511':  return 'traffic';
     case 'adsb': return 'aircraft';
     case 'aisstream': return 'maritime';
@@ -574,7 +575,7 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
@@ -590,9 +591,10 @@ async function loadHazards(){
       fetch(`/live/storm_reports?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/cyclones?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/airport_delays?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/wildfires?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
     ]);
     hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
-                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly]
+                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly, ...wf]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }

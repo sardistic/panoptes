@@ -44,7 +44,7 @@ _SOURCE_KIND: dict[str, SignalKind] = {
     "usgs_flood": SignalKind.weather, "openaq": SignalKind.weather,
     "volcano": SignalKind.weather, "hms_smoke": SignalKind.weather,
     "ndbc": SignalKind.weather, "spc": SignalKind.weather, "nhc": SignalKind.weather,
-    "faa_delay": SignalKind.traffic,
+    "faa_delay": SignalKind.traffic, "nifc_fire": SignalKind.weather,
 }
 
 
