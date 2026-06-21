@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -484,6 +484,35 @@ def load_firms() -> int:
     return 1
 
 
+def load_odin() -> int:
+    """Register the ODIN power-outage feed (apb.ingest.odin) as one hidden feed."""
+    if "odin" in FEEDS:
+        return 0
+    FEEDS["odin"] = CadFeed(metro="odin", name="ODIN Power Outages",
+                            url="odin", kind="odin", hidden=True)
+    return 1
+
+
+def load_usgs_flood() -> int:
+    """Register the NOAA NWPS river-gauge flood feed (apb.ingest.usgs_flood)."""
+    if "usgs_flood" in FEEDS:
+        return 0
+    FEEDS["usgs_flood"] = CadFeed(metro="usgs_flood", name="River Gauge Flood Status",
+                                  url="usgs_flood", kind="usgs_flood", hidden=True)
+    return 1
+
+
+def load_openaq() -> int:
+    """Register the OpenAQ air-quality feed (apb.ingest.openaq) as one hidden feed.
+    Only registers when an OPENAQ_KEY is configured."""
+    from apb.ingest.openaq import api_key
+    if "openaq" in FEEDS or not api_key():
+        return 0
+    FEEDS["openaq"] = CadFeed(metro="openaq", name="OpenAQ Air Quality",
+                              url="openaq", kind="openaq", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -516,6 +545,9 @@ class CadIngest:
         self._tfr = None
         self._fema = None
         self._firms = None
+        self._odin = None
+        self._flood = None
+        self._openaq = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -561,6 +593,18 @@ class CadIngest:
                 return out
             if feed.kind == "firms":
                 out = self._fetch_firms(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "odin":
+                out = self._fetch_odin(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "usgs_flood":
+                out = self._fetch_usgs_flood(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "openaq":
+                out = self._fetch_openaq(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -684,6 +728,27 @@ class CadIngest:
             from apb.ingest.firms import FirmsIngest
             self._firms = FirmsIngest()
         return self._firms.fetch()
+
+    def _fetch_odin(self, feed: CadFeed) -> list[dict]:
+        """Fetch current power outages (rows already normalized)."""
+        if getattr(self, "_odin", None) is None:
+            from apb.ingest.odin import OdinIngest
+            self._odin = OdinIngest()
+        return self._odin.fetch()
+
+    def _fetch_usgs_flood(self, feed: CadFeed) -> list[dict]:
+        """Poll the NWPS gauge watch list for flooding (rows already normalized)."""
+        if getattr(self, "_flood", None) is None:
+            from apb.ingest.usgs_flood import UsgsFloodIngest
+            self._flood = UsgsFloodIngest()
+        return self._flood.fetch()
+
+    def _fetch_openaq(self, feed: CadFeed) -> list[dict]:
+        """Fetch PM2.5 air-quality spikes (rows already normalized)."""
+        if getattr(self, "_openaq", None) is None:
+            from apb.ingest.openaq import OpenAQIngest
+            self._openaq = OpenAQIngest()
+        return self._openaq.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

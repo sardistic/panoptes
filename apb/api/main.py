@@ -15,8 +15,9 @@ from fastapi.staticfiles import StaticFiles
 from apb.context.feeds import feeds_near
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
-                            load_faa_tfr, load_fema, load_firms, load_hazard, load_p2c,
-                            load_pulsepoint, load_southern, load_traffic511)
+                            load_faa_tfr, load_fema, load_firms, load_hazard, load_odin,
+                            load_openaq, load_p2c, load_pulsepoint, load_southern,
+                            load_traffic511, load_usgs_flood)
 
 import os as _os
 import threading
@@ -37,9 +38,13 @@ _h = load_adsb() if _os.environ.get("APB_ADSB") else 0  # heavier (14 polls/cycl
 _i = load_faa_tfr()
 _j = load_fema()
 _k = load_firms()  # only registers when FIRMS_MAP_KEY is set
+_l = load_odin()
+_m = load_usgs_flood()
+_n = load_openaq()  # only registers when OPENAQ_KEY is set
 print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
       f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
-      f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k})")
+      f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k}, "
+      f"odin +{_l}, flood +{_m}, openaq +{_n})")
 
 
 def _poller(interval: float = 120.0):
@@ -75,6 +80,12 @@ if _os.environ.get("APB_NEWS"):
 if _os.environ.get("APB_SOCIAL_RSS"):
     from apb.fusion import social_store as _social_rss
     _social_rss.start_rss(keep_unplaced=bool(_os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
+
+# Optional aisstream maritime firehose -> rolling vessel buffer for /live/maritime.
+# Needs AISSTREAM_KEY + `pip install websockets`; kept out of the lean prod image.
+if _os.environ.get("AISSTREAM_KEY"):
+    from apb.fusion import maritime_store as _maritime
+    _maritime.start()
 
 # DB stack (sqlalchemy/geoalchemy/psycopg) is imported lazily so the live/map UI and
 # /feeds work with only FastAPI installed — no Postgres/PostGIS required to test.
@@ -276,6 +287,45 @@ def live_fire(max_age_hours: float = 0.0):
     cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
     out = [d for d in _cad.fetch("firms")
            if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+def _live_feed(slug: str, max_age_hours: float) -> list[dict]:
+    """Shared helper: fetch one hidden feed, optionally time-filtered, newest first."""
+    import time as _t
+    if slug not in CAD_FEEDS:
+        return []
+    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out = [d for d in _cad.fetch(slug)
+           if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+@app.get("/live/outages")
+def live_outages(max_age_hours: float = 0.0):
+    """ODIN current power outages (county-level), largest first."""
+    return _live_feed("odin", max_age_hours)
+
+
+@app.get("/live/flood")
+def live_flood(max_age_hours: float = 0.0):
+    """NOAA NWPS river gauges currently at/above flood 'action' stage."""
+    return _live_feed("usgs_flood", max_age_hours)
+
+
+@app.get("/live/airquality")
+def live_airquality(max_age_hours: float = 0.0):
+    """OpenAQ PM2.5 spikes (Unhealthy+). Empty unless OPENAQ_KEY is configured."""
+    return _live_feed("openaq", max_age_hours)
+
+
+@app.get("/live/maritime")
+def live_maritime(max_age_hours: float = 2.0):
+    """Live AIS vessel positions (US coastal). Empty unless AISSTREAM_KEY is configured."""
+    from apb.fusion import maritime_store
+    out = maritime_store.recent(max_age_hours)
     out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
     return out
 

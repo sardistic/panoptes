@@ -38,8 +38,10 @@ _SOURCE_KIND: dict[str, SignalKind] = {
     "usgs": SignalKind.weather, "nws": SignalKind.weather, "eonet": SignalKind.weather,
     "firms": SignalKind.weather,
     "511": SignalKind.traffic,
-    "adsb": SignalKind.aircraft,
+    "adsb": SignalKind.aircraft, "aisstream": SignalKind.traffic,
     "fema": SignalKind.context, "faa_tfr": SignalKind.context,
+    "odin": SignalKind.context,
+    "usgs_flood": SignalKind.weather, "openaq": SignalKind.weather,
 }
 
 

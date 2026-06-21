@@ -511,6 +511,10 @@ const HAZ_STYLE = {
   aircraft:   {c:'#9aa6b2', g:'A', label:'AIRCRAFT'},
   declaration:{c:'#e04c6e', g:'D', label:'FEMA DECLARATION'},
   tfr:        {c:'#e08a2c', g:'R', label:'FLIGHT RESTRICTION'},
+  outage:     {c:'#f0c020', g:'O', label:'POWER OUTAGE'},
+  flood:      {c:'#3a7bd5', g:'L', label:'RIVER FLOOD'},
+  airquality: {c:'#8a9a3a', g:'Q', label:'AIR QUALITY'},
+  maritime:   {c:'#2c9ea0', g:'V', label:'VESSEL'},
 };
 // row.source -> category key (drives style + the filter chips).
 function hazCat(d){
@@ -521,8 +525,12 @@ function hazCat(d){
     case 'firms':return 'fire';
     case '511':  return 'traffic';
     case 'adsb': return 'aircraft';
+    case 'aisstream': return 'maritime';
     case 'fema': return 'declaration';
     case 'faa_tfr': return 'tfr';
+    case 'odin': return 'outage';
+    case 'usgs_flood': return 'flood';
+    case 'openaq': return 'airquality';
     default: return d.type==='traffic'?'traffic':'weather';
   }
 }
@@ -532,14 +540,18 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/declarations?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/fire?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/outages?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/flood?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/airquality?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/maritime`).then(r=>r.json()).catch(()=>[]),
     ]);
-    hazardData = [...hz, ...tr, ...air, ...decl, ...fire]
+    hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
