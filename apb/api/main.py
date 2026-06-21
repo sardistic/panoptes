@@ -16,10 +16,10 @@ from apb.context.feeds import feeds_near
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
                             load_faa_tfr, load_fema, load_firms, load_hazard,
-                            load_faa_delays, load_hms_smoke, load_ndbc, load_nhc,
-                            load_nifc_fire, load_odin, load_openaq, load_p2c,
-                            load_pulsepoint, load_southern, load_spc, load_traffic511,
-                            load_usgs_flood, load_volcano)
+                            load_acled, load_airnow, load_faa_delays, load_hms_smoke,
+                            load_ndbc, load_nhc, load_nifc_fire, load_odin, load_openaq,
+                            load_p2c, load_pulsepoint, load_southern, load_spc,
+                            load_traffic511, load_usgs_flood, load_volcano)
 
 import os as _os
 import threading
@@ -50,11 +50,13 @@ _r = load_spc()
 _s = load_nhc()
 _t = load_faa_delays()
 _u = load_nifc_fire()
+_v = load_airnow()  # only registers when AIRNOW_KEY is set
+_w = load_acled()   # only registers when ACLED_KEY + ACLED_EMAIL are set
 print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
       f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
       f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k}, "
       f"odin +{_l}, flood +{_m}, openaq +{_n}, volcano +{_o}, smoke +{_p}, ndbc +{_q}, "
-      f"spc +{_r}, nhc +{_s}, faa_delay +{_t}, nifc_fire +{_u})")
+      f"spc +{_r}, nhc +{_s}, faa_delay +{_t}, nifc_fire +{_u}, airnow +{_v}, acled +{_w})")
 
 
 def _poller(interval: float = 120.0):
@@ -380,6 +382,18 @@ def live_airport_delays(max_age_hours: float = 0.0):
 def live_wildfires(max_age_hours: float = 0.0):
     """NIFC WFIGS active named wildfire incidents (acreage / % contained)."""
     return _live_feed("nifc_fire", max_age_hours)
+
+
+@app.get("/live/airnow")
+def live_airnow(max_age_hours: float = 0.0):
+    """AirNow official AQI readings (Unhealthy+). Empty unless AIRNOW_KEY is set."""
+    return _live_feed("airnow", max_age_hours)
+
+
+@app.get("/live/unrest")
+def live_unrest(max_age_hours: float = 0.0):
+    """ACLED civil-unrest events. Empty unless ACLED_KEY + ACLED_EMAIL are set."""
+    return _live_feed("acled", max_age_hours)
 
 
 @app.get("/db/stats")

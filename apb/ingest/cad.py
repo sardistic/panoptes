@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc|spc|nhc|faa_delay|nifc_fire
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc|spc|nhc|faa_delay|nifc_fire|airnow|acled
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -576,6 +576,27 @@ def load_nifc_fire() -> int:
     return 1
 
 
+def load_airnow() -> int:
+    """Register the AirNow AQI feed (apb.ingest.airnow). Needs AIRNOW_KEY."""
+    from apb.ingest.airnow import api_key
+    if "airnow" in FEEDS or not api_key():
+        return 0
+    FEEDS["airnow"] = CadFeed(metro="airnow", name="AirNow AQI",
+                              url="airnow", kind="airnow", hidden=True)
+    return 1
+
+
+def load_acled() -> int:
+    """Register the ACLED civil-unrest feed (apb.ingest.acled). Needs ACLED_KEY+EMAIL."""
+    from apb.ingest.acled import creds
+    key, email = creds()
+    if "acled" in FEEDS or not (key and email):
+        return 0
+    FEEDS["acled"] = CadFeed(metro="acled", name="ACLED Civil Unrest",
+                             url="acled", kind="acled", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -618,6 +639,8 @@ class CadIngest:
         self._nhc = None
         self._faadelay = None
         self._nifc = None
+        self._airnow = None
+        self._acled = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -703,6 +726,14 @@ class CadIngest:
                 return out
             if feed.kind == "nifc_fire":
                 out = self._fetch_nifc_fire(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "airnow":
+                out = self._fetch_airnow(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "acled":
+                out = self._fetch_acled(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -896,6 +927,20 @@ class CadIngest:
             from apb.ingest.nifc_fire import NifcFireIngest
             self._nifc = NifcFireIngest()
         return self._nifc.fetch()
+
+    def _fetch_airnow(self, feed: CadFeed) -> list[dict]:
+        """Fetch Unhealthy+ AirNow AQI readings (rows already normalized)."""
+        if getattr(self, "_airnow", None) is None:
+            from apb.ingest.airnow import AirNowIngest
+            self._airnow = AirNowIngest()
+        return self._airnow.fetch()
+
+    def _fetch_acled(self, feed: CadFeed) -> list[dict]:
+        """Fetch recent ACLED civil-unrest events (rows already normalized)."""
+        if getattr(self, "_acled", None) is None:
+            from apb.ingest.acled import AcledIngest
+            self._acled = AcledIngest()
+        return self._acled.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so
