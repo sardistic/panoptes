@@ -66,15 +66,20 @@
   button:hover,select:hover{border-color:var(--line-3);color:var(--txt)}
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
-  .hazfilter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:52vw}
-  .hgrp{display:flex;gap:4px;align-items:center;padding-right:8px;border-right:1px solid var(--line-2)}
+  /* own deck, right of the side panel; single row that scrolls instead of wrapping */
+  #hazFilter{top:100px;left:352px;right:16px;padding:8px 12px;
+    gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
+  #hazFilter::-webkit-scrollbar{height:6px}
+  #hazFilter::-webkit-scrollbar-thumb{background:var(--line-3);border-radius:3px}
+  .hazfilter{display:flex}
+  .hgrp{display:flex;gap:4px;align-items:center;padding-right:8px;border-right:1px solid var(--line-2);flex:0 0 auto}
   .hgrp:last-child{border-right:none}
   .hglbl{font:700 8px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;
     color:var(--dim);cursor:pointer;margin-right:2px;white-space:nowrap}
   .hglbl:hover{color:var(--txt-2)}
   .hazfilter .hchip{font:600 9px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;
-    padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;
-    color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45}
+    padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;flex:0 0 auto;
+    color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45;white-space:nowrap}
   .hazfilter .hchip.on{opacity:1;color:var(--txt-2);border-color:var(--line-3)}
   .hazfilter .hchip i{width:7px;height:7px;border-radius:50%;background:var(--hcc);display:inline-block}
   .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block;
@@ -239,12 +244,14 @@
     <button id="surgesBtn" class="on" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="hazardsBtn" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
   </span></label>
-  <span id="hazFilter" class="hazfilter" style="display:none"></span>
   <span class="spacer"></span>
   <span class="pill"><span class="dot"></span><span id="status">LIVE</span></span>
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
     <span id="alertCount">0</span> SURGE</span>
 </div>
+
+<!-- Hazard family filter: its own single-row deck (shown only while HAZARDS is on) -->
+<div id="hazFilter" class="hud hazfilter" style="display:none"></div>
 
 <div id="side" class="hud">
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
