@@ -21,3 +21,6 @@ uvicorn[standard]>=0.29
 
 # --- dev ---
 pytest>=8.0
+
+# --- optional collectors ---
+# websockets>=12.0      # needed only for scripts/run_bluesky.py

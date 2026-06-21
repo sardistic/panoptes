@@ -31,6 +31,9 @@ TERMS = [
     "dispatch log", "call log", "crime mapping", "police reports",
     "arrests", "citations", "traffic crashes", "accident reports",
     "fire ems incidents", "public safety", "crime incidents recent",
+    # Canada-flavoured phrasings (hub.arcgis.com is global)
+    "police occurrences", "calls for service ontario", "police incidents canada",
+    "appels de service police", "rcmp calls for service", "service de police incidents",
 ]
 INCLUDE = ("police", "fire", "crime", "dispatch", "incident", "911", "calls",
            "sheriff", "ems", "emergency", "shots")

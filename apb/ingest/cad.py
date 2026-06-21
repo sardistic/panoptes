@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # "socrata"|"arcgis"|"pulsepoint"|"p2c"|"southern"
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -416,6 +416,74 @@ def load_p2c(path: str | Path = "data/p2c_agencies.json") -> int:
     return added
 
 
+def load_hazard() -> int:
+    """Register no-key national hazard/event feeds (USGS quakes, NWS alerts, NASA
+    EONET) as hidden feeds. See apb.ingest.hazard. feed.url = source key."""
+    from apb.ingest.hazard import SOURCES
+    added = 0
+    for key, label in SOURCES.items():
+        slug = "hz_" + key
+        if slug in FEEDS:
+            continue
+        FEEDS[slug] = CadFeed(metro=slug, name=label, url=key,
+                              kind="hazard", hidden=True)
+        added += 1
+    return added
+
+
+def load_traffic511() -> int:
+    """Register state DOT 511 traffic-incident feeds (apb.ingest.traffic511) as hidden
+    feeds. feed.url = system key."""
+    from apb.ingest.traffic511 import SYSTEMS
+    added = 0
+    for key, spec in SYSTEMS.items():
+        slug = "t511_" + key
+        if slug in FEEDS:
+            continue
+        FEEDS[slug] = CadFeed(metro=slug, name=spec.name, url=key,
+                              kind="traffic511", hidden=True, state=spec.state)
+        added += 1
+    return added
+
+
+def load_adsb() -> int:
+    """Register the ADS-B aircraft-loiter watcher (apb.ingest.adsb) as one hidden feed."""
+    if "adsb" in FEEDS:
+        return 0
+    FEEDS["adsb"] = CadFeed(metro="adsb", name="ADS-B Aircraft Loiter",
+                            url="adsb", kind="adsb", hidden=True)
+    return 1
+
+
+def load_faa_tfr() -> int:
+    """Register the national FAA TFR feed (apb.ingest.faa_tfr) as one hidden feed."""
+    if "faa_tfr" in FEEDS:
+        return 0
+    FEEDS["faa_tfr"] = CadFeed(metro="faa_tfr", name="FAA Temporary Flight Restrictions",
+                               url="faa_tfr", kind="faa_tfr", hidden=True)
+    return 1
+
+
+def load_fema() -> int:
+    """Register the OpenFEMA disaster-declarations feed (apb.ingest.fema) as one hidden feed."""
+    if "fema" in FEEDS:
+        return 0
+    FEEDS["fema"] = CadFeed(metro="fema", name="FEMA Disaster Declarations",
+                            url="fema", kind="fema", hidden=True)
+    return 1
+
+
+def load_firms() -> int:
+    """Register the NASA FIRMS active-fire feed (apb.ingest.firms) as one hidden feed.
+    Only registers when a FIRMS_MAP_KEY is configured."""
+    from apb.ingest.firms import map_key
+    if "firms" in FEEDS or not map_key():
+        return 0
+    FEEDS["firms"] = CadFeed(metro="firms", name="NASA FIRMS Active Fire",
+                             url="firms", kind="firms", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -442,6 +510,12 @@ class CadIngest:
         self._pp = None
         self._p2c = None
         self._ss = None
+        self._hz = None
+        self._t511 = None
+        self._adsb = None
+        self._tfr = None
+        self._fema = None
+        self._firms = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -463,6 +537,30 @@ class CadIngest:
                 return out
             if feed.kind == "southern":
                 out = self._fetch_southern(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "hazard":
+                out = self._fetch_hazard(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "traffic511":
+                out = self._fetch_traffic511(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "adsb":
+                out = self._fetch_adsb(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "faa_tfr":
+                out = self._fetch_faa_tfr(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "fema":
+                out = self._fetch_fema(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "firms":
+                out = self._fetch_firms(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -539,6 +637,53 @@ class CadIngest:
                 "ts": parse_ts(i.get("at")),
             })
         return out
+
+    def _fetch_hazard(self, feed: CadFeed) -> list[dict]:
+        """Fetch one no-key hazard source (feed.url = source key); rows are already
+        normalized to the incident-dict shape by apb.ingest.hazard."""
+        if getattr(self, "_hz", None) is None:
+            from apb.ingest.hazard import HazardIngest
+            self._hz = HazardIngest()
+        out = []
+        for d in self._hz.fetch(feed.url):
+            d = {**d, "metro": feed.metro}     # key everything under the hz_ slug
+            out.append(d)
+        return out
+
+    def _fetch_traffic511(self, feed: CadFeed) -> list[dict]:
+        """Fetch one state 511 system (feed.url = system key); rows already normalized."""
+        if getattr(self, "_t511", None) is None:
+            from apb.ingest.traffic511 import Traffic511
+            self._t511 = Traffic511()
+        return self._t511.fetch(feed.url)
+
+    def _fetch_adsb(self, feed: CadFeed) -> list[dict]:
+        """Run the stateful ADS-B loiter scan across watched metros."""
+        if getattr(self, "_adsb", None) is None:
+            from apb.ingest.adsb import AdsbIngest
+            self._adsb = AdsbIngest()
+        return self._adsb.scan()
+
+    def _fetch_faa_tfr(self, feed: CadFeed) -> list[dict]:
+        """Fetch the national TFR list (rows already normalized)."""
+        if getattr(self, "_tfr", None) is None:
+            from apb.ingest.faa_tfr import FaaTfrIngest
+            self._tfr = FaaTfrIngest()
+        return self._tfr.fetch()
+
+    def _fetch_fema(self, feed: CadFeed) -> list[dict]:
+        """Fetch recent FEMA disaster declarations (rows already normalized)."""
+        if getattr(self, "_fema", None) is None:
+            from apb.ingest.fema import FemaIngest
+            self._fema = FemaIngest()
+        return self._fema.fetch()
+
+    def _fetch_firms(self, feed: CadFeed) -> list[dict]:
+        """Fetch CONUS VIIRS active-fire pixels (rows already normalized)."""
+        if getattr(self, "_firms", None) is None:
+            from apb.ingest.firms import FirmsIngest
+            self._firms = FirmsIngest()
+        return self._firms.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

@@ -22,6 +22,23 @@ Broadcastify (fallback) ─┴─► ingest (metadata) ──┤   + rolling bas
 - Sourcing prefers your own SDR nodes + OpenMHz over Broadcastify (avoid lock-in).
 - Geocoding: self-hosted Nominatim (`APB_NOMINATIM_URL`), metro-bbox constrained.
 
+## Fusion layer
+
+APB now treats CAD, radio activity, social posts, news, traffic, and weather as
+event sensors. Each source normalizes into an `EventSignal`, then `/live/fused`
+clusters nearby signals and ranks them by surge score: volume, recency, severity,
+confidence, and independent source diversity.
+
+- `/live/signals` — normalized source rows from CAD/history plus optional
+  `data/social_seed.jsonl` rows for offline social/news experiments.
+- `/live/fused` — source-diverse event clusters for the national "Fused Events"
+  panel.
+- `apb.ingest.bluesky.BlueskyJetstream` — optional Bluesky/ATProto Jetstream
+  collector scaffold. Install `websockets` only when running that collector.
+- `scripts/run_bluesky.py` — bounded collector that appends event-like public posts
+  to `data/social_seed.jsonl`. Posts without exact geo are resolved only to coarse
+  metro centroids when the text explicitly names a known place.
+
 ## Legal / ethical guardrails (read first)
 
 - Receiving public-safety radio is legal federally and in most states. **Encrypted

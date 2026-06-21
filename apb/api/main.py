@@ -14,9 +14,11 @@ from fastapi.staticfiles import StaticFiles
 
 from apb.context.feeds import feeds_near
 from apb.ingest.cad import FEEDS as CAD_FEEDS
-from apb.ingest.cad import (CadIngest, load_arcgis_catalog, load_catalog,
-                            load_p2c, load_pulsepoint, load_southern)
+from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
+                            load_faa_tfr, load_fema, load_firms, load_hazard, load_p2c,
+                            load_pulsepoint, load_southern, load_traffic511)
 
+import os as _os
 import threading
 import time as _time
 
@@ -29,8 +31,15 @@ _b = load_arcgis_catalog()
 _c = load_pulsepoint()
 _d = load_p2c()
 _e = load_southern()
+_f = load_hazard()
+_g = load_traffic511()
+_h = load_adsb() if _os.environ.get("APB_ADSB") else 0  # heavier (14 polls/cycle); opt-in
+_i = load_faa_tfr()
+_j = load_fema()
+_k = load_firms()  # only registers when FIRMS_MAP_KEY is set
 print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
-      f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e})")
+      f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
+      f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k})")
 
 
 def _poller(interval: float = 120.0):
@@ -50,6 +59,22 @@ def _poller(interval: float = 120.0):
 
 
 threading.Thread(target=_poller, daemon=True).start()
+
+# Optional live Bluesky firehose -> rolling social-signal buffer for /live/fused.
+# Off unless APB_BLUESKY is set AND `websockets` is installed (kept out of lean prod).
+if _os.environ.get("APB_BLUESKY"):
+    from apb.fusion import social_store as _social
+    _social.start(keep_unplaced=bool(_os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
+
+# Optional keyless news-RSS poller -> rolling news-signal buffer for /live/fused.
+if _os.environ.get("APB_NEWS"):
+    from apb.fusion import news_store as _news
+    _news.start(keep_unplaced=bool(_os.environ.get("APB_NEWS_KEEP_UNPLACED")))
+
+# Optional keyless Reddit/Mastodon RSS poller -> shares the social-signal buffer.
+if _os.environ.get("APB_SOCIAL_RSS"):
+    from apb.fusion import social_store as _social_rss
+    _social_rss.start_rss(keep_unplaced=bool(_os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
 
 # DB stack (sqlalchemy/geoalchemy/psycopg) is imported lazily so the live/map UI and
 # /feeds work with only FastAPI installed — no Postgres/PostGIS required to test.
@@ -179,6 +204,82 @@ def live_overview(limit_per: int = 60, max_age_hours: float = 72.0):
     return list(merged.values())
 
 
+@app.get("/live/hazards")
+def live_hazards(source: str | None = None, max_age_hours: float = 24.0):
+    """No-key national hazard/event feeds (USGS quakes, NWS alerts, NASA EONET).
+    `source` filters to one of: usgs, nws, eonet. These also seed the correlation layer."""
+    import time as _t
+    from apb.ingest.hazard import SOURCES
+    keys = [source] if source in SOURCES else list(SOURCES)
+    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out: list[dict] = []
+    for k in keys:
+        for d in _cad.fetch("hz_" + k):
+            if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
+                out.append(d)
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+@app.get("/live/traffic")
+def live_traffic(system: str | None = None, include_planned: bool = False,
+                 max_age_hours: float = 0.0):
+    """State DOT 511 traffic incidents (crashes/hazards/closures). `system` filters to a
+    state key (e.g. 'ny'). Planned roadwork excluded unless include_planned=true."""
+    import time as _t
+    from apb.ingest.traffic511 import SYSTEMS
+    keys = [system] if system in SYSTEMS else list(SYSTEMS)
+    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out: list[dict] = []
+    for k in keys:
+        rows = _cad._fetch_traffic511(CAD_FEEDS["t511_" + k]) if ("t511_" + k) in CAD_FEEDS else []
+        for d in rows:
+            if include_planned or d.get("threat_score", 0) > 0.2:
+                if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
+                    out.append(d)
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+@app.get("/live/aircraft")
+def live_aircraft():
+    """ADS-B loitering rotorcraft (police/medevac orbiting a scene) — an early proxy for
+    a major ground incident. Stateful: accuracy improves as the watcher accumulates track
+    history. Enable the background watcher with APB_ADSB=1."""
+    return _cad.fetch("adsb") if "adsb" in CAD_FEEDS else []
+
+
+@app.get("/live/declarations")
+def live_declarations(source: str | None = None, max_age_hours: float = 0.0):
+    """Authority event signals: FAA Temporary Flight Restrictions + FEMA disaster
+    declarations. `source` filters to 'faa_tfr' or 'fema'. These anchor the
+    correlation layer (a TFR/declaration explains a local surge)."""
+    import time as _t
+    keys = [source] if source in ("faa_tfr", "fema") else ["faa_tfr", "fema"]
+    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out: list[dict] = []
+    for k in keys:
+        if k in CAD_FEEDS:
+            for d in _cad.fetch(k):
+                if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
+                    out.append(d)
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+@app.get("/live/fire")
+def live_fire(max_age_hours: float = 0.0):
+    """NASA FIRMS active-fire pixels (VIIRS). Empty unless FIRMS_MAP_KEY is configured."""
+    import time as _t
+    if "firms" not in CAD_FEEDS:
+        return []
+    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out = [d for d in _cad.fetch("firms")
+           if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
 @app.get("/db/stats")
 def db_stats():
     """How much history the snapshot poller has accumulated."""
@@ -210,6 +311,84 @@ def live_emerging(min_count: int = 3, threat_floor: float = 0.5,
     clusters = detect(_cad.overview(max_age_hours=max_age_hours),
                       min_count=min_count, threat_floor=threat_floor)
     return [c.__dict__ for c in clusters]
+
+
+def _parse_kinds(kinds: str | None) -> set[str] | None:
+    """Comma-separated source_kind filter -> set, or None for all. Powers per-family
+    filtering across the fusion endpoints (cad, traffic, weather, aircraft, social,
+    news, context, radio_metadata, radio_transcript)."""
+    if not kinds:
+        return None
+    return {k.strip() for k in kinds.split(",") if k.strip()}
+
+
+@app.get("/live/signals")
+def live_signals(limit_per: int = 60, max_age_hours: float = 24.0,
+                 include_seed: bool = True, include_live: bool = True,
+                 kinds: str | None = None):
+    """Normalized source signals across CAD/history plus optional local seed rows.
+
+    This is the source-fusion substrate: every sensor becomes the same shape before
+    clustering. `kinds` filters by sensor family (e.g. kinds=cad,social,weather).
+    `data/social_seed.jsonl` can be used for offline social/news tests.
+    """
+    from apb.fusion.signals import dict_signal
+    from apb.fusion.sources import cad_signals, load_seed_signals
+    from apb.fusion import news_store, social_store
+    signals = cad_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
+                          include_live=include_live)
+    _cut = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).timestamp()
+    if include_seed:   # seed is offline test data — drop stale rows so live windows stay live
+        signals.extend(s for s in load_seed_signals() if s.observed_at.timestamp() >= _cut)
+    signals.extend(social_store.recent(max_age_hours))   # live Bluesky firehose
+    signals.extend(news_store.recent(max_age_hours))     # live news RSS
+    want = _parse_kinds(kinds)
+    if want is not None:
+        signals = [s for s in signals if s.source_kind.value in want]
+    signals.sort(key=lambda s: s.observed_at, reverse=True)
+    return [dict_signal(s) for s in signals[:5000]]
+
+
+@app.get("/live/fused")
+def live_fused(min_count: int = 2, min_sources: int = 1, min_score: float = 1.2,
+               max_age_hours: float = 24.0, limit_per: int = 20,
+               include_seed: bool = True, include_live: bool = True,
+               kinds: str | None = None):
+    """Cross-source event clusters ranked by surge score.
+
+    Unlike /live/emerging, this is built for APB's broader goal: radio/CAD/social/
+    traffic/news signals can reinforce each other when they converge in place/time.
+    `kinds` restricts the clustered substrate to given sensor families.
+    """
+    from apb.fusion.cluster import detect
+    from apb.fusion.sources import cad_signals, load_seed_signals
+    from apb.fusion import news_store, social_store
+    signals = cad_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
+                          include_live=include_live)
+    if include_seed:
+        signals.extend(load_seed_signals())
+    signals.extend(social_store.recent(max_age_hours))   # live Bluesky firehose
+    signals.extend(news_store.recent(max_age_hours))     # live news RSS
+    want = _parse_kinds(kinds)
+    if want is not None:
+        signals = [s for s in signals if s.source_kind.value in want]
+    return [e.__dict__ for e in detect(
+        signals, min_count=min_count, min_sources=min_sources, min_score=min_score,
+        max_age_hours=max_age_hours)]
+
+
+@app.get("/live/social")
+def live_social(max_age_hours: float = 24.0, limit: int = 800):
+    """Placed social/news signals (seed + live Bluesky buffer) for the map social layer.
+    Rendered as their own markers so the firehose is visible even without CAD corroboration."""
+    from apb.fusion.signals import dict_signal
+    from apb.fusion.sources import load_seed_signals
+    from apb.fusion import news_store, social_store
+    out = [s for s in (load_seed_signals() + social_store.recent(max_age_hours)
+                       + news_store.recent(max_age_hours))
+           if s.lat is not None and s.lon is not None]
+    out.sort(key=lambda s: s.observed_at, reverse=True)
+    return [dict_signal(s) for s in out[:limit]]
 
 
 @app.get("/live/metros")

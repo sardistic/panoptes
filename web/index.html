@@ -66,7 +66,14 @@
   button:hover,select:hover{border-color:var(--line-3);color:var(--txt)}
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
-  .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block}
+  .hazfilter{display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:46vw}
+  .hazfilter .hchip{font:600 9px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;
+    padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;
+    color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45}
+  .hazfilter .hchip.on{opacity:1;color:var(--txt-2);border-color:var(--line-3)}
+  .hazfilter .hchip i{width:7px;height:7px;border-radius:50%;background:var(--hcc);display:inline-block}
+  .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block;
+    margin-right:6px;vertical-align:middle}
   button.on .led{background:var(--red)}
   button#surgesBtn.on .led{background:var(--amber)}
 
@@ -173,6 +180,14 @@
     animation:surgepulse 2.8s ease-in-out infinite}
   @keyframes surgepulse{0%,100%{transform:scale(.65);opacity:.45}50%{transform:scale(1.15);opacity:.9}}
 
+  /* ── social firehose markers (teal diamond; glows when near official activity) ── */
+  .soc i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;background:#37c0d8;
+    transform:rotate(45deg);opacity:.5;pointer-events:auto;cursor:pointer;border-radius:1px}
+  .soc.corro i{opacity:1;width:10px;height:10px;left:-5px;top:-5px;box-shadow:0 0 8px #37c0d8}
+  .haz i{display:block;width:7px;height:7px;font-size:0;background:var(--hc);border-radius:50%;
+    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
+  button#hazardsBtn.on .led{background:#37c0d8}
+
   /* ── compact density ── */
   body.compact #side{width:300px}
   body.compact #top{padding:8px 14px;gap:12px}
@@ -217,7 +232,9 @@
   <label class="ctl">Alerts<span class="segwrap">
     <button id="spikesBtn" class="on" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
+    <button id="hazardsBtn" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
   </span></label>
+  <span id="hazFilter" class="hazfilter" style="display:none"></span>
   <span class="spacer"></span>
   <span class="pill"><span class="dot"></span><span id="status">LIVE</span></span>
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
@@ -234,7 +251,7 @@
   <span class="lab">Threat Intensity</span>
   <div class="bar"></div>
   <div class="ends"><span>LOW</span><span>CRITICAL</span></div>
-  <div class="hint">each dot = one incident · color encodes threat · scoped to map view</div>
+  <div class="hint">red = incident (color/throb = threat) · ◆ teal = social post (glows near official activity) · ◯ ring = corroborated</div>
 </div>
 
 <div id="footer" class="hud">
@@ -269,12 +286,18 @@ let throbLayer = L.layerGroup().addTo(map);   // DOM dots that pulse by threat l
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
 let alertLayer = L.layerGroup().addTo(map);
+let fusedLayer = L.layerGroup().addTo(map);   // multi-source corroborated events
+let socialLayer = L.layerGroup().addTo(map);  // social/news firehose posts
+let hazardLayer = L.layerGroup().addTo(map);  // quakes / weather / wildfire / traffic / aircraft
 
 let paused = false, timer = null;
 let currentData = [];          // last fetched incident set (full scope)
 let emergingClusters = [];     // last fetched emerging clusters
+let fusedEvents = [];          // multi-source fused events (/live/fused)
+let socialPosts = [];          // placed social/news signals (/live/social)
 let seenIds = new Set(), primed = false;
 let showSpikes = true, showSurges = true, surgeAlerts = [];
+let showHazards = false, hazardData = [];   // off by default; opt-in extra-signal layer
 let fitNext = false;
 const US_BOUNDS = [[24.5,-125.0],[49.5,-66.5]];
 
@@ -335,6 +358,9 @@ async function load(){
   refreshTypeOptions();
   if(isNational()) await loadEmerging();
   if(isNational()) loadAlerts(); else alertLayer.clearLayers();
+  if(isNational()) await loadFused(); else fusedLayer.clearLayers();
+  if(isNational()) await loadSocial(); else socialLayer.clearLayers();
+  await loadHazards();
   draw();
   pingNew(inView(applyFilters(currentData)));
   if(fitNext && currentData.length){
@@ -386,6 +412,28 @@ function draw(){
       .on('click',()=>openIncident(d)).addTo(markers);
   });
   hot.forEach(d=>throbLayer.addLayer(throbDot(d, z)));
+  // multi-source corroborated events: a bright open ring, distinct from red dots
+  fusedLayer.clearLayers();
+  const fb=map.getBounds();
+  fusedEvents.filter(e=>e.lat!=null && fb.contains([e.lat,e.lon])).forEach(e=>{
+    const m=L.circleMarker([e.lat,e.lon],{radius:9+Math.min(13,e.count/3),
+      color:'#d7dde5',weight:2,fill:false,opacity:.9});
+    m.bindTooltip(`CORROBORATED · ${Object.keys(e.sources||{}).join('+')} · ${e.count} signals`,{direction:'top'});
+    m.on('click',()=>showCorrelation(e.lat,e.lon,Object.keys(e.types||{}).slice(0,3).join(','),
+      `<div class="meta">${Object.entries(e.sources||{}).map(([k,v])=>k+' '+v).join(' · ')} · conf ${(+e.confidence).toFixed(2)}</div>`));
+    m.addTo(fusedLayer);
+  });
+  // social/news firehose — teal diamonds; glow when near official CAD activity (city radius)
+  socialLayer.clearLayers();
+  socialPosts.filter(s=>s.lat!=null && fb.contains([s.lat,s.lon])).forEach(s=>{
+    const corro = currentData.some(d=>Math.abs(d.lat-s.lat)<0.25 && Math.abs(d.lon-s.lon)<0.25);
+    const m=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'soc'+(corro?' corro':''),
+      html:'<i></i>',iconSize:[0,0]})});
+    m.bindTooltip(`SOCIAL · ${s.source||'bluesky'}${corro?' · near official activity':''}`,{direction:'top'});
+    m.on('click',()=>openSocial(s,corro));
+    m.addTo(socialLayer);
+  });
+  drawHazards();
   updateCount(scoped);
   if(isNational()) renderEmergingPanel(scoped);
   else renderIncidentPanel(scoped);
@@ -442,6 +490,90 @@ async function loadEmerging(){
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{ emergingClusters = await (await fetch(`/live/emerging?max_age_hours=${w}`)).json(); }
   catch(e){ emergingClusters=[]; }
+}
+async function loadFused(){      // only multi-source events (CAD/radio + social corroboration)
+  const w = Math.max(EMERGING_HOURS, +winHours());
+  try{ fusedEvents = await (await fetch(`/live/fused?max_age_hours=${w}&min_sources=2&min_score=0.1&limit_per=10&include_live=false`)).json(); }
+  catch(e){ fusedEvents=[]; }
+}
+async function loadSocial(){     // social/news firehose posts (seed + live Bluesky)
+  const w = Math.max(EMERGING_HOURS, +winHours());
+  try{ socialPosts = await (await fetch(`/live/social?max_age_hours=${w}`)).json(); }
+  catch(e){ socialPosts=[]; }
+}
+// extra-signal layer: quakes, weather, wildfire, traffic, aircraft, declarations (TFR/FEMA)
+// Each family is a `category` keyed off the row's `source`, independently filterable.
+const HAZ_STYLE = {
+  quake:      {c:'#b06be0', g:'Q', label:'EARTHQUAKE'},
+  weather:    {c:'#37c0d8', g:'W', label:'WEATHER ALERT'},
+  fire:       {c:'#e0662c', g:'F', label:'WILDFIRE / FIRE'},
+  traffic:    {c:'#d9b13a', g:'T', label:'TRAFFIC'},
+  aircraft:   {c:'#9aa6b2', g:'A', label:'AIRCRAFT'},
+  declaration:{c:'#e04c6e', g:'D', label:'FEMA DECLARATION'},
+  tfr:        {c:'#e08a2c', g:'R', label:'FLIGHT RESTRICTION'},
+};
+// row.source -> category key (drives style + the filter chips).
+function hazCat(d){
+  switch(d.source){
+    case 'usgs': return 'quake';
+    case 'nws':  return 'weather';
+    case 'eonet':return d.type==='fire'?'fire':'weather';
+    case 'firms':return 'fire';
+    case '511':  return 'traffic';
+    case 'adsb': return 'aircraft';
+    case 'fema': return 'declaration';
+    case 'faa_tfr': return 'tfr';
+    default: return d.type==='traffic'?'traffic':'weather';
+  }
+}
+// Per-family visibility. All on by default; toggled via the filter chips.
+const hazCats = new Set(Object.keys(HAZ_STYLE));
+async function loadHazards(){
+  if(!showHazards){ hazardData=[]; return; }
+  const w = Math.max(EMERGING_HOURS, +winHours());
+  try{
+    const [hz, tr, air, decl, fire] = await Promise.all([
+      fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/declarations?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/fire?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+    ]);
+    hazardData = [...hz, ...tr, ...air, ...decl, ...fire]
+      .filter(d=>d.lat!=null && d.lon!=null)
+      .map(d=>({...d, _cat:hazCat(d)}));
+  }catch(e){ hazardData=[]; }
+}
+function drawHazards(){
+  hazardLayer.clearLayers();
+  if(!showHazards) return;
+  const b=map.getBounds();
+  hazardData.filter(d=>b.contains([d.lat,d.lon]) && hazCats.has(d._cat))
+    .slice(0,1200).forEach(d=>{
+    const st = HAZ_STYLE[d._cat] || HAZ_STYLE.weather;
+    const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'haz',iconSize:[8,8],
+      iconAnchor:[4,4],
+      html:`<i style="--hc:${st.c}"></i>`})});
+    m.bindTooltip(`${st.label}${d.source?' · '+d.source:''}`,{direction:'top'});
+    m.on('click',()=>L.popup({maxWidth:300}).setLatLng([d.lat,d.lon]).setContent(
+      `<div class="pop"><div class="kick" style="color:${st.c}">${st.label}</div>`
+      +`<div class="sum">${(d.summary||'').slice(0,220)}</div>`
+      +`<div class="meta">${(d.location||'')} · sev ${(+d.threat_score).toFixed(2)} · ${ago(d.ts)}</div>`
+      +`</div>`).openOn(map));
+    m.addTo(hazardLayer);
+  });
+}
+function openSocial(s, corro){
+  const bsky = s.url && s.url.startsWith('at://');
+  const link = bsky ? `https://bsky.app/profile/${s.url.split('/')[2]}/post/${s.url.split('/').pop()}` : s.url;
+  const t = s.observed_at ? ago(new Date(s.observed_at).getTime()/1000) : '';
+  L.popup({maxWidth:300}).setLatLng([s.lat,s.lon]).setContent(
+    `<div class="pop"><div class="kick" style="color:#37c0d8">Social · ${s.source||'bluesky'}</div>`
+    +`<div class="sum">${(s.summary||'').slice(0,200)}</div>`
+    +`<div class="meta">${(s.metro||s.location_text||'').replace(/^geo_/,'').replace(/_/g,' ')} · ${t}`
+    +`${corro?' · near official activity':''}</div>`
+    +(link?`<div class="meta"><a href="${link}" target="_blank" style="color:#37c0d8">view source ↗</a></div>`:'')
+    +`</div>`).openOn(map);
 }
 
 async function loadAlerts(){
@@ -561,6 +693,30 @@ document.getElementById('spikesBtn').onclick=e=>{
 document.getElementById('surgesBtn').onclick=e=>{
   showSurges=!showSurges; e.currentTarget.classList.toggle('on',showSurges);
   if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
+};
+// Per-family filter chips (built once; shown only while the HAZARDS layer is on).
+(function buildHazChips(){
+  const bar=document.getElementById('hazFilter');
+  Object.entries(HAZ_STYLE).forEach(([cat,st])=>{
+    const chip=document.createElement('span');
+    chip.className='hchip on'; chip.dataset.cat=cat;
+    chip.style.setProperty('--hcc',st.c);
+    chip.innerHTML=`<i></i>${st.label.split(' ')[0]}`;
+    chip.title=st.label;
+    chip.onclick=()=>{
+      if(hazCats.has(cat)) hazCats.delete(cat); else hazCats.add(cat);
+      chip.classList.toggle('on',hazCats.has(cat));
+      drawHazards();              // filter already-loaded data, no refetch
+    };
+    bar.appendChild(chip);
+  });
+})();
+document.getElementById('hazardsBtn').onclick=async e=>{
+  showHazards=!showHazards; e.currentTarget.classList.toggle('on',showHazards);
+  document.getElementById('hazFilter').style.display=showHazards?'flex':'none';
+  if(!showHazards){ hazardData=[]; hazardLayer.clearLayers(); }
+  else { await loadHazards(); }
+  draw();                         // quakes/weather/wildfire/traffic/aircraft/declarations layer
 };
 document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
 

@@ -9,3 +9,6 @@ cryptography>=42.0          # PulsePoint feed AES decrypt (apb/ingest/pulsepoint
 pyyaml>=6.0
 pydantic>=2.6
 pydantic-settings>=2.2
+
+# Optional: install only on a collector worker that runs scripts/run_bluesky.py.
+# websockets>=12.0

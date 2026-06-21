@@ -70,6 +70,8 @@ class IncidentType(str, Enum):
     suspicious = "suspicious"
     pursuit = "pursuit"
     welfare = "welfare"
+    quake = "quake"            # seismic event (USGS)
+    weather = "weather"        # severe-weather alert / natural hazard (NWS, EONET)
     other = "other"
     noise = "noise"            # not an incident (radio check, dispatch chatter)
 
@@ -80,6 +82,20 @@ class Sentiment(str, Enum):
     elevated = "elevated"
     urgent = "urgent"
     distress = "distress"
+
+
+class SignalKind(str, Enum):
+    """Sensor family for a normalized event signal."""
+
+    radio_metadata = "radio_metadata"
+    radio_transcript = "radio_transcript"
+    cad = "cad"
+    social = "social"
+    news = "news"
+    traffic = "traffic"
+    weather = "weather"
+    aircraft = "aircraft"      # ADS-B loiter / airspace-activity signal
+    context = "context"        # authority declarations (FEMA, FAA TFR)
 
 
 class Incident(BaseModel):
@@ -102,3 +118,28 @@ class Incident(BaseModel):
     extracted_by: str
     extracted_at: datetime = Field(default_factory=datetime.utcnow)
     redacted: bool = True
+
+
+class EventSignal(BaseModel):
+    """A normalized real-world event hint from any source.
+
+    APB treats radio, CAD, social posts, news, traffic, and weather as sensors with
+    different confidence levels. Fusion/clustering works over this common shape.
+    """
+
+    signal_id: str
+    source: str
+    source_kind: SignalKind
+    observed_at: datetime
+    lat: float | None = None
+    lon: float | None = None
+    metro: str | None = None
+    location_text: str | None = None
+    raw_type: str | None = None
+    normalized_type: IncidentType = IncidentType.other
+    summary: str
+    confidence: float = 0.5
+    severity: float = 0.3
+    url: str | None = None
+    dedupe_key: str | None = None
+    metadata: dict = Field(default_factory=dict)

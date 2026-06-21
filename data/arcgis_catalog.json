@@ -5526,5 +5526,29 @@
     "url": "https://mycity2.houstontx.gov/pubgis02/rest/services/HoustonMap/Public_safety/MapServer/7",
     "geocoded": true,
     "time_field": "EventDate"
+  },
+  {
+    "name": "Fire Incidents Demo",
+    "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Fire_Incidents_DN8/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Incident_Date"
+  },
+  {
+    "name": "Fire Incidents Demo - Current Operations",
+    "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Fire_Incidents_Demo_View1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "Incident_Date"
+  },
+  {
+    "name": "Crime Incidents",
+    "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Philadelphia_Crime_Map_WFL1/FeatureServer/0",
+    "geocoded": true,
+    "time_field": "DISPATCH_DATE_TIME"
+  },
+  {
+    "name": "Dispatch Assignments (Open 20+ days)",
+    "url": "https://utility.arcgis.com/usrsvcs/servers/323f52c8c2f447c79715e658484fb060/rest/services/HCTRAMaintenance/DispatchAssignments/FeatureServer/3",
+    "geocoded": true,
+    "time_field": "Start_Date"
   }
 ]
