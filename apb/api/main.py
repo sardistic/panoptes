@@ -15,9 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from apb.context.feeds import feeds_near
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
-                            load_faa_tfr, load_fema, load_firms, load_hazard, load_odin,
-                            load_openaq, load_p2c, load_pulsepoint, load_southern,
-                            load_traffic511, load_usgs_flood)
+                            load_faa_tfr, load_fema, load_firms, load_hazard,
+                            load_hms_smoke, load_ndbc, load_odin, load_openaq, load_p2c,
+                            load_pulsepoint, load_southern, load_traffic511,
+                            load_usgs_flood, load_volcano)
 
 import os as _os
 import threading
@@ -41,10 +42,13 @@ _k = load_firms()  # only registers when FIRMS_MAP_KEY is set
 _l = load_odin()
 _m = load_usgs_flood()
 _n = load_openaq()  # only registers when OPENAQ_KEY is set
+_o = load_volcano()
+_p = load_hms_smoke()
+_q = load_ndbc()
 print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
       f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
       f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k}, "
-      f"odin +{_l}, flood +{_m}, openaq +{_n})")
+      f"odin +{_l}, flood +{_m}, openaq +{_n}, volcano +{_o}, smoke +{_p}, ndbc +{_q})")
 
 
 def _poller(interval: float = 120.0):
@@ -328,6 +332,24 @@ def live_maritime(max_age_hours: float = 2.0):
     out = maritime_store.recent(max_age_hours)
     out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
     return out
+
+
+@app.get("/live/volcano")
+def live_volcano(max_age_hours: float = 0.0):
+    """USGS elevated-status volcanoes (aviation color code / alert level)."""
+    return _live_feed("volcano", max_age_hours)
+
+
+@app.get("/live/smoke")
+def live_smoke(max_age_hours: float = 0.0):
+    """NOAA HMS satellite smoke plumes (Light/Medium/Heavy)."""
+    return _live_feed("hms_smoke", max_age_hours)
+
+
+@app.get("/live/marine")
+def live_marine(max_age_hours: float = 0.0):
+    """NDBC buoys currently reporting high seas / gale-force winds."""
+    return _live_feed("ndbc", max_age_hours)
 
 
 @app.get("/db/stats")

@@ -257,7 +257,7 @@ class CadFeed:
     center: tuple[float, float] | None = None
     adaptive: bool = False         # detect fields per-row instead of using config
     state: str | None = None
-    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq
+    kind: str = "socrata"          # socrata|arcgis|pulsepoint|p2c|southern|hazard|traffic511|adsb|faa_tfr|fema|firms|odin|usgs_flood|openaq|volcano|hms_smoke|ndbc
     hidden: bool = False           # in overview/poller but not the metro dropdown
 
 
@@ -513,6 +513,33 @@ def load_openaq() -> int:
     return 1
 
 
+def load_volcano() -> int:
+    """Register the USGS Volcano elevated-status feed (apb.ingest.volcano)."""
+    if "volcano" in FEEDS:
+        return 0
+    FEEDS["volcano"] = CadFeed(metro="volcano", name="USGS Volcano Alerts",
+                               url="volcano", kind="volcano", hidden=True)
+    return 1
+
+
+def load_hms_smoke() -> int:
+    """Register the NOAA HMS satellite smoke-plume feed (apb.ingest.hms_smoke)."""
+    if "hms_smoke" in FEEDS:
+        return 0
+    FEEDS["hms_smoke"] = CadFeed(metro="hms_smoke", name="NOAA HMS Smoke Plumes",
+                                 url="hms_smoke", kind="hms_smoke", hidden=True)
+    return 1
+
+
+def load_ndbc() -> int:
+    """Register the NDBC marine-buoy hazard feed (apb.ingest.ndbc)."""
+    if "ndbc" in FEEDS:
+        return 0
+    FEEDS["ndbc"] = CadFeed(metro="ndbc", name="NDBC Marine Buoys",
+                            url="ndbc", kind="ndbc", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -548,6 +575,9 @@ class CadIngest:
         self._odin = None
         self._flood = None
         self._openaq = None
+        self._volcano = None
+        self._smoke = None
+        self._ndbc = None
         self._rot = 0           # rotating cursor for bounded overview polling
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
@@ -605,6 +635,18 @@ class CadIngest:
                 return out
             if feed.kind == "openaq":
                 out = self._fetch_openaq(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "volcano":
+                out = self._fetch_volcano(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "hms_smoke":
+                out = self._fetch_hms_smoke(feed)
+                self._cache[metro] = (time.time(), out)
+                return out
+            if feed.kind == "ndbc":
+                out = self._fetch_ndbc(feed)
                 self._cache[metro] = (time.time(), out)
                 return out
             if feed.kind == "arcgis":
@@ -749,6 +791,27 @@ class CadIngest:
             from apb.ingest.openaq import OpenAQIngest
             self._openaq = OpenAQIngest()
         return self._openaq.fetch()
+
+    def _fetch_volcano(self, feed: CadFeed) -> list[dict]:
+        """Fetch elevated-status volcanoes (rows already normalized)."""
+        if getattr(self, "_volcano", None) is None:
+            from apb.ingest.volcano import VolcanoIngest
+            self._volcano = VolcanoIngest()
+        return self._volcano.fetch()
+
+    def _fetch_hms_smoke(self, feed: CadFeed) -> list[dict]:
+        """Fetch NOAA HMS smoke polygons (rows already normalized)."""
+        if getattr(self, "_smoke", None) is None:
+            from apb.ingest.hms_smoke import HmsSmokeIngest
+            self._smoke = HmsSmokeIngest()
+        return self._smoke.fetch()
+
+    def _fetch_ndbc(self, feed: CadFeed) -> list[dict]:
+        """Fetch NDBC buoys reporting high seas / gales (rows already normalized)."""
+        if getattr(self, "_ndbc", None) is None:
+            from apb.ingest.ndbc import NdbcIngest
+            self._ndbc = NdbcIngest()
+        return self._ndbc.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

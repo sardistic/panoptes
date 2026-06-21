@@ -512,16 +512,40 @@ const HAZ_STYLE = {
   declaration:{c:'#e04c6e', g:'D', label:'FEMA DECLARATION'},
   tfr:        {c:'#e08a2c', g:'R', label:'FLIGHT RESTRICTION'},
   outage:     {c:'#f0c020', g:'O', label:'POWER OUTAGE'},
-  flood:      {c:'#3a7bd5', g:'L', label:'RIVER FLOOD'},
+  flood:      {c:'#3a7bd5', g:'L', label:'FLOOD'},
   airquality: {c:'#8a9a3a', g:'Q', label:'AIR QUALITY'},
   maritime:   {c:'#2c9ea0', g:'V', label:'VESSEL'},
+  volcano:    {c:'#d2492a', g:'^', label:'VOLCANO'},
+  smoke:      {c:'#9c7a5a', g:'S', label:'SMOKE PLUME'},
+  marine:     {c:'#2c7fa0', g:'M', label:'MARINE'},
+  tornado:    {c:'#e0354b', g:'N', label:'TORNADO'},
+  severe:     {c:'#d98a2b', g:'!', label:'SEVERE STORM'},
+  winter:     {c:'#7fb8e0', g:'*', label:'WINTER WX'},
+  heat:       {c:'#e06a3a', g:'H', label:'HEAT'},
+  tsunami:    {c:'#a04bd0', g:'~', label:'TSUNAMI'},
 };
+// Split NWS alerts (source='nws') into filterable sub-families by event name.
+function nwsSub(summary){
+  const t=(summary||'').toLowerCase();
+  if(/tsunami/.test(t)) return 'tsunami';
+  if(/tornado/.test(t)) return 'tornado';
+  if(/flood|hydrolog/.test(t)) return 'flood';
+  if(/red flag|fire weather/.test(t)) return 'fire';
+  if(/marine|small craft|gale|coastal|beach hazard|rip current|high surf/.test(t)) return 'marine';
+  if(/winter|snow|ice|blizzard|freez|wind chill|frost/.test(t)) return 'winter';
+  if(/heat/.test(t)) return 'heat';
+  if(/thunderstorm|severe/.test(t)) return 'severe';
+  return 'weather';
+}
 // row.source -> category key (drives style + the filter chips).
 function hazCat(d){
   switch(d.source){
     case 'usgs': return 'quake';
-    case 'nws':  return 'weather';
+    case 'nws':  return nwsSub(d.summary);
     case 'eonet':return d.type==='fire'?'fire':'weather';
+    case 'volcano': return 'volcano';
+    case 'hms_smoke': return 'smoke';
+    case 'ndbc': return 'marine';
     case 'firms':return 'fire';
     case '511':  return 'traffic';
     case 'adsb': return 'aircraft';
@@ -540,7 +564,7 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
@@ -550,8 +574,12 @@ async function loadHazards(){
       fetch(`/live/flood?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/airquality?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/maritime`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/volcano?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/smoke?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/marine?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
     ]);
-    hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar]
+    hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
+                  ...vol, ...smk, ...mrn]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
