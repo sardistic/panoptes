@@ -15,12 +15,13 @@ and surge-score source-diversity.
 | EPA AirNow | `AIRNOW_KEY` | Official AQI by station; smoke/hazmat proxy | https://docs.airnowapi.org/ → "Request an API key" |
 | OpenAQ | `OPENAQ_KEY` | PM2.5 air-quality spikes (v3 API) | https://openaq.org/ → account → API key (https://docs.openaq.org/) |
 | aisstream.io | `AISSTREAM_KEY` | Live maritime AIS vessel positions (websocket) | https://aisstream.io/ → free signup → API key |
-| ACLED | `ACLED_KEY` + `ACLED_EMAIL` | Protests, riots, political-violence events | https://acleddata.com/ → register → access key (use your registered email) |
+| ACLED | `ACLED_EMAIL` + `ACLED_PASSWORD` | Protests, riots, political-violence events | https://acleddata.com/user/register → myACLED account (OAuth login; the old key+email API is retired) |
 
 Notes:
 - **AISStream** is a websocket firehose. `websockets` ships with `uvicorn[standard]`,
   so it runs on the lean Railway image once the key is set.
-- **ACLED** needs *both* `ACLED_KEY` and `ACLED_EMAIL` (the email you registered with).
+- **ACLED** uses OAuth: set `ACLED_EMAIL` + `ACLED_PASSWORD` (your myACLED login).
+  The lane fetches a 24h bearer token automatically.
 - These lanes self-register only when their key is present — no key, no extra load.
 
 ## Backend / pipeline keys (local work, not the live map)
@@ -39,7 +40,7 @@ local pipeline and source discovery:
 
 1. `FIRMS_MAP_KEY`, `AIRNOW_KEY`, `OPENAQ_KEY` — instant, no review, three new lanes.
 2. `AISSTREAM_KEY` — instant signup, adds the maritime layer.
-3. `ACLED_KEY` + `ACLED_EMAIL` — quick account, adds civil-unrest events.
+3. `ACLED_EMAIL` + `ACLED_PASSWORD` — myACLED account, adds civil-unrest events.
 
 Everything else is keyless and already on. See `.env.example` for the full variable
 list and the `*_OFF` opt-out flags.

@@ -2,9 +2,12 @@
 
 A domain nothing else in the pipeline covers: geolocated protest / riot / armed-clash
 / political-violence events. A protest or unrest cluster is both an event and a strong
-cause signal for CAD/traffic surges in the same place/time. ACLED requires a free
-account (key + registered email); opt-in via the ACLED_KEY and ACLED_EMAIL env vars,
-so the lean core never depends on it. Defaults to US events in the last week.
+cause signal for CAD/traffic surges in the same place/time.
+
+ACLED migrated off the legacy `key`+`email` query-param API to OAuth: you POST your
+myACLED account email + password to /oauth/token for a 24h bearer token, then call
+/api/acled/read with it. Opt-in via the ACLED_EMAIL and ACLED_PASSWORD env vars, so
+the lean core never depends on it. Defaults to US events in the last week.
 
 Returns the same normalized incident dict the CAD/hazard layers emit. Registered as a
 hidden feed of kind="acled"; see apb.ingest.cad.load_acled.
@@ -12,12 +15,14 @@ hidden feed of kind="acled"; see apb.ingest.cad.load_acled.
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
 
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
-_API = "https://api.acleddata.com/acled/read"
+_API = "https://acleddata.com/api/acled/read"
+_TOKEN_URL = "https://acleddata.com/oauth/token"
 
 _SENTIMENT = ["calm", "routine", "elevated", "urgent", "distress"]
 
@@ -33,7 +38,8 @@ _TYPE = {
 
 
 def creds() -> tuple[str | None, str | None]:
-    return os.environ.get("ACLED_KEY"), os.environ.get("ACLED_EMAIL")
+    """(email, password) for the myACLED OAuth login."""
+    return os.environ.get("ACLED_EMAIL"), os.environ.get("ACLED_PASSWORD")
 
 
 def _epoch(s: str | None) -> float | None:
@@ -53,20 +59,47 @@ class AcledIngest:
         self._client = httpx.Client(timeout=30.0, headers=_UA, follow_redirects=True)
         self._country = country
         self._days = days
+        self._token: str | None = None
+        self._token_exp: float = 0.0
+
+    def _bearer(self) -> str | None:
+        """Return a cached OAuth access token, refreshing ~60s before expiry."""
+        if self._token and time.time() < self._token_exp - 60:
+            return self._token
+        email, password = creds()
+        if not email or not password:
+            return None
+        data = {
+            "username": email, "password": password, "grant_type": "password",
+            "client_id": "acled", "scope": "authenticated",
+        }
+        try:
+            resp = self._client.post(_TOKEN_URL, data=data)
+            resp.raise_for_status()
+            tok = resp.json()
+        except (httpx.HTTPError, ValueError) as e:
+            print(f"[acled] oauth token failed: {e}")
+            self._token = None
+            return None
+        self._token = tok.get("access_token")
+        self._token_exp = time.time() + float(tok.get("expires_in") or 0)
+        return self._token
 
     def fetch(self) -> list[dict]:
-        key, email = creds()
-        if not key or not email:
+        token = self._bearer()
+        if not token:
             return []
         start = (datetime.now(timezone.utc) - timedelta(days=self._days)).strftime("%Y-%m-%d")
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         params = {
-            "key": key, "email": email, "country": self._country,
+            "country": self._country,
             "event_date": f"{start}|{today}", "event_date_where": "BETWEEN",
             "limit": 500,
         }
         try:
-            payload = self._client.get(_API, params=params).json()
+            payload = self._client.get(
+                _API, params=params,
+                headers={"Authorization": f"Bearer {token}"}).json()
         except (httpx.HTTPError, ValueError) as e:
             print(f"[acled] fetch failed: {e}")
             return []

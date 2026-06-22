@@ -587,10 +587,10 @@ def load_airnow() -> int:
 
 
 def load_acled() -> int:
-    """Register the ACLED civil-unrest feed (apb.ingest.acled). Needs ACLED_KEY+EMAIL."""
+    """Register the ACLED civil-unrest feed (apb.ingest.acled). Needs ACLED_EMAIL+PASSWORD."""
     from apb.ingest.acled import creds
-    key, email = creds()
-    if "acled" in FEEDS or not (key and email):
+    email, password = creds()
+    if "acled" in FEEDS or not (email and password):
         return 0
     FEEDS["acled"] = CadFeed(metro="acled", name="ACLED Civil Unrest",
                              url="acled", kind="acled", hidden=True)
