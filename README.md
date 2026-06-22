@@ -1,13 +1,72 @@
-# APB — Aggregated Public Broadcast intelligence
+# Panoptes — live event intelligence
 
-Ingests public-safety radio (police/fire/EMS) across major US metros, transcribes
-audio, and extracts structured incidents + sentiment/threat signals for query and
-alerting.
+[panoptes.run](https://panoptes.run) · All-seeing event intelligence
 
-## Pipeline (activity-first)
+Panoptes fuses dozens of public, mostly keyless data feeds — CAD/911 dispatch,
+public-safety radio activity, hazards, aircraft/maritime traffic, weather, air
+quality, and news/social posts — into a single national map of what's happening
+right now. Each source normalizes into an `EventSignal`; nearby signals are
+clustered and ranked by a surge score (volume, recency, severity, confidence,
+and independent-source diversity).
 
-The foundation is radio **activity/metadata**, not transcripts — it's cheap, fast,
-and works even on **encrypted** systems. Transcription is a deferred enrichment layer.
+> The Python package is still named `apb` (the project's original name,
+> "Aggregated Public Broadcast"); the product and repo are now Panoptes.
+
+## What it ingests
+
+Sources auto-register at API startup. Most are keyless; a few only register when
+their key is present in the environment.
+
+- **CAD / 911 dispatch** — Socrata + ArcGIS open-data catalogs, PulsePoint
+  (AES-decrypted), P2C, Southern Software, ODIN. Catalogs are discovered offline
+  (see *Source discovery*) and committed under `data/`.
+- **Public-safety radio activity** — trunk-recorder / OpenMHz metadata,
+  Broadcastify fallback. Activity-first: cheap, fast, and works on encrypted
+  systems. Transcription is a deferred enrichment layer.
+- **Hazards & weather** — USGS, NWS, EONET, USGS flood, SPC storm reports, NHC
+  cyclones, volcano activity, NIFC active wildfires, NASA FIRMS (`FIRMS_MAP_KEY`),
+  HMS smoke, FEMA declarations.
+- **Air quality** — AirNow (`AIRNOW_KEY`), OpenAQ (`OPENAQ_KEY`).
+- **Traffic & transport** — 511 traffic, FAA TFRs, FAA airport delays.
+- **Aircraft & maritime** — ADS-B (`APB_ADSB`, heavier/opt-in), AIS stream, NDBC buoys.
+- **Civil unrest** — ACLED (`ACLED_KEY` + `ACLED_EMAIL`).
+- **News & social** — news RSS, social RSS (Reddit/Mastodon), Bluesky/ATProto
+  Jetstream collector, GDELT correlation.
+
+## API
+
+`uvicorn apb.api.main:app` serves the dissemination layer. Selected endpoints:
+
+- `/live/overview` — national rollup across all lanes.
+- `/live/fused` — source-diverse, surge-ranked event clusters (the "Fused Events" panel).
+- `/live/signals` — normalized `EventSignal` rows from CAD/history + optional
+  `data/social_seed.jsonl`.
+- `/live/incidents`, `/live/hazards`, `/live/traffic`, `/live/aircraft`,
+  `/live/maritime`, `/live/fire`, `/live/wildfires`, `/live/flood`,
+  `/live/airquality`, `/live/airnow`, `/live/storm_reports`, `/live/cyclones`,
+  `/live/volcano`, `/live/smoke`, `/live/marine`, `/live/airport_delays`,
+  `/live/declarations`, `/live/outages`, `/live/unrest`, `/live/social` —
+  per-lane live feeds.
+- `/live/emerging`, `/emerging`, `/baseline/anomalies` — surge / anomaly detection
+  against rolling baselines.
+- `/correlate`, `/feeds` — keyless news/context correlation (GDELT, BigDataCloud).
+- `/incidents`, `/activity` — stored, **PII-redacted** records.
+- `/health`, `/db/stats`, `/live/metros`.
+
+The live map UI is served from `web/` at the API root.
+
+## Source discovery (build-time)
+
+`apb/discover/*` finds new CAD/open-data sources via web search and vendor "dork"
+registries (Socrata, ArcGIS hubs, PulsePoint, P2C, Southern Software). This runs
+**locally** to regenerate the committed `data/*.json` catalogs
+(`sources_catalog.json`, `arcgis_catalog.json`, `pulsepoint_agencies.json`,
+`p2c_agencies.json`, `southern_agencies.json`, `type_map.json`). Production just
+serves those catalogs — no discovery keys needed in prod.
+
+## Radio activity pipeline (activity-first)
+
+The radio foundation is **activity/metadata**, not transcripts.
 
 ```
 own trunk-recorder node ─┐                       ┌─► aggregate → ActivityWindow
@@ -17,51 +76,46 @@ Broadcastify (fallback) ─┴─► ingest (metadata) ──┤   + rolling bas
                               transcribe → infer (Claude: incident+sentiment+geocode)
 ```
 
-- `scripts/run_activity.py` — the day-one pipeline: metadata → anomaly → store.
+- `scripts/run_activity.py` — metadata → anomaly → store.
 - `scripts/run_pipeline.py` — optional transcription/extraction enrichment (bookmarked).
-- Sourcing prefers your own SDR nodes + OpenMHz over Broadcastify (avoid lock-in).
+- `scripts/run_bluesky.py` — bounded Bluesky collector appending event-like posts
+  to `data/social_seed.jsonl`.
 - Geocoding: self-hosted Nominatim (`APB_NOMINATIM_URL`), metro-bbox constrained.
-
-## Fusion layer
-
-APB now treats CAD, radio activity, social posts, news, traffic, and weather as
-event sensors. Each source normalizes into an `EventSignal`, then `/live/fused`
-clusters nearby signals and ranks them by surge score: volume, recency, severity,
-confidence, and independent source diversity.
-
-- `/live/signals` — normalized source rows from CAD/history plus optional
-  `data/social_seed.jsonl` rows for offline social/news experiments.
-- `/live/fused` — source-diverse event clusters for the national "Fused Events"
-  panel.
-- `apb.ingest.bluesky.BlueskyJetstream` — optional Bluesky/ATProto Jetstream
-  collector scaffold. Install `websockets` only when running that collector.
-- `scripts/run_bluesky.py` — bounded collector that appends event-like public posts
-  to `data/social_seed.jsonl`. Posts without exact geo are resolved only to coarse
-  metro centroids when the text explicitly names a known place.
+- Sourcing prefers your own SDR nodes + OpenMHz over Broadcastify (avoid lock-in).
 
 ## Legal / ethical guardrails (read first)
 
 - Receiving public-safety radio is legal federally and in most states. **Encrypted
   systems are off-limits** — do not ingest or attempt to decrypt (ECPA/CALEA).
-- Source feeds (Broadcastify, OpenMHz) have **API terms / licenses** — respect them.
+- Source feeds (Broadcastify, OpenMHz, etc.) have **API terms / licenses** — respect them.
 - The pipeline **redacts PII** (names, addresses, phone, medical, victim details)
-  before any record is exposed via the API. Dissemination is the highest-liability
-  stage; keep redaction on.
+  before any record is exposed via the API. Keep redaction on.
 
 ## Quick start
 
 ```bash
 python -m venv .venv && . .venv/Scripts/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env            # fill in keys
-# start postgres+postgis (see docker-compose), then:
+cp .env.example .env            # optional keys (FIRMS_MAP_KEY, AIRNOW_KEY, etc.)
+
+# Live map + fused events (keyless, no DB needed):
+uvicorn apb.api.main:app --reload    # open http://localhost:8000/
+
+# Full radio/incident pipeline (needs postgres+postgis):
 python -m apb.store.db --init
-python scripts/run_activity.py --metro nyc      # activity-first, no transcription
-uvicorn apb.api.main:app --reload               # GET /activity?anomalous_only=true
+python scripts/run_activity.py --metro nyc
 ```
 
-## Status
+## Deploy
 
-First milestone: one-metro-at-a-time vertical slice across major metros, with
-sentiment analysis. Single-process orchestrator for now; swap the in-process
-queue in `scripts/run_pipeline.py` for Redis/RabbitMQ before scaling.
+Deployed on **Railway** from a lean Docker image:
+
+- `Dockerfile` (python:3.11-slim) installs `requirements-web.txt` only and runs
+  `uvicorn apb.api.main:app --host 0.0.0.0 --port $PORT`.
+- `requirements-web.txt` is the minimal serving set (fastapi, uvicorn, httpx,
+  cryptography for PulsePoint decrypt, pyyaml, pydantic). The SQL stack and the
+  transcription pipeline stay in `requirements.txt` and aren't needed to serve the
+  live map.
+- `railway.toml` uses the Dockerfile builder with healthcheck `/health`.
+- No secrets required in prod. For persistent snapshot history, mount a Railway
+  volume at `/app/data` (otherwise `data/apb.sqlite` resets each deploy).
