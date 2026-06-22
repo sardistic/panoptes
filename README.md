@@ -14,8 +14,9 @@ and independent-source diversity).
 
 ## What it ingests
 
-Sources auto-register at API startup. Most are keyless; a few only register when
-their key is present in the environment.
+Sources auto-register at API startup. Most are keyless and **on by default**; a few
+only register when a free key is present. See [SOURCES.md](SOURCES.md) for what to
+register to unlock the keyed lanes.
 
 - **CAD / 911 dispatch** — Socrata + ArcGIS open-data catalogs, PulsePoint
   (AES-decrypted), P2C, Southern Software, ODIN. Catalogs are discovered offline

@@ -27,6 +27,11 @@ import time as _time
 
 from apb.store import snapshots
 
+def _off(flag: str) -> bool:
+    """True if an opt-out env flag is set truthy (keyless lanes default ON)."""
+    return _os.environ.get(flag, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 _cad = CadIngest()
 # Auto-register every live-ready feed found by the discovery sweeps (countrywide).
 _a = load_catalog()
@@ -36,7 +41,7 @@ _d = load_p2c()
 _e = load_southern()
 _f = load_hazard()
 _g = load_traffic511()
-_h = load_adsb() if _os.environ.get("APB_ADSB") else 0  # heavier (14 polls/cycle); opt-in
+_h = 0 if _off("APB_ADSB_OFF") else load_adsb()  # keyless but heavy (14 polls/cycle); APB_ADSB_OFF to disable
 _i = load_faa_tfr()
 _j = load_fema()
 _k = load_firms()  # only registers when FIRMS_MAP_KEY is set
@@ -77,21 +82,30 @@ def _poller(interval: float = 120.0):
 
 threading.Thread(target=_poller, daemon=True).start()
 
-# Optional live Bluesky firehose -> rolling social-signal buffer for /live/fused.
-# Off unless APB_BLUESKY is set AND `websockets` is installed (kept out of lean prod).
-if _os.environ.get("APB_BLUESKY"):
-    from apb.fusion import social_store as _social
-    _social.start(keep_unplaced=bool(_os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
+# Keyless live Bluesky firehose -> rolling social-signal buffer for /live/fused.
+# Default ON (websockets ships with uvicorn[standard]); APB_BLUESKY_OFF to disable.
+if not _off("APB_BLUESKY_OFF"):
+    try:
+        from apb.fusion import social_store as _social
+        _social.start(keep_unplaced=bool(_os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
+    except Exception as e:
+        print(f"[api] bluesky lane disabled: {e}")
 
-# Optional keyless news-RSS poller -> rolling news-signal buffer for /live/fused.
-if _os.environ.get("APB_NEWS"):
-    from apb.fusion import news_store as _news
-    _news.start(keep_unplaced=bool(_os.environ.get("APB_NEWS_KEEP_UNPLACED")))
+# Keyless news-RSS poller -> rolling news-signal buffer for /live/fused. APB_NEWS_OFF to disable.
+if not _off("APB_NEWS_OFF"):
+    try:
+        from apb.fusion import news_store as _news
+        _news.start(keep_unplaced=bool(_os.environ.get("APB_NEWS_KEEP_UNPLACED")))
+    except Exception as e:
+        print(f"[api] news lane disabled: {e}")
 
-# Optional keyless Reddit/Mastodon RSS poller -> shares the social-signal buffer.
-if _os.environ.get("APB_SOCIAL_RSS"):
-    from apb.fusion import social_store as _social_rss
-    _social_rss.start_rss(keep_unplaced=bool(_os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
+# Keyless Reddit/Mastodon RSS poller -> shares the social-signal buffer. APB_SOCIAL_RSS_OFF to disable.
+if not _off("APB_SOCIAL_RSS_OFF"):
+    try:
+        from apb.fusion import social_store as _social_rss
+        _social_rss.start_rss(keep_unplaced=bool(_os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
+    except Exception as e:
+        print(f"[api] social-rss lane disabled: {e}")
 
 # Optional aisstream maritime firehose -> rolling vessel buffer for /live/maritime.
 # Needs AISSTREAM_KEY + `pip install websockets`; kept out of the lean prod image.
