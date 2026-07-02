@@ -6,9 +6,8 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from apb.common.grid import bucket, neighborhoods
 from apb.common.models import EventSignal
-
-CELL_DEG = 0.018
 
 
 @dataclass
@@ -46,19 +45,11 @@ def detect(
     """
     now = time.time()
     cutoff = now - max_age_hours * 3600
-    cells: dict[tuple[int, int], list[EventSignal]] = defaultdict(list)
-    for s in signals:
-        if s.lat is None or s.lon is None:
-            continue
-        ts = s.observed_at.timestamp()
-        if ts < cutoff:
-            continue
-        cells[(round(s.lat / CELL_DEG), round(s.lon / CELL_DEG))].append(s)
+    cells = bucket((s for s in signals if s.observed_at.timestamp() >= cutoff),
+                   lambda s: (s.lat, s.lon))
 
     events: list[FusedEvent] = []
-    for key, pts in cells.items():
-        if len(pts) < min_count:
-            continue
+    for key, pts in neighborhoods(cells, min_count=min_count):
         latest = max(p.observed_at.timestamp() for p in pts)
         sources: dict[str, int] = defaultdict(int)
         corroborating_sources: dict[str, int] = defaultdict(int)

@@ -13,8 +13,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-# ~0.018 deg latitude ≈ 2 km; good neighborhood-scale cell for "converging" events.
-CELL_DEG = 0.018
+from apb.common.grid import bucket, neighborhoods
 
 
 @dataclass
@@ -35,17 +34,10 @@ def detect(incidents: list[dict], min_count: int = 3,
            threat_floor: float = 0.5, top: int = 50) -> list[Cluster]:
     """Find emerging clusters: >= min_count incidents in a ~2km cell with elevated
     severity. Returns clusters ranked by score (volume weighted by severity)."""
-    cells: dict[tuple, list[dict]] = defaultdict(list)
-    for d in incidents:
-        if d.get("lat") is None or d.get("lon") is None:
-            continue
-        key = (round(d["lat"] / CELL_DEG), round(d["lon"] / CELL_DEG))
-        cells[key].append(d)
+    cells = bucket(incidents, lambda d: (d.get("lat"), d.get("lon")))
 
     clusters: list[Cluster] = []
-    for pts in cells.values():
-        if len(pts) < min_count:
-            continue
+    for _key, pts in neighborhoods(cells, min_count=min_count):
         threats = [p.get("threat_score", 0.0) for p in pts]
         peak, mean = max(threats), sum(threats) / len(threats)
         if peak < threat_floor and mean < 0.4:
