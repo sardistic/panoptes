@@ -23,6 +23,10 @@ from pathlib import Path
 
 import httpx
 
+import logging
+
+log = logging.getLogger("apb.cad")
+
 
 _TS_MIN = 1262304000.0   # 2010-01-01 — older parses are almost certainly junk
 
@@ -194,7 +198,10 @@ def _detect_type_key(row: dict) -> str | None:
         score = 0
         if any(w in kl for w in ("name", "desc", "nature", "english", "text")):
             score += 3
-        if any(w in kl for w in ("code", "id", "num", "_no", "objectid")):
+        # token-wise: plain substring matching penalized "incident_type" ("id" is
+        # inside "incident"), silently degrading the most common CAD field name
+        if any(t.startswith(("code", "id", "num", "no", "objectid"))
+               for t in kl.split("_")):
             score -= 3
         if isinstance(v, str) and not v.strip().isdigit():
             score += 2          # real text value, not a numeric code
@@ -642,6 +649,31 @@ class CadIngest:
         self._airnow = None
         self._acled = None
         self._rot = 0           # rotating cursor for bounded overview polling
+        self._fail: dict[str, tuple[int, float]] = {}  # metro -> (fail count, retry-after ts)
+
+    # Feed kinds whose fetcher returns already-normalized incident dicts.
+    _FETCHERS = {
+        "pulsepoint": "_fetch_pulsepoint", "p2c": "_fetch_p2c",
+        "southern": "_fetch_southern", "hazard": "_fetch_hazard",
+        "traffic511": "_fetch_traffic511", "adsb": "_fetch_adsb",
+        "faa_tfr": "_fetch_faa_tfr", "fema": "_fetch_fema",
+        "firms": "_fetch_firms", "odin": "_fetch_odin",
+        "usgs_flood": "_fetch_usgs_flood", "openaq": "_fetch_openaq",
+        "volcano": "_fetch_volcano", "hms_smoke": "_fetch_hms_smoke",
+        "ndbc": "_fetch_ndbc", "spc": "_fetch_spc", "nhc": "_fetch_nhc",
+        "faa_delay": "_fetch_faa_delays", "nifc_fire": "_fetch_nifc_fire",
+        "airnow": "_fetch_airnow", "acled": "_fetch_acled",
+    }
+
+    def _backing_off(self, metro: str) -> bool:
+        fail = self._fail.get(metro)
+        return bool(fail) and time.time() < fail[1]
+
+    def _note_failure(self, metro: str) -> None:
+        """Exponential per-feed backoff (60s doubling, capped 1h) so a dead or
+        rate-limiting upstream isn't hammered at full cadence forever."""
+        n = min(self._fail.get(metro, (0, 0.0))[0] + 1, 7)
+        self._fail[metro] = (n, time.time() + min(3600.0, 60.0 * 2 ** (n - 1)))
 
     def fetch(self, metro: str, limit: int = 400) -> list[dict]:
         feed = FEEDS.get(metro)
@@ -650,106 +682,30 @@ class CadIngest:
         hit = self._cache.get(metro)
         if hit and time.time() - hit[0] < self.ttl_sec:
             return hit[1]
-
-        try:
-            if feed.kind == "pulsepoint":
-                out = self._fetch_pulsepoint(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "p2c":
-                out = self._fetch_p2c(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "southern":
-                out = self._fetch_southern(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "hazard":
-                out = self._fetch_hazard(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "traffic511":
-                out = self._fetch_traffic511(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "adsb":
-                out = self._fetch_adsb(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "faa_tfr":
-                out = self._fetch_faa_tfr(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "fema":
-                out = self._fetch_fema(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "firms":
-                out = self._fetch_firms(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "odin":
-                out = self._fetch_odin(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "usgs_flood":
-                out = self._fetch_usgs_flood(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "openaq":
-                out = self._fetch_openaq(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "volcano":
-                out = self._fetch_volcano(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "hms_smoke":
-                out = self._fetch_hms_smoke(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "ndbc":
-                out = self._fetch_ndbc(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "spc":
-                out = self._fetch_spc(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "nhc":
-                out = self._fetch_nhc(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "faa_delay":
-                out = self._fetch_faa_delays(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "nifc_fire":
-                out = self._fetch_nifc_fire(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "airnow":
-                out = self._fetch_airnow(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "acled":
-                out = self._fetch_acled(feed)
-                self._cache[metro] = (time.time(), out)
-                return out
-            if feed.kind == "arcgis":
-                rows = self._fetch_arcgis(feed, limit)
-            else:
-                params = {"$limit": limit}
-                if feed.time_field:
-                    params["$order"] = f"{feed.time_field} DESC"
-                resp = self._client.get(feed.url, params=params)
-                resp.raise_for_status()
-                rows = resp.json()
-        except (httpx.HTTPError, ValueError) as e:
-            print(f"[cad] {metro} fetch failed: {e}")
+        if self._backing_off(metro):
             return hit[1] if hit else []
 
-        out = self._normalize(rows, feed)
+        try:
+            fetcher = self._FETCHERS.get(feed.kind)
+            if fetcher:                       # returns normalized rows directly
+                out = getattr(self, fetcher)(feed)
+            else:
+                if feed.kind == "arcgis":
+                    rows = self._fetch_arcgis(feed, limit)
+                else:                         # socrata (curated or adaptive)
+                    params = {"$limit": limit}
+                    if feed.time_field:
+                        params["$order"] = f"{feed.time_field} DESC"
+                    resp = self._client.get(feed.url, params=params)
+                    resp.raise_for_status()
+                    rows = resp.json()
+                out = self._normalize(rows, feed)
+        except (httpx.HTTPError, ValueError) as e:
+            self._note_failure(metro)
+            log.warning("%s fetch failed: %s", metro, e)
+            return hit[1] if hit else []
+
+        self._fail.pop(metro, None)
         self._cache[metro] = (time.time(), out)
         return out
 
@@ -1015,7 +971,7 @@ class CadIngest:
             try:
                 return self.fetch(m, limit_per)
             except Exception as e:           # one bad feed must not sink the overview
-                print(f"[cad] overview: {m} failed: {e}")
+                log.warning("overview: %s failed: %s", m, e)
                 return []
 
         cutoff = time.time() - max_age_hours * 3600
