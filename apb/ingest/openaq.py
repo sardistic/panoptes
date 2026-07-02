@@ -18,6 +18,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 # OpenAQ v3: latest values for PM2.5 (parameters_id=2), with coordinates.
 _API = "https://api.openaq.org/v3/parameters/2/latest"
 
@@ -65,7 +69,7 @@ class OpenAQIngest:
             results = self._client.get(
                 _API, params={"limit": self._limit}).json().get("results", [])
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[openaq] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in results:

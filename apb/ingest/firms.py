@@ -18,6 +18,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 # CSV area endpoint: {key}/{source}/{west,south,east,north}/{days}. CONUS bbox, 1 day.
 _API = ("https://firms.modaps.eosdis.nasa.gov/api/area/csv/"
@@ -55,7 +59,7 @@ class FirmsIngest:
             r = self._client.get(_API.format(key=key))
             r.raise_for_status()
         except httpx.HTTPError as e:
-            print(f"[firms] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for row in csv.DictReader(io.StringIO(r.text)):

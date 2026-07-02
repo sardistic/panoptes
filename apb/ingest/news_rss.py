@@ -17,6 +17,10 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "Mozilla/5.0 apb-news/0.1 (panoptes.run)"}
 _GNEWS = "https://news.google.com/rss/search"
 
@@ -76,7 +80,7 @@ class NewsRSS:
                                                  "gl": "US", "ceid": "US:en"})
             r.raise_for_status()
         except httpx.HTTPError as e:
-            print(f"[news] query '{q}' failed: {e}")
+            log.warning(f"query '{q}' failed: {e}")
             return []
         return self._parse(r.text, f"gnews:{q}")[:max_items]
 
@@ -85,7 +89,7 @@ class NewsRSS:
             r = self._client.get(url)
             r.raise_for_status()
         except httpx.HTTPError as e:
-            print(f"[news] feed {url} failed: {e}")
+            log.warning(f"feed {url} failed: {e}")
             return []
         return self._parse(r.text, f"rss:{url}")[:max_items]
 

@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _ELEVATED = "https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes"
 
@@ -69,7 +73,7 @@ class VolcanoIngest:
         try:
             rows = self._client.get(_ELEVATED).json()
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[volcano] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in rows if isinstance(rows, list) else []:

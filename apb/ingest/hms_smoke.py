@@ -15,6 +15,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _URL = ("https://services2.arcgis.com/C8EMgrsFcRFL6LrL/arcgis/rest/services/"
         "NOAA_Satellite_Smoke_Detection_(v1)/FeatureServer/0/query")
@@ -68,7 +72,7 @@ class HmsSmokeIngest:
         try:
             feats = self._client.get(_URL, params=params).json().get("features", [])
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[hms_smoke] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for f in feats:

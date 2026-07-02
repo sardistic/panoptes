@@ -18,6 +18,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _API = ("https://ornl.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
         "odin-real-time-outages-county/records")
@@ -80,7 +84,7 @@ class OdinIngest:
         try:
             rows = self._client.get(_API, params=params).json().get("results", [])
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[odin] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in rows:

@@ -19,6 +19,10 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from apb.common.config import settings
 from apb.common.models import ActivityWindow, Call, Incident, Transcript
 
+import logging
+
+log = logging.getLogger(__name__)
+
 engine = create_engine(settings.apb_database_url, future=True)
 
 
@@ -101,7 +105,7 @@ def init_db() -> None:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
         conn.commit()
     Base.metadata.create_all(engine)
-    print("[db] schema initialized")
+    log.info("schema initialized")
 
 
 def persist(call: Call, transcript: Transcript, incident: Incident) -> None:

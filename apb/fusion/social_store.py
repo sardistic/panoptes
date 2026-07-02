@@ -6,8 +6,8 @@ to a coarse metro, normalizes it to an EventSignal, and keeps a rolling, time-wi
 in-memory buffer that /live/fused and /live/signals merge with CAD/radio so weak social
 posts can corroborate official signals in place + time.
 
-Off by default — enable with APB_BLUESKY=1 and `pip install websockets`. Kept out of the
-lean prod image so the core map never depends on it.
+Default ON (websockets ships with uvicorn[standard]); APB_BLUESKY_OFF / APB_SOCIAL_RSS_OFF
+to disable. Degrades to a no-op if websockets is unavailable.
 """
 from __future__ import annotations
 
@@ -19,9 +19,17 @@ from apb.common.models import EventSignal
 from apb.fusion.places import resolve_place
 from apb.fusion.sources import social_text_signals
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _lock = threading.Lock()
 _buf: list[EventSignal] = []        # rolling buffer, newest appended
 _MAX = 5000
+# Dedupe keys survive buffer eviction: RSS re-polls the same items every cycle, so
+# keys must be remembered longer than the rolling buffer keeps the signals themselves.
+_seen: set[str] = set()
+_SEEN_MAX = 50_000
 _started = False
 
 
@@ -29,8 +37,12 @@ def add(signals: list[EventSignal]) -> None:
     if not signals:
         return
     with _lock:
-        seen = {s.dedupe_key for s in _buf}
-        _buf.extend(s for s in signals if s.dedupe_key not in seen)
+        fresh = [s for s in signals if s.dedupe_key not in _seen]
+        _seen.update(s.dedupe_key for s in fresh)
+        if len(_seen) > _SEEN_MAX:      # rare full reset beats unbounded growth
+            _seen.clear()
+            _seen.update(s.dedupe_key for s in _buf)
+        _buf.extend(fresh)
         if len(_buf) > _MAX:
             del _buf[:len(_buf) - _MAX]
 
@@ -64,7 +76,7 @@ async def _consume(keep_unplaced: bool) -> None:
         try:
             add(social_text_signals([_row(post, place)]))
         except Exception as e:            # one bad post must not kill the stream
-            print(f"[bluesky] signal error: {e}")
+            log.warning(f"signal error: {e}")
 
 
 _rss_started = False
@@ -98,14 +110,14 @@ def start_rss(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
         while True:
             try:
                 n = _rss_poll_once(keep_unplaced)
-                print(f"[social_rss] poll: +{n} signals, {stats()}")
+                log.info(f"poll: +{n} signals, {stats()}")
             except Exception as e:            # one bad poll must not kill the loop
-                print(f"[social_rss] poll error: {e}")
+                log.warning(f"poll error: {e}")
             time.sleep(interval)
 
     threading.Thread(target=_run, daemon=True).start()
     _rss_started = True
-    print("[social_rss] Reddit/Mastodon poller started")
+    log.info("Reddit/Mastodon poller started")
     return True
 
 
@@ -118,7 +130,7 @@ def start(keep_unplaced: bool = False) -> bool:
     try:
         import websockets  # noqa: F401
     except ImportError:
-        print("[bluesky] websockets not installed; live firehose disabled")
+        log.warning("websockets not installed; live firehose disabled")
         return False
 
     def _run():
@@ -126,10 +138,10 @@ def start(keep_unplaced: bool = False) -> bool:
             try:
                 asyncio.run(_consume(keep_unplaced))
             except Exception as e:
-                print(f"[bluesky] stream dropped: {e}; reconnecting in 10s")
+                log.warning(f"stream dropped: {e}; reconnecting in 10s")
                 time.sleep(10)
 
     threading.Thread(target=_run, daemon=True).start()
     _started = True
-    print("[bluesky] live firehose started")
+    log.info("live firehose started")
     return True

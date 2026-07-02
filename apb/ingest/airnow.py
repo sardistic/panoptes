@@ -16,6 +16,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _API = "https://www.airnowapi.org/aq/data/"
 _BBOX = "-125,24,-66,50"          # CONUS
@@ -69,7 +73,7 @@ class AirNowIngest:
         try:
             rows = self._client.get(_API, params=params).json()
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[airnow] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in rows if isinstance(rows, list) else []:

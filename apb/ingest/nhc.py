@@ -14,6 +14,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _URL = "https://www.nhc.noaa.gov/CurrentStorms.json"
 
@@ -48,7 +52,7 @@ class NhcIngest:
         try:
             storms = self._client.get(_URL).json().get("activeStorms", [])
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[nhc] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for s in storms:

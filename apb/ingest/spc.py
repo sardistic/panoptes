@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _BASE = "https://www.spc.noaa.gov/climo/reports/today_{kind}.csv"
 _KINDS = ("torn", "hail", "wind")
@@ -59,7 +63,7 @@ class SpcIngest:
         try:
             text = self._client.get(_BASE.format(kind=kind)).text
         except httpx.HTTPError as e:
-            print(f"[spc] {kind} fetch failed: {e}")
+            log.warning(f"{kind} fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in csv.DictReader(io.StringIO(text)):

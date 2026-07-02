@@ -22,6 +22,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 
 # USGS magnitude feed: M2.5+ in the past day (good signal/noise nationally).
@@ -112,7 +116,7 @@ class HazardIngest:
             if source == "eonet":
                 return self._eonet()
         except (httpx.HTTPError, ValueError, KeyError) as e:
-            print(f"[hazard] {source} fetch failed: {e}")
+            log.warning(f"{source} fetch failed: {e}")
         return []
 
     def _usgs(self) -> list[dict]:

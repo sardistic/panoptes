@@ -14,6 +14,10 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 @dataclass
 class Feed:
@@ -107,6 +111,6 @@ def feeds_near(lat: float, lon: float, radius_m: float = 800.0, limit: int = 20)
         try:
             found.extend(provider.feeds_near(lat, lon, radius_m))
         except Exception as e:  # one bad provider shouldn't break the click
-            print(f"[feeds] {provider.name} failed: {e}")
+            log.warning(f"{provider.name} failed: {e}")
     found.sort(key=lambda f: f.distance_m)
     return found[:limit]

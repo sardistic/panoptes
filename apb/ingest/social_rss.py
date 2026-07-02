@@ -18,6 +18,10 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "Mozilla/5.0 (compatible; apb-social/0.1; +panoptes.run)"}
 
 # Local-news / safety subreddits tend to surface breaking incidents fast.
@@ -105,7 +109,7 @@ class SocialRSS:
             r = self._client.get(url)
             r.raise_for_status()
         except httpx.HTTPError as e:
-            print(f"[social_rss] {source} failed: {e}")
+            log.warning(f"{source} failed: {e}")
             return []
         return self._parse(r.text, source)[:max_items]
 

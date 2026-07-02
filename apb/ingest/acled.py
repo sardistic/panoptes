@@ -20,6 +20,10 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _API = "https://acleddata.com/api/acled/read"
 _TOKEN_URL = "https://acleddata.com/oauth/token"
@@ -78,7 +82,7 @@ class AcledIngest:
             resp.raise_for_status()
             tok = resp.json()
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[acled] oauth token failed: {e}")
+            log.warning(f"oauth token failed: {e}")
             self._token = None
             return None
         self._token = tok.get("access_token")
@@ -101,7 +105,7 @@ class AcledIngest:
                 _API, params=params,
                 headers={"Authorization": f"Bearer {token}"}).json()
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[acled] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         for r in payload.get("data", []) if isinstance(payload, dict) else []:

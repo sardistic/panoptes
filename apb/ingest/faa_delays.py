@@ -16,6 +16,10 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _URL = "https://nasstatus.faa.gov/api/airport-status-information"
 
@@ -64,7 +68,7 @@ class FaaDelayIngest:
         try:
             root = ET.fromstring(self._client.get(_URL).text)
         except (httpx.HTTPError, ET.ParseError) as e:
-            print(f"[faa_delay] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         ts = datetime.now(timezone.utc).timestamp()
         out: list[dict] = []

@@ -16,6 +16,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _API = "https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries"
 
@@ -75,7 +79,7 @@ class FemaIngest:
             rows = self._client.get(_API, params=params).json().get(
                 "DisasterDeclarationsSummaries", [])
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[fema] fetch failed: {e}")
+            log.warning(f"fetch failed: {e}")
             return []
         out: list[dict] = []
         seen: set[str] = set()

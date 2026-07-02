@@ -10,6 +10,10 @@ import asyncio
 import threading
 import time
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _lock = threading.Lock()
 _vessels: dict[str, dict] = {}     # MMSI -> latest position row
 _MAX = 8000
@@ -48,7 +52,7 @@ def start() -> bool:
     try:
         import websockets  # noqa: F401
     except ImportError:
-        print("[aisstream] websockets not installed; maritime stream disabled")
+        log.warning("websockets not installed; maritime stream disabled")
         return False
 
     async def _consume():
@@ -61,10 +65,10 @@ def start() -> bool:
             try:
                 asyncio.run(_consume())
             except Exception as e:
-                print(f"[aisstream] stream dropped: {e}; reconnecting in 10s")
+                log.warning(f"stream dropped: {e}; reconnecting in 10s")
                 time.sleep(10)
 
     threading.Thread(target=_run, daemon=True).start()
     _started = True
-    print("[aisstream] maritime firehose started")
+    log.info("maritime firehose started")
     return True

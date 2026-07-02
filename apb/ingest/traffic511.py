@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 
 import httpx
 
+import logging
+
+log = logging.getLogger(__name__)
+
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _SENTIMENT = ["calm", "routine", "elevated", "urgent", "distress"]
 
@@ -70,7 +74,7 @@ class Traffic511:
         try:
             data = self._client.get(spec.url).json()
         except (httpx.HTTPError, ValueError) as e:
-            print(f"[511] {key} fetch failed: {e}")
+            log.warning(f"[511] {key} fetch failed: {e}")
             return []
         if spec.shape == "carmanah":
             return self._carmanah(data, spec, include_planned)

@@ -19,6 +19,10 @@ import httpx
 from apb.common.config import MetroSystem, settings
 from apb.common.models import Call
 
+import logging
+
+log = logging.getLogger(__name__)
+
 LIVE_CALLS_URL = "https://api.broadcastify.com/owncalls/livecalls"
 
 
@@ -92,7 +96,7 @@ class BroadcastifyClient:
             try:
                 calls, pos = self.poll(system, pos)
             except httpx.HTTPError as e:
-                print(f"[ingest] poll error for {system.name}: {e}")
+                log.warning(f"poll error for {system.name}: {e}")
                 time.sleep(interval * 3)
                 continue
             for call in calls:
