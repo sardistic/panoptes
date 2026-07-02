@@ -28,6 +28,36 @@ def cad_signals(
     return [incident_to_signal(d) for d in merged.values()]
 
 
+def gather_signals(
+    cad: CadIngest,
+    *,
+    limit_per: int = 60,
+    max_age_hours: float = 24.0,
+    include_seed: bool = True,
+    include_live: bool = True,
+    kinds: set[str] | None = None,
+) -> list[EventSignal]:
+    """The fusion substrate: CAD live+history, seed rows, social + news buffers —
+    all time-windowed to max_age_hours and optionally filtered by sensor family.
+    Single source of truth for /live/signals and /live/fused."""
+    from apb.fusion import news_store, social_store
+    signals = cad_signals(cad, limit_per=limit_per, max_age_hours=max_age_hours,
+                          include_live=include_live)
+    if include_seed:
+        signals.extend(seed_recent(max_age_hours))
+    signals.extend(social_store.recent(max_age_hours))   # live Bluesky + social RSS
+    signals.extend(news_store.recent(max_age_hours))     # live news RSS
+    if kinds is not None:
+        signals = [s for s in signals if s.source_kind.value in kinds]
+    return signals
+
+
+def seed_recent(max_age_hours: float) -> list[EventSignal]:
+    """Seed rows are offline test data — drop stale ones so live windows stay live."""
+    cutoff = datetime.now(timezone.utc).timestamp() - max_age_hours * 3600
+    return [s for s in load_seed_signals() if s.observed_at.timestamp() >= cutoff]
+
+
 def social_text_signals(rows: Iterable[dict]) -> list[EventSignal]:
     """Normalize already-collected social/news rows.
 

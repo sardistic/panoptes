@@ -2,66 +2,72 @@
 
 Only redacted incident records are exposed here. Raw audio and unredacted
 transcripts are intentionally NOT served by this API.
+
+All startup side effects (feed registration, background pollers) run in the
+FastAPI lifespan handler — importing this module is side-effect free, so tests,
+tooling, and multi-worker servers behave predictably.
 """
 from __future__ import annotations
 
+import logging
+import os
+import threading
+import time as _time
+from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from apb.context.feeds import feeds_near
+from apb.ingest import cad as cad_mod
 from apb.ingest.cad import FEEDS as CAD_FEEDS
-from apb.ingest.cad import (CadIngest, load_adsb, load_arcgis_catalog, load_catalog,
-                            load_faa_tfr, load_fema, load_firms, load_hazard,
-                            load_acled, load_airnow, load_faa_delays, load_hms_smoke,
-                            load_ndbc, load_nhc, load_nifc_fire, load_odin, load_openaq,
-                            load_p2c, load_pulsepoint, load_southern, load_spc,
-                            load_traffic511, load_usgs_flood, load_volcano)
-
-import os as _os
-import threading
-import time as _time
-
+from apb.ingest.cad import CadIngest
 from apb.store import snapshots
+
+log = logging.getLogger("apb.api")
+
 
 def _off(flag: str) -> bool:
     """True if an opt-out env flag is set truthy (keyless lanes default ON)."""
-    return _os.environ.get(flag, "").strip().lower() in ("1", "true", "yes", "on")
+    return os.environ.get(flag, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 _cad = CadIngest()
-# Auto-register every live-ready feed found by the discovery sweeps (countrywide).
-_a = load_catalog()
-_b = load_arcgis_catalog()
-_c = load_pulsepoint()
-_d = load_p2c()
-_e = load_southern()
-_f = load_hazard()
-_g = load_traffic511()
-_h = 0 if _off("APB_ADSB_OFF") else load_adsb()  # keyless but heavy (14 polls/cycle); APB_ADSB_OFF to disable
-_i = load_faa_tfr()
-_j = load_fema()
-_k = load_firms()  # only registers when FIRMS_MAP_KEY is set
-_l = load_odin()
-_m = load_usgs_flood()
-_n = load_openaq()  # only registers when OPENAQ_KEY is set
-_o = load_volcano()
-_p = load_hms_smoke()
-_q = load_ndbc()
-_r = load_spc()
-_s = load_nhc()
-_t = load_faa_delays()
-_u = load_nifc_fire()
-_v = load_airnow()  # only registers when AIRNOW_KEY is set
-_w = load_acled()   # only registers when ACLED_KEY + ACLED_EMAIL are set
-print(f"[api] live CAD feeds: {len(CAD_FEEDS)} "
-      f"(socrata +{_a}, arcgis +{_b}, pulsepoint +{_c}, p2c +{_d}, southern +{_e}, "
-      f"hazard +{_f}, traffic511 +{_g}, adsb +{_h}, tfr +{_i}, fema +{_j}, firms +{_k}, "
-      f"odin +{_l}, flood +{_m}, openaq +{_n}, volcano +{_o}, smoke +{_p}, ndbc +{_q}, "
-      f"spc +{_r}, nhc +{_s}, faa_delay +{_t}, nifc_fire +{_u}, airnow +{_v}, acled +{_w})")
+
+# Every live-ready lane found by the discovery sweeps (countrywide). Keyed lanes
+# (firms, openaq, airnow, acled, ...) register 0 feeds unless their key is set.
+_LOADERS: list[tuple[str, Callable[[], int]]] = [
+    ("socrata", cad_mod.load_catalog),
+    ("arcgis", cad_mod.load_arcgis_catalog),
+    ("pulsepoint", cad_mod.load_pulsepoint),
+    ("p2c", cad_mod.load_p2c),
+    ("southern", cad_mod.load_southern),
+    ("hazard", cad_mod.load_hazard),
+    ("traffic511", cad_mod.load_traffic511),
+    # keyless but heavy (14 polls/cycle); APB_ADSB_OFF to disable
+    ("adsb", lambda: 0 if _off("APB_ADSB_OFF") else cad_mod.load_adsb()),
+    ("tfr", cad_mod.load_faa_tfr),
+    ("fema", cad_mod.load_fema),
+    ("firms", cad_mod.load_firms),
+    ("odin", cad_mod.load_odin),
+    ("flood", cad_mod.load_usgs_flood),
+    ("openaq", cad_mod.load_openaq),
+    ("volcano", cad_mod.load_volcano),
+    ("smoke", cad_mod.load_hms_smoke),
+    ("ndbc", cad_mod.load_ndbc),
+    ("spc", cad_mod.load_spc),
+    ("nhc", cad_mod.load_nhc),
+    ("faa_delay", cad_mod.load_faa_delays),
+    ("nifc_fire", cad_mod.load_nifc_fire),
+    ("airnow", cad_mod.load_airnow),
+    ("acled", cad_mod.load_acled),
+]
 
 
 def _poller(interval: float = 120.0):
@@ -74,44 +80,75 @@ def _poller(interval: float = 120.0):
             n += 1
             if n % 30 == 0:
                 snapshots.prune()
-            print(f"[poller] snapshot {n}: +{wrote} rows, db={snapshots.stats()}")
+            log.info("snapshot %d: +%d rows, db=%s", n, wrote, snapshots.stats())
         except Exception as e:
-            print(f"[poller] error: {e}")
+            log.warning("poller error: %s", e)
         _time.sleep(interval)
 
 
-threading.Thread(target=_poller, daemon=True).start()
+_started = False
 
-# Keyless live Bluesky firehose -> rolling social-signal buffer for /live/fused.
-# Default ON (websockets ships with uvicorn[standard]); APB_BLUESKY_OFF to disable.
-if not _off("APB_BLUESKY_OFF"):
-    try:
-        from apb.fusion import social_store as _social
-        _social.start(keep_unplaced=bool(_os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
-    except Exception as e:
-        print(f"[api] bluesky lane disabled: {e}")
 
-# Keyless news-RSS poller -> rolling news-signal buffer for /live/fused. APB_NEWS_OFF to disable.
-if not _off("APB_NEWS_OFF"):
-    try:
-        from apb.fusion import news_store as _news
-        _news.start(keep_unplaced=bool(_os.environ.get("APB_NEWS_KEEP_UNPLACED")))
-    except Exception as e:
-        print(f"[api] news lane disabled: {e}")
+def _startup() -> None:
+    """Register feeds and launch background workers. Idempotent per process; run more
+    than one worker/process only with APB_POLLER_OFF set everywhere but one, or each
+    will poll upstreams and write the SQLite history independently."""
+    global _started
+    if _started:
+        return
+    _started = True
 
-# Keyless Reddit/Mastodon RSS poller -> shares the social-signal buffer. APB_SOCIAL_RSS_OFF to disable.
-if not _off("APB_SOCIAL_RSS_OFF"):
-    try:
-        from apb.fusion import social_store as _social_rss
-        _social_rss.start_rss(keep_unplaced=bool(_os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
-    except Exception as e:
-        print(f"[api] social-rss lane disabled: {e}")
+    counts: dict[str, int] = {}
+    for label, loader in _LOADERS:
+        try:
+            counts[label] = loader()
+        except Exception as e:
+            log.warning("lane %s failed to register: %s", label, e)
+    log.info("live CAD feeds: %d (%s)", len(CAD_FEEDS),
+             ", ".join(f"{k} +{v}" for k, v in counts.items()))
 
-# Optional aisstream maritime firehose -> rolling vessel buffer for /live/maritime.
-# Needs AISSTREAM_KEY + `pip install websockets`; kept out of the lean prod image.
-if _os.environ.get("AISSTREAM_KEY"):
-    from apb.fusion import maritime_store as _maritime
-    _maritime.start()
+    if not _off("APB_POLLER_OFF"):
+        threading.Thread(target=_poller, daemon=True).start()
+
+    # Keyless live Bluesky firehose -> rolling social-signal buffer for /live/fused.
+    # Default ON (websockets ships with uvicorn[standard]); APB_BLUESKY_OFF to disable.
+    if not _off("APB_BLUESKY_OFF"):
+        try:
+            from apb.fusion import social_store
+            social_store.start(keep_unplaced=bool(os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
+        except Exception as e:
+            log.warning("bluesky lane disabled: %s", e)
+
+    # Keyless news-RSS poller -> rolling news-signal buffer. APB_NEWS_OFF to disable.
+    if not _off("APB_NEWS_OFF"):
+        try:
+            from apb.fusion import news_store
+            news_store.start(keep_unplaced=bool(os.environ.get("APB_NEWS_KEEP_UNPLACED")))
+        except Exception as e:
+            log.warning("news lane disabled: %s", e)
+
+    # Keyless Reddit/Mastodon RSS poller -> shares the social buffer. APB_SOCIAL_RSS_OFF to disable.
+    if not _off("APB_SOCIAL_RSS_OFF"):
+        try:
+            from apb.fusion import social_store
+            social_store.start_rss(keep_unplaced=bool(os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
+        except Exception as e:
+            log.warning("social-rss lane disabled: %s", e)
+
+    # Optional aisstream maritime firehose -> rolling vessel buffer for /live/maritime.
+    # Needs AISSTREAM_KEY + `pip install websockets`; kept out of the lean prod image.
+    if os.environ.get("AISSTREAM_KEY"):
+        from apb.fusion import maritime_store
+        maritime_store.start()
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    _startup()
+    yield
+
 
 # DB stack (sqlalchemy/geoalchemy/psycopg) is imported lazily so the live/map UI and
 # /feeds work with only FastAPI installed — no Postgres/PostGIS required to test.
@@ -121,12 +158,65 @@ def _db():
     from apb.store.db import ActivityRow, IncidentRow, engine
     return select, Session, ActivityRow, IncidentRow, engine
 
-app = FastAPI(title="APB", version="0.1.0")
+
+app = FastAPI(title="APB", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
+
+# ---------------------------------------------------------------------------
+# Cheap abuse protection + client caching. The map UI polls /live/* endpoints;
+# per-IP throttling keeps one bad client from monopolizing the fetch/cluster
+# work, and Cache-Control lets browsers/proxies absorb repeat hits.
+_RATE_PER_MIN = int(os.environ.get("APB_RATE_LIMIT", "300"))  # 0 disables
+_hits: dict[str, deque] = defaultdict(deque)
+_hits_lock = threading.Lock()
+
+
+@app.middleware("http")
+async def _throttle_and_cache(request: Request, call_next):
+    if _RATE_PER_MIN and request.url.path != "/health":
+        ip = request.client.host if request.client else "?"
+        now = _time.time()
+        with _hits_lock:
+            q = _hits[ip]
+            while q and q[0] < now - 60.0:
+                q.popleft()
+            if len(q) >= _RATE_PER_MIN:
+                return JSONResponse({"error": "rate limited"}, status_code=429,
+                                    headers={"Retry-After": "30"})
+            q.append(now)
+            if len(_hits) > 10_000:      # bound memory under IP churn
+                _hits.clear()
+    resp = await call_next(request)
+    if (request.method == "GET" and "cache-control" not in resp.headers
+            and request.url.path.startswith(("/live/", "/baseline/"))):
+        resp.headers["Cache-Control"] = "public, max-age=15"
+    return resp
+
+
+# Server-side TTL cache for the expensive endpoints (fetch + normalize + cluster
+# over thousands of signals). Keyed on endpoint+params so the map's default view
+# is computed once per window no matter how many clients poll.
+_resp_cache: dict[tuple, tuple[float, object]] = {}
+_resp_lock = threading.Lock()
+
+
+def _cached(key: tuple, ttl: float, fn: Callable[[], object]):
+    now = _time.time()
+    with _resp_lock:
+        hit = _resp_cache.get(key)
+        if hit and now - hit[0] < ttl:
+            return hit[1]
+    val = fn()   # computed outside the lock; a rare duplicate compute beats blocking
+    with _resp_lock:
+        _resp_cache[key] = (now, val)
+        if len(_resp_cache) > 256:       # bound memory under param churn
+            for k in sorted(_resp_cache, key=lambda k: _resp_cache[k][0])[:128]:
+                _resp_cache.pop(k, None)
+    return val
 
 
 @app.get("/health")
@@ -224,8 +314,7 @@ def live_incidents(metro: str = "seattle", limit: int = 400,
     within that window (0 = no time filter)."""
     rows = _cad.fetch(metro, limit)
     if max_age_hours > 0:
-        import time as _t
-        cutoff = _t.time() - max_age_hours * 3600
+        cutoff = _time.time() - max_age_hours * 3600
         rows = [d for d in rows if d.get("ts") and d["ts"] >= cutoff]
     return rows
 
@@ -234,21 +323,22 @@ def live_incidents(metro: str = "seattle", limit: int = 400,
 def live_overview(limit_per: int = 60, max_age_hours: float = 72.0):
     """National aggregate: live fetch UNIONed with accumulated DB history (dedup), so
     coverage grows over time instead of being limited to each feed's latest page."""
-    live = _cad.overview(limit_per, max_age_hours)
-    merged = {(d["metro"], str(d["call_id"])): d for d in snapshots.query(max_age_hours)}
-    for d in live:                       # live wins on conflict (freshest)
-        merged[(d["metro"], str(d["call_id"]))] = d
-    return list(merged.values())
+    def _build():
+        live = _cad.overview(limit_per, max_age_hours)
+        merged = {(d["metro"], str(d["call_id"])): d for d in snapshots.query(max_age_hours)}
+        for d in live:                       # live wins on conflict (freshest)
+            merged[(d["metro"], str(d["call_id"]))] = d
+        return list(merged.values())
+    return _cached(("overview", limit_per, max_age_hours), 20.0, _build)
 
 
 @app.get("/live/hazards")
 def live_hazards(source: str | None = None, max_age_hours: float = 24.0):
     """No-key national hazard/event feeds (USGS quakes, NWS alerts, NASA EONET).
     `source` filters to one of: usgs, nws, eonet. These also seed the correlation layer."""
-    import time as _t
     from apb.ingest.hazard import SOURCES
     keys = [source] if source in SOURCES else list(SOURCES)
-    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    cutoff = _time.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
     out: list[dict] = []
     for k in keys:
         for d in _cad.fetch("hz_" + k):
@@ -263,14 +353,12 @@ def live_traffic(system: str | None = None, include_planned: bool = False,
                  max_age_hours: float = 0.0):
     """State DOT 511 traffic incidents (crashes/hazards/closures). `system` filters to a
     state key (e.g. 'ny'). Planned roadwork excluded unless include_planned=true."""
-    import time as _t
     from apb.ingest.traffic511 import SYSTEMS
     keys = [system] if system in SYSTEMS else list(SYSTEMS)
-    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    cutoff = _time.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
     out: list[dict] = []
     for k in keys:
-        rows = _cad._fetch_traffic511(CAD_FEEDS["t511_" + k]) if ("t511_" + k) in CAD_FEEDS else []
-        for d in rows:
+        for d in _cad.fetch("t511_" + k):
             if include_planned or d.get("threat_score", 0) > 0.2:
                 if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
                     out.append(d)
@@ -283,7 +371,7 @@ def live_aircraft():
     """ADS-B loitering rotorcraft (police/medevac orbiting a scene) — an early proxy for
     a major ground incident. Stateful: accuracy improves as the watcher accumulates track
     history. Enable the background watcher with APB_ADSB=1."""
-    return _cad.fetch("adsb") if "adsb" in CAD_FEEDS else []
+    return _cad.fetch("adsb")
 
 
 @app.get("/live/declarations")
@@ -291,15 +379,24 @@ def live_declarations(source: str | None = None, max_age_hours: float = 0.0):
     """Authority event signals: FAA Temporary Flight Restrictions + FEMA disaster
     declarations. `source` filters to 'faa_tfr' or 'fema'. These anchor the
     correlation layer (a TFR/declaration explains a local surge)."""
-    import time as _t
     keys = [source] if source in ("faa_tfr", "fema") else ["faa_tfr", "fema"]
-    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    cutoff = _time.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
     out: list[dict] = []
     for k in keys:
-        if k in CAD_FEEDS:
-            for d in _cad.fetch(k):
-                if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
-                    out.append(d)
+        for d in _cad.fetch(k):
+            if not cutoff or (d.get("ts") and d["ts"] >= cutoff):
+                out.append(d)
+    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+    return out
+
+
+def _live_feed(slug: str, max_age_hours: float) -> list[dict]:
+    """Shared helper: fetch one hidden feed, optionally time-filtered, newest first."""
+    if slug not in CAD_FEEDS:
+        return []
+    cutoff = _time.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
+    out = [d for d in _cad.fetch(slug)
+           if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
     out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
     return out
 
@@ -307,26 +404,7 @@ def live_declarations(source: str | None = None, max_age_hours: float = 0.0):
 @app.get("/live/fire")
 def live_fire(max_age_hours: float = 0.0):
     """NASA FIRMS active-fire pixels (VIIRS). Empty unless FIRMS_MAP_KEY is configured."""
-    import time as _t
-    if "firms" not in CAD_FEEDS:
-        return []
-    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
-    out = [d for d in _cad.fetch("firms")
-           if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
-    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
-    return out
-
-
-def _live_feed(slug: str, max_age_hours: float) -> list[dict]:
-    """Shared helper: fetch one hidden feed, optionally time-filtered, newest first."""
-    import time as _t
-    if slug not in CAD_FEEDS:
-        return []
-    cutoff = _t.time() - max_age_hours * 3600 if max_age_hours > 0 else 0
-    out = [d for d in _cad.fetch(slug)
-           if not cutoff or (d.get("ts") and d["ts"] >= cutoff)]
-    out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
-    return out
+    return _live_feed("firms", max_age_hours)
 
 
 @app.get("/live/outages")
@@ -438,9 +516,12 @@ def live_emerging(min_count: int = 3, threat_floor: float = 0.5,
     """Emerging events: spatial clusters of converging, elevated-severity incidents
     from the RECENT live stream (default last 24h)."""
     from apb.infer.cluster import detect
-    clusters = detect(_cad.overview(max_age_hours=max_age_hours),
-                      min_count=min_count, threat_floor=threat_floor)
-    return [c.__dict__ for c in clusters]
+
+    def _build():
+        clusters = detect(_cad.overview(max_age_hours=max_age_hours),
+                          min_count=min_count, threat_floor=threat_floor)
+        return [c.__dict__ for c in clusters]
+    return _cached(("emerging", min_count, threat_floor, max_age_hours), 20.0, _build)
 
 
 def _parse_kinds(kinds: str | None) -> set[str] | None:
@@ -463,20 +544,16 @@ def live_signals(limit_per: int = 60, max_age_hours: float = 24.0,
     `data/social_seed.jsonl` can be used for offline social/news tests.
     """
     from apb.fusion.signals import dict_signal
-    from apb.fusion.sources import cad_signals, load_seed_signals
-    from apb.fusion import news_store, social_store
-    signals = cad_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
-                          include_live=include_live)
-    _cut = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).timestamp()
-    if include_seed:   # seed is offline test data — drop stale rows so live windows stay live
-        signals.extend(s for s in load_seed_signals() if s.observed_at.timestamp() >= _cut)
-    signals.extend(social_store.recent(max_age_hours))   # live Bluesky firehose
-    signals.extend(news_store.recent(max_age_hours))     # live news RSS
-    want = _parse_kinds(kinds)
-    if want is not None:
-        signals = [s for s in signals if s.source_kind.value in want]
-    signals.sort(key=lambda s: s.observed_at, reverse=True)
-    return [dict_signal(s) for s in signals[:5000]]
+    from apb.fusion.sources import gather_signals
+
+    def _build():
+        signals = gather_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
+                                 include_seed=include_seed, include_live=include_live,
+                                 kinds=_parse_kinds(kinds))
+        signals.sort(key=lambda s: s.observed_at, reverse=True)
+        return [dict_signal(s) for s in signals[:5000]]
+    return _cached(("signals", limit_per, max_age_hours, include_seed, include_live,
+                    kinds), 20.0, _build)
 
 
 @app.get("/live/fused")
@@ -491,20 +568,17 @@ def live_fused(min_count: int = 2, min_sources: int = 1, min_score: float = 1.2,
     `kinds` restricts the clustered substrate to given sensor families.
     """
     from apb.fusion.cluster import detect
-    from apb.fusion.sources import cad_signals, load_seed_signals
-    from apb.fusion import news_store, social_store
-    signals = cad_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
-                          include_live=include_live)
-    if include_seed:
-        signals.extend(load_seed_signals())
-    signals.extend(social_store.recent(max_age_hours))   # live Bluesky firehose
-    signals.extend(news_store.recent(max_age_hours))     # live news RSS
-    want = _parse_kinds(kinds)
-    if want is not None:
-        signals = [s for s in signals if s.source_kind.value in want]
-    return [e.__dict__ for e in detect(
-        signals, min_count=min_count, min_sources=min_sources, min_score=min_score,
-        max_age_hours=max_age_hours)]
+    from apb.fusion.sources import gather_signals
+
+    def _build():
+        signals = gather_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
+                                 include_seed=include_seed, include_live=include_live,
+                                 kinds=_parse_kinds(kinds))
+        return [e.__dict__ for e in detect(
+            signals, min_count=min_count, min_sources=min_sources, min_score=min_score,
+            max_age_hours=max_age_hours)]
+    return _cached(("fused", min_count, min_sources, min_score, max_age_hours,
+                    limit_per, include_seed, include_live, kinds), 20.0, _build)
 
 
 @app.get("/live/social")
@@ -512,9 +586,9 @@ def live_social(max_age_hours: float = 24.0, limit: int = 800):
     """Placed social/news signals (seed + live Bluesky buffer) for the map social layer.
     Rendered as their own markers so the firehose is visible even without CAD corroboration."""
     from apb.fusion.signals import dict_signal
-    from apb.fusion.sources import load_seed_signals
+    from apb.fusion.sources import seed_recent
     from apb.fusion import news_store, social_store
-    out = [s for s in (load_seed_signals() + social_store.recent(max_age_hours)
+    out = [s for s in (seed_recent(max_age_hours) + social_store.recent(max_age_hours)
                        + news_store.recent(max_age_hours))
            if s.lat is not None and s.lon is not None]
     out.sort(key=lambda s: s.observed_at, reverse=True)
