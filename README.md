@@ -19,7 +19,8 @@ only register when a free key is present. See [SOURCES.md](SOURCES.md) for what 
 register to unlock the keyed lanes.
 
 - **CAD / 911 dispatch** — Socrata + ArcGIS open-data catalogs, PulsePoint
-  (AES-decrypted), P2C, Southern Software, ODIN. Catalogs are discovered offline
+  (AES-decrypted), P2C, Southern Software, ODIN, CHP statewide live incidents
+  (California Highway Patrol, keyless). Catalogs are discovered offline
   (see *Source discovery*) and committed under `data/`.
 - **Public-safety radio activity** — trunk-recorder / OpenMHz metadata,
   Broadcastify fallback. Activity-first: cheap, fast, and works on encrypted
@@ -29,7 +30,8 @@ register to unlock the keyed lanes.
   HMS smoke, FEMA declarations, EMSC global earthquakes, GDACS Orange/Red global
   disaster alerts, AWC SIGMETs (hazardous airspace weather).
 - **Air quality** — AirNow (`AIRNOW_KEY`), OpenAQ (`OPENAQ_KEY`).
-- **Traffic & transport** — 511 traffic, FAA TFRs, FAA airport delays.
+- **Traffic & transport** — 511 traffic (NY keyless; GA/LA/PA/ID/VA/New England
+  unlock with free `T511_*_KEY`s), FAA TFRs, FAA airport delays.
 - **Aircraft & maritime** — ADS-B (`APB_ADSB`, heavier/opt-in), AIS stream, NDBC buoys.
 - **Civil unrest** — ACLED (`ACLED_KEY` + `ACLED_EMAIL`).
 - **News & social** — news RSS, social RSS (Reddit/Mastodon), Bluesky/ATProto

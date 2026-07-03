@@ -48,6 +48,7 @@ _SOURCE_KIND: dict[str, SignalKind] = {
     "airnow": SignalKind.weather, "acled": SignalKind.context,
     "emsc": SignalKind.weather, "gdacs": SignalKind.context,
     "sigmet": SignalKind.weather,
+    # "chp" is real dispatch CAD — the default SignalKind.cad is correct.
 }
 
 

@@ -441,9 +441,9 @@ def load_hazard() -> int:
 def load_traffic511() -> int:
     """Register state DOT 511 traffic-incident feeds (apb.ingest.traffic511) as hidden
     feeds. feed.url = system key."""
-    from apb.ingest.traffic511 import SYSTEMS
+    from apb.ingest.traffic511 import available
     added = 0
-    for key, spec in SYSTEMS.items():
+    for key, spec in available().items():
         slug = "t511_" + key
         if slug in FEEDS:
             continue
@@ -622,6 +622,16 @@ def load_gdacs() -> int:
     return 1
 
 
+def load_chp() -> int:
+    """Register the CHP statewide live-CAD feed (apb.ingest.chp). Keyless."""
+    if "chp" in FEEDS:
+        return 0
+    FEEDS["chp"] = CadFeed(metro="chp", name="CHP Statewide Incidents", state="CA",
+                           url="chp", kind="chp", hidden=True,
+                           center=(36.5, -119.5))
+    return 1
+
+
 def load_sigmet() -> int:
     """Register the AWC SIGMET hazardous-airspace feed (apb.ingest.sigmet). Keyless."""
     if "sigmet" in FEEDS:
@@ -691,6 +701,7 @@ class CadIngest:
         "faa_delay": "_fetch_faa_delays", "nifc_fire": "_fetch_nifc_fire",
         "airnow": "_fetch_airnow", "acled": "_fetch_acled",
         "emsc": "_fetch_emsc", "gdacs": "_fetch_gdacs", "sigmet": "_fetch_sigmet",
+        "chp": "_fetch_chp",
     }
 
     def _backing_off(self, metro: str) -> bool:
@@ -946,6 +957,13 @@ class CadIngest:
             from apb.ingest.sigmet import SigmetIngest
             self._sigmet = SigmetIngest()
         return self._sigmet.fetch()
+
+    def _fetch_chp(self, feed: CadFeed) -> list[dict]:
+        """Fetch all active CHP incidents statewide (rows already normalized)."""
+        if getattr(self, "_chp", None) is None:
+            from apb.ingest.chp import ChpIngest
+            self._chp = ChpIngest()
+        return self._chp.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

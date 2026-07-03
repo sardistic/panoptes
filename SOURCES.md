@@ -16,6 +16,12 @@ and surge-score source-diversity.
 | OpenAQ | `OPENAQ_KEY` | PM2.5 air-quality spikes (v3 API) | https://openaq.org/ → account → API key (https://docs.openaq.org/) |
 | aisstream.io | `AISSTREAM_KEY` | Live maritime AIS vessel positions (websocket) | https://aisstream.io/ → free signup → API key |
 | ACLED | `ACLED_EMAIL` + `ACLED_PASSWORD` | Protests, riots, political-violence events | https://acleddata.com/user/register → myACLED account (OAuth login; the old key+email API is retired) |
+| 511 Georgia | `T511_GA_KEY` | Statewide GA DOT traffic incidents | https://511ga.org → developer resources (free key) |
+| 511 Louisiana | `T511_LA_KEY` | Statewide LA DOT traffic incidents | https://511la.org → developer resources |
+| 511 Pennsylvania | `T511_PA_KEY` | Statewide PA DOT traffic incidents | https://www.511pa.com → developer resources |
+| 511 Idaho | `T511_ID_KEY` | Statewide ID DOT traffic incidents | https://511.idaho.gov → developer resources |
+| 511 Virginia | `T511_VA_KEY` | Statewide VA DOT traffic incidents | https://www.511virginia.org → developer resources |
+| New England 511 | `T511_NE_KEY` | CT/ME/MA/NH/RI/VT traffic incidents (one key, six states) | https://newengland511.org → developer resources |
 
 Notes:
 - **AISStream** is a websocket firehose. `websockets` ships with `uvicorn[standard]`,
@@ -41,6 +47,17 @@ local pipeline and source discovery:
 1. `FIRMS_MAP_KEY`, `AIRNOW_KEY`, `OPENAQ_KEY` — instant, no review, three new lanes.
 2. `AISSTREAM_KEY` — instant signup, adds the maritime layer.
 3. `ACLED_EMAIL` + `ACLED_PASSWORD` — myACLED account, adds civil-unrest events.
+4. `T511_*_KEY` — each free 511 key lights up a whole state's DOT incident feed
+   (New England's covers six states at once). 511NY needs no key and is already on.
+
+## Evaluated and not viable (so far)
+
+- **Waze live-map GeoRSS** — every host variant (www/embed, live-map api, rtserver)
+  returns 403 to non-browser clients; bot protection blocks server-side use.
+- **CBP border wait times** — keyless JSON but no coordinates and mostly
+  "Update Pending" rows.
+- **NGA maritime navigational warnings** — keyless but offshore DMS-string
+  positions with little map value for this product.
 
 Everything else is keyless and already on. See `.env.example` for the full variable
 list and the `*_OFF` opt-out flags.

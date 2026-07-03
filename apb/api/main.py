@@ -70,6 +70,7 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("emsc", cad_mod.load_emsc),
     ("gdacs", cad_mod.load_gdacs),
     ("sigmet", cad_mod.load_sigmet),
+    ("chp", cad_mod.load_chp),
 ]
 
 

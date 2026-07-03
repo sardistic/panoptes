@@ -38,16 +38,45 @@ _EVENT_THREAT = {
 class SystemSpec:
     key: str            # slug, e.g. "ny"
     name: str
-    url: str
+    url: str            # may contain {key}, filled from env `env_key`
     shape: str = "carmanah"   # parser family
     state: str | None = None
+    env_key: str | None = None   # env var holding a (free) API key; None = keyless
 
 
-# Verified-keyless seed. Add states here (most others need a per-state API key).
+# NY is verified keyless. The other states run the same platform ("carmanah"
+# /api/getevents shape) but require a free API key — register at each site's
+# "developer resources" page and set the env var to unlock the lane.
 SYSTEMS: dict[str, SystemSpec] = {
     "ny": SystemSpec("ny", "511 New York Traffic",
                      "https://511ny.org/api/getevents?format=json", state="NY"),
+    "ga": SystemSpec("ga", "511 Georgia Traffic",
+                     "https://511ga.org/api/getevents?key={key}&format=json",
+                     state="GA", env_key="T511_GA_KEY"),
+    "la": SystemSpec("la", "511 Louisiana Traffic",
+                     "https://511la.org/api/getevents?key={key}&format=json",
+                     state="LA", env_key="T511_LA_KEY"),
+    "pa": SystemSpec("pa", "511 Pennsylvania Traffic",
+                     "https://www.511pa.com/api/getevents?key={key}&format=json",
+                     state="PA", env_key="T511_PA_KEY"),
+    "id": SystemSpec("id", "511 Idaho Traffic",
+                     "https://511.idaho.gov/api/getevents?key={key}&format=json",
+                     state="ID", env_key="T511_ID_KEY"),
+    "va": SystemSpec("va", "511 Virginia Traffic",
+                     "https://www.511virginia.org/api/getevents?key={key}&format=json",
+                     state="VA", env_key="T511_VA_KEY"),
+    # one system covers CT/ME/MA/NH/RI/VT
+    "ne6": SystemSpec("ne6", "New England 511 Traffic",
+                      "https://newengland511.org/api/getevents?key={key}&format=json",
+                      state=None, env_key="T511_NE_KEY"),
 }
+
+
+def available() -> dict[str, SystemSpec]:
+    """Systems usable right now: keyless ones plus keyed ones whose env key is set."""
+    import os
+    return {k: s for k, s in SYSTEMS.items()
+            if not s.env_key or os.environ.get(s.env_key, "").strip()}
 
 
 def _parse_dt(s: str | None) -> float | None:
@@ -68,11 +97,18 @@ class Traffic511:
         self._client = httpx.Client(timeout=20.0, headers=_UA, follow_redirects=True)
 
     def fetch(self, key: str, include_planned: bool = False) -> list[dict]:
+        import os
         spec = SYSTEMS.get(key)
         if not spec:
             return []
+        url = spec.url
+        if spec.env_key:
+            api_key = os.environ.get(spec.env_key, "").strip()
+            if not api_key:
+                return []
+            url = url.format(key=api_key)
         try:
-            data = self._client.get(spec.url).json()
+            data = self._client.get(url).json()
         except (httpx.HTTPError, ValueError) as e:
             log.warning(f"[511] {key} fetch failed: {e}")
             return []
