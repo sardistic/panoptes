@@ -692,26 +692,43 @@ function pingNew(pts){
 }
 function resetScope(){ seenIds.clear(); primed=false; pingLayer.clearLayers(); }
 
-// ── GDELT correlation (shared by spikes, surge alerts, and incidents) ────────
-function articlesHtml(arts){
-  if(!arts || !arts.length) return '<div class="empty">no matching news · last 3d</div>';
-  return '<div class="arts">'+arts.slice(0,4).map(a=>`<div class="art">`
+// ── news correlation (shared by spikes, surge alerts, and incidents) ─────────
+function artRows(arts,n){
+  return arts.slice(0,n).map(a=>`<div class="art">`
     +`<a href="${a.url}" target="_blank">${(a.title||'(untitled)').slice(0,92)}</a>`
-    +`<div class="src">${a.domain||''}${a.at?' · '+ago(new Date(a.at).getTime()/1000):''}</div></div>`).join('')+'</div>';
+    +`<div class="src">${a.domain||''}${a.at?' · '+ago(new Date(a.at).getTime()/1000):''}</div></div>`).join('');
+}
+// r = /correlate payload: {articles (GDELT), local (news-RSS buffer), throttled}
+function articlesHtml(r){
+  const gdelt=r.articles||[], local=(r.local||[]).filter(a=>!gdelt.some(g=>g.url===a.url));
+  if(!gdelt.length && !local.length)
+    return r.throttled ? '<div class="empty">news search busy — try again in a minute</div>'
+                       : '<div class="empty">no matching news · last 3d</div>';
+  let h='<div class="arts">'+artRows(gdelt,4);
+  if(local.length) h+=`<div class="src" style="margin-top:6px;opacity:.6">nearby local headlines</div>`+artRows(local,3);
+  return h+'</div>';
 }
 async function fetchCorrelation(lat,lon,types){
-  try{ return await (await fetch(`/correlate?lat=${lat}&lon=${lon}&types=${types||''}`)).json(); }
-  catch(e){ return {articles:[]}; }
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),20000);
+  try{
+    const r=await fetch(`/correlate?lat=${lat}&lon=${lon}&types=${types||''}`,{signal:ctl.signal});
+    if(!r.ok) return {articles:[],local:[],error:true};
+    return await r.json();
+  }
+  catch(e){ return {articles:[],local:[],error:true}; }
+  finally{ clearTimeout(t); }
 }
-// Open a popup that fills in "possible cause" news once GDELT responds.
+// Open a popup that fills in "possible cause" news once the correlator responds.
 function showCorrelation(lat,lon,types,headerHtml){
   const pop=L.popup({maxWidth:320}).setLatLng([lat,lon])
     .setContent('<div class="pop"><div class="kick">Correlating</div><div class="meta">searching news near here…</div></div>')
     .openOn(map);
   fetchCorrelation(lat,lon,types).then(r=>{
+    if(!map.hasLayer(pop)) return;              // user closed it while we searched
     const place=r.place?`${r.place}${r.state?', '+r.state:''}`:'this area';
     pop.setContent(`<div class="pop"><div class="kick">Possible Cause</div>`
-      +`<div class="ttl">${place}</div>`+(headerHtml||'')+articlesHtml(r.articles)+`</div>`);
+      +`<div class="ttl">${place}</div>`+(headerHtml||'')
+      +(r.error?'<div class="empty">news search failed — retry shortly</div>':articlesHtml(r))+`</div>`);
   });
 }
 
@@ -735,10 +752,11 @@ async function openIncident(d){
     .setContent(base+`<div class="meta" style="opacity:.55">checking news…</div></div>`)
     .openOn(map);
   fetchCorrelation(d.lat,d.lon,d.type).then(r=>{       // incident-level correlation
-    const arts=(r.articles||[]).slice(0,3);
-    pop.setContent(base+(arts.length
-      ? `<div class="kick" style="margin-top:11px">Possible Cause</div>`+articlesHtml(arts)
-      : `<div class="empty">no related news nearby</div>`)+`</div>`);
+    if(!map.hasLayer(pop)) return;
+    const any=(r.articles||[]).length || (r.local||[]).length;
+    pop.setContent(base+(any
+      ? `<div class="kick" style="margin-top:11px">Possible Cause</div>`+articlesHtml(r)
+      : `<div class="empty">${r.throttled?'news search busy — try again in a minute':'no related news nearby'}</div>`)+`</div>`);
   });
 }
 

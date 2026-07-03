@@ -610,14 +610,41 @@ def feeds(lat: float, lon: float, radius_m: float = 800.0):
     return [f.__dict__ for f in feeds_near(lat, lon, radius_m)]
 
 
+def _local_news(lat: float, lon: float, radius_km: float = 60.0,
+                max_age_hours: float = 48.0, limit: int = 4) -> list[dict]:
+    """Placed headlines from the live news-RSS buffer near a point — instant and
+    immune to GDELT throttling, so the popup always has something to show."""
+    import math
+    from apb.fusion import news_store
+    coslat = max(0.2, math.cos(math.radians(lat)))
+    out = []
+    for s in news_store.recent(max_age_hours):
+        if s.lat is None or s.lon is None:
+            continue
+        dkm = math.hypot(s.lat - lat, (s.lon - lon) * coslat) * 111.0
+        if dkm <= radius_km:
+            out.append({"title": s.summary, "url": s.url,
+                        "domain": s.source, "at": s.observed_at.isoformat()})
+    out.sort(key=lambda d: d["at"] or "", reverse=True)
+    return out[:limit]
+
+
 @app.get("/correlate")
 def correlate(lat: float, lon: float, types: str | None = None,
               timespan: str = "3d"):
-    """Spike -> likely cause: recent GDELT news near a spike's place/time. Free, no key.
+    """Spike -> likely cause: local news-RSS headlines near the point (instant) plus
+    recent GDELT news for the place/types (free, no key, heavily rate-limited).
     `types` = comma-separated incident types from the cluster (shapes the news query)."""
     from apb.context.gdelt import correlate as _corr
-    tl = [t for t in (types or "").split(",") if t]
-    return _corr(lat, lon, tl or None, timespan)
+    tl = sorted({t for t in (types or "").split(",") if t})
+
+    def _build():
+        out = _corr(lat, lon, tl or None, timespan)
+        out["local"] = _local_news(lat, lon)
+        return out
+    # rounded key: repeat clicks on the same cluster reuse one GDELT slot
+    return _cached(("correlate", round(lat, 2), round(lon, 2), ",".join(tl), timespan),
+                   120.0, _build)
 
 
 # Serve the test UI at / (mounted last so it doesn't shadow API routes).
