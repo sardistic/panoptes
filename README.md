@@ -31,7 +31,8 @@ register to unlock the keyed lanes.
   disaster alerts, AWC SIGMETs (hazardous airspace weather).
 - **Air quality** — AirNow (`AIRNOW_KEY`), OpenAQ (`OPENAQ_KEY`).
 - **Traffic & transport** — 511 traffic (NY keyless; GA/LA/PA/ID/VA/New England
-  unlock with free `T511_*_KEY`s), FAA TFRs, FAA airport delays.
+  unlock with free `T511_*_KEY`s), FAA TFRs, FAA airport delays, Amtrak trains
+  running 1h+ late (rail-corridor anomaly signal).
 - **Aircraft & maritime** — ADS-B (`APB_ADSB`, heavier/opt-in), AIS stream, NDBC buoys.
 - **Civil unrest** — ACLED (`ACLED_KEY` + `ACLED_EMAIL`).
 - **News & social** — news RSS, social RSS (Reddit/Mastodon), Bluesky/ATProto

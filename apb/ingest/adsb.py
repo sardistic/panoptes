@@ -22,6 +22,9 @@ import httpx
 _UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
 _POINT = "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}"
 _MIL = "https://api.adsb.lol/v2/mil"
+# Same community v2 API on an independent aggregator; used when adsb.lol errors.
+_POINT_ALT = "https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}"
+_MIL_ALT = "https://api.airplanes.live/v2/mil"
 _MIN_INTERVAL = 1.3      # adsb.lol throttles rapid polling; keep ~1 req/1.3s
 _PER_SCAN = 3            # metros polled per scan (rotates through WATCH)
 _SENTIMENT = ["calm", "routine", "elevated", "urgent", "distress"]
@@ -89,24 +92,26 @@ class AdsbIngest:
                 time.sleep(wait)
             self._last_req = time.time()
 
+    def _get_ac(self, url: str, fallback: str) -> list[dict]:
+        """Fetch an aircraft list, failing over to the alternate aggregator."""
+        for u in (url, fallback):
+            try:
+                r = self._client.get(u)
+                r.raise_for_status()
+                return r.json().get("ac", []) or []
+            except (httpx.HTTPError, ValueError):
+                continue
+        return []
+
     def _poll_point(self, lat: float, lon: float) -> list[dict]:
         self._throttle()
-        try:
-            r = self._client.get(_POINT.format(lat=lat, lon=lon, radius=_RADIUS))
-            r.raise_for_status()
-            return r.json().get("ac", []) or []
-        except (httpx.HTTPError, ValueError):
-            return []
+        return self._get_ac(_POINT.format(lat=lat, lon=lon, radius=_RADIUS),
+                            _POINT_ALT.format(lat=lat, lon=lon, radius=_RADIUS))
 
     def _poll_mil(self) -> list[dict]:
         """Single cheap nationwide call: military aircraft (often surveillance holds)."""
         self._throttle()
-        try:
-            r = self._client.get(_MIL)
-            r.raise_for_status()
-            return r.json().get("ac", []) or []
-        except (httpx.HTTPError, ValueError):
-            return []
+        return self._get_ac(_MIL, _MIL_ALT)
 
     def _prune(self, now: float) -> None:
         for hx in [h for h, t in self._last_seen.items() if now - t > _HIST_TTL]:

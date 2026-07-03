@@ -44,6 +44,22 @@ def test_chp_summary_never_includes_log_details():
     assert "LogDetails" not in parse
 
 
+def test_amtrak_delay_uses_worst_reached_station():
+    from apb.ingest.amtrak import _delay_min, _threat
+    train = {"stations": [
+        {"schArr": "2026-07-02T13:25:00-06:00", "arr": "2026-07-02T13:30:00-06:00",
+         "status": "Departed"},
+        {"schArr": "2026-07-02T15:00:00-06:00", "arr": "2026-07-02T17:00:00-06:00",
+         "status": "Arrived"},
+        # not reached yet -> projected times must not count
+        {"schArr": "2026-07-02T18:00:00-06:00", "arr": "2026-07-02T23:00:00-06:00",
+         "status": "Enroute"},
+    ]}
+    assert _delay_min(train) == 120.0
+    assert _delay_min({"stations": []}) is None
+    assert _threat(60) < _threat(180) <= 0.6
+
+
 def test_lane_feeds_register_once():
     from apb.ingest.cad import FEEDS, load_emsc, load_gdacs, load_sigmet
     assert load_emsc() in (0, 1)      # 1 first time, 0 if already registered

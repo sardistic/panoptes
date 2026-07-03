@@ -632,6 +632,15 @@ def load_chp() -> int:
     return 1
 
 
+def load_amtrak() -> int:
+    """Register the Amtrak delayed-trains feed (apb.ingest.amtrak). Keyless."""
+    if "amtrak" in FEEDS:
+        return 0
+    FEEDS["amtrak"] = CadFeed(metro="amtrak", name="Amtrak Delayed Trains",
+                              url="amtrak", kind="amtrak", hidden=True)
+    return 1
+
+
 def load_sigmet() -> int:
     """Register the AWC SIGMET hazardous-airspace feed (apb.ingest.sigmet). Keyless."""
     if "sigmet" in FEEDS:
@@ -701,7 +710,7 @@ class CadIngest:
         "faa_delay": "_fetch_faa_delays", "nifc_fire": "_fetch_nifc_fire",
         "airnow": "_fetch_airnow", "acled": "_fetch_acled",
         "emsc": "_fetch_emsc", "gdacs": "_fetch_gdacs", "sigmet": "_fetch_sigmet",
-        "chp": "_fetch_chp",
+        "chp": "_fetch_chp", "amtrak": "_fetch_amtrak",
     }
 
     def _backing_off(self, metro: str) -> bool:
@@ -964,6 +973,13 @@ class CadIngest:
             from apb.ingest.chp import ChpIngest
             self._chp = ChpIngest()
         return self._chp.fetch()
+
+    def _fetch_amtrak(self, feed: CadFeed) -> list[dict]:
+        """Fetch significantly-delayed Amtrak trains (rows already normalized)."""
+        if getattr(self, "_amtrak", None) is None:
+            from apb.ingest.amtrak import AmtrakIngest
+            self._amtrak = AmtrakIngest()
+        return self._amtrak.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

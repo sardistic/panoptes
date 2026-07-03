@@ -71,6 +71,7 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("gdacs", cad_mod.load_gdacs),
     ("sigmet", cad_mod.load_sigmet),
     ("chp", cad_mod.load_chp),
+    ("amtrak", cad_mod.load_amtrak),
 ]
 
 
@@ -508,6 +509,12 @@ def live_disasters(max_age_hours: float = 0.0):
 def live_sigmets(max_age_hours: float = 0.0):
     """AWC SIGMETs in effect: convective/turbulence/icing/ash airspace hazards."""
     return _live_feed("sigmet", max_age_hours)
+
+
+@app.get("/live/rail")
+def live_rail(max_age_hours: float = 0.0):
+    """Amtrak trains running >= 1h late — a rail-corridor anomaly signal."""
+    return _live_feed("amtrak", max_age_hours)
 
 
 @app.get("/db/stats")
