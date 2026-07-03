@@ -604,6 +604,33 @@ def load_acled() -> int:
     return 1
 
 
+def load_emsc() -> int:
+    """Register the EMSC global-earthquake feed (apb.ingest.emsc). Keyless."""
+    if "emsc" in FEEDS:
+        return 0
+    FEEDS["emsc"] = CadFeed(metro="emsc", name="EMSC Earthquakes",
+                            url="emsc", kind="emsc", hidden=True)
+    return 1
+
+
+def load_gdacs() -> int:
+    """Register the GDACS global-disaster feed (apb.ingest.gdacs). Keyless."""
+    if "gdacs" in FEEDS:
+        return 0
+    FEEDS["gdacs"] = CadFeed(metro="gdacs", name="GDACS Disaster Alerts",
+                             url="gdacs", kind="gdacs", hidden=True)
+    return 1
+
+
+def load_sigmet() -> int:
+    """Register the AWC SIGMET hazardous-airspace feed (apb.ingest.sigmet). Keyless."""
+    if "sigmet" in FEEDS:
+        return 0
+    FEEDS["sigmet"] = CadFeed(metro="sigmet", name="AWC SIGMETs",
+                              url="sigmet", kind="sigmet", hidden=True)
+    return 1
+
+
 def load_southern(path: str | Path = "data/southern_agencies.json") -> int:
     """Register Southern Software 'Citizen Connect' agencies (police/sheriff CAD) as
     hidden feeds. feed.url = AgencyID; resolved lazily on first fetch."""
@@ -663,6 +690,7 @@ class CadIngest:
         "ndbc": "_fetch_ndbc", "spc": "_fetch_spc", "nhc": "_fetch_nhc",
         "faa_delay": "_fetch_faa_delays", "nifc_fire": "_fetch_nifc_fire",
         "airnow": "_fetch_airnow", "acled": "_fetch_acled",
+        "emsc": "_fetch_emsc", "gdacs": "_fetch_gdacs", "sigmet": "_fetch_sigmet",
     }
 
     def _backing_off(self, metro: str) -> bool:
@@ -897,6 +925,27 @@ class CadIngest:
             from apb.ingest.acled import AcledIngest
             self._acled = AcledIngest()
         return self._acled.fetch()
+
+    def _fetch_emsc(self, feed: CadFeed) -> list[dict]:
+        """Fetch recent M4+ global earthquakes (rows already normalized)."""
+        if getattr(self, "_emsc", None) is None:
+            from apb.ingest.emsc import EmscIngest
+            self._emsc = EmscIngest()
+        return self._emsc.fetch()
+
+    def _fetch_gdacs(self, feed: CadFeed) -> list[dict]:
+        """Fetch current Orange/Red GDACS disasters (rows already normalized)."""
+        if getattr(self, "_gdacs", None) is None:
+            from apb.ingest.gdacs import GdacsIngest
+            self._gdacs = GdacsIngest()
+        return self._gdacs.fetch()
+
+    def _fetch_sigmet(self, feed: CadFeed) -> list[dict]:
+        """Fetch currently-valid SIGMETs (rows already normalized)."""
+        if getattr(self, "_sigmet", None) is None:
+            from apb.ingest.sigmet import SigmetIngest
+            self._sigmet = SigmetIngest()
+        return self._sigmet.fetch()
 
     def _fetch_arcgis(self, feed: CadFeed, limit: int) -> list[dict]:
         """Query an ArcGIS FeatureServer layer as GeoJSON; embed geometry per row so

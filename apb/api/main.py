@@ -67,6 +67,9 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("nifc_fire", cad_mod.load_nifc_fire),
     ("airnow", cad_mod.load_airnow),
     ("acled", cad_mod.load_acled),
+    ("emsc", cad_mod.load_emsc),
+    ("gdacs", cad_mod.load_gdacs),
+    ("sigmet", cad_mod.load_sigmet),
 ]
 
 
@@ -486,6 +489,24 @@ def live_airnow(max_age_hours: float = 0.0):
 def live_unrest(max_age_hours: float = 0.0):
     """ACLED civil-unrest events. Empty unless ACLED_KEY + ACLED_EMAIL are set."""
     return _live_feed("acled", max_age_hours)
+
+
+@app.get("/live/quakes_global")
+def live_quakes_global(max_age_hours: float = 24.0):
+    """EMSC global M4+ earthquakes (multi-agency, often earlier than USGS abroad)."""
+    return _live_feed("emsc", max_age_hours)
+
+
+@app.get("/live/disasters")
+def live_disasters(max_age_hours: float = 0.0):
+    """GDACS Orange/Red global disaster alerts (EQ/TC/flood/wildfire/volcano)."""
+    return _live_feed("gdacs", max_age_hours)
+
+
+@app.get("/live/sigmets")
+def live_sigmets(max_age_hours: float = 0.0):
+    """AWC SIGMETs in effect: convective/turbulence/icing/ash airspace hazards."""
+    return _live_feed("sigmet", max_age_hours)
 
 
 @app.get("/db/stats")

@@ -538,6 +538,7 @@ const HAZ_STYLE = {
   cyclone:    {c:'#c03a8f', g:'@', label:'TROPICAL CYCLONE'},
   delay:      {c:'#9aa6b2', g:'D', label:'AIRPORT DELAY'},
   unrest:     {c:'#d83a3a', g:'U', label:'CIVIL UNREST'},
+  disaster:   {c:'#c0392b', g:'X', label:'GDACS DISASTER'},
 };
 // Split NWS alerts (source='nws') into filterable sub-families by event name.
 function nwsSub(summary){
@@ -576,6 +577,11 @@ function hazCat(d){
     case 'odin': return 'outage';
     case 'usgs_flood': return 'flood';
     case 'openaq': return 'airquality';
+    case 'emsc': return 'quake';
+    case 'gdacs': return d.event_type==='WF'?'fire'
+      : d.event_type==='EQ'?'quake' : d.event_type==='TC'?'cyclone'
+      : d.event_type==='FL'?'flood' : 'disaster';
+    case 'sigmet': return d.hazard==='ASH'?'volcano':'severe';
     default: return d.type==='traffic'?'traffic':'weather';
   }
 }
@@ -585,7 +591,7 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf, an, unr] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf, an, unr, gq, dis, sgm] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
@@ -604,9 +610,13 @@ async function loadHazards(){
       fetch(`/live/wildfires?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/airnow?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/unrest?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/quakes_global?max_age_hours=${Math.max(w,24)}`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/disasters`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/sigmets`).then(r=>r.json()).catch(()=>[]),
     ]);
     hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
-                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly, ...wf, ...an, ...unr]
+                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly, ...wf, ...an, ...unr,
+                  ...gq, ...dis, ...sgm]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
@@ -786,7 +796,7 @@ const HAZ_GROUPS = [
   ["Water",  ["flood","marine","maritime"]],
   ["Fire/Air",["fire","smoke","airquality","volcano","quake"]],
   ["Transport",["traffic","aircraft","tfr","delay"]],
-  ["Infra",  ["outage","declaration"]],
+  ["Infra",  ["outage","declaration","disaster"]],
   ["Civil",  ["unrest"]],
 ];
 (function buildHazChips(){

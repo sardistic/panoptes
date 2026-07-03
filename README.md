@@ -26,7 +26,8 @@ register to unlock the keyed lanes.
   systems. Transcription is a deferred enrichment layer.
 - **Hazards & weather** — USGS, NWS, EONET, USGS flood, SPC storm reports, NHC
   cyclones, volcano activity, NIFC active wildfires, NASA FIRMS (`FIRMS_MAP_KEY`),
-  HMS smoke, FEMA declarations.
+  HMS smoke, FEMA declarations, EMSC global earthquakes, GDACS Orange/Red global
+  disaster alerts, AWC SIGMETs (hazardous airspace weather).
 - **Air quality** — AirNow (`AIRNOW_KEY`), OpenAQ (`OPENAQ_KEY`).
 - **Traffic & transport** — 511 traffic, FAA TFRs, FAA airport delays.
 - **Aircraft & maritime** — ADS-B (`APB_ADSB`, heavier/opt-in), AIS stream, NDBC buoys.
