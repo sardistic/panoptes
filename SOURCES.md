@@ -20,8 +20,12 @@ and surge-score source-diversity.
 | 511 Louisiana | `T511_LA_KEY` | Statewide LA DOT traffic incidents | https://511la.org → developer resources |
 | 511 Pennsylvania | `T511_PA_KEY` | Statewide PA DOT traffic incidents | https://www.511pa.com → developer resources |
 | 511 Idaho | `T511_ID_KEY` | Statewide ID DOT traffic incidents | https://511.idaho.gov → developer resources |
-| 511 Virginia | `T511_VA_KEY` | Statewide VA DOT traffic incidents | https://www.511virginia.org → developer resources |
 | New England 511 | `T511_NE_KEY` | CT/ME/MA/NH/RI/VT traffic incidents (one key, six states) | https://newengland511.org → developer resources |
+
+Virginia does **not** run the `getevents` platform — VDOT's data portal is
+https://smarterroads.org (free account, different API; not wired up yet).
+North Carolina needs no key: NCDOT TIMS incidents are already flowing through the
+ArcGIS catalog (`ag_ncdot_timsincidentsbylanesaffected`).
 
 Notes:
 - **AISStream** is a websocket firehose. `websockets` ships with `uvicorn[standard]`,

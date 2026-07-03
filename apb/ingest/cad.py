@@ -211,10 +211,22 @@ def _detect_type_key(row: dict) -> str | None:
 
 
 def _detect_time_key(row: dict) -> str | None:
+    best, best_rank = None, -1
     for k in row:
-        if _TIME_RE.search(k.lower()):
-            return k
-    return None
+        kl = k.lower()
+        if not _TIME_RE.search(kl):
+            continue
+        # Prefer event-start times; an EndDateTime on a planned closure is in the
+        # future, which parse_ts rejects and the row loses its timestamp entirely.
+        if any(w in kl for w in ("start", "report", "receiv", "creat", "occur")):
+            rank = 2
+        elif any(w in kl for w in ("end", "clear", "close", "expir")):
+            rank = 0
+        else:
+            rank = 1
+        if rank > best_rank:
+            best, best_rank = k, rank
+    return best
 
 
 def _detect_addr_key(row: dict) -> str | None:
@@ -988,6 +1000,9 @@ class CadIngest:
                   "resultRecordCount": limit}
         if feed.time_field:
             params["orderByFields"] = f"{feed.time_field} DESC"
+            # DOT layers mix future-scheduled closures into the same table; ordered
+            # DESC those crowd out everything live, so cap at the current time.
+            params["where"] = f"{feed.time_field} <= CURRENT_TIMESTAMP"
         url = feed.url.rstrip("/")
         if not url.endswith("/query"):
             url += "/query"

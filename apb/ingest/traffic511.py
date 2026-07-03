@@ -62,9 +62,6 @@ SYSTEMS: dict[str, SystemSpec] = {
     "id": SystemSpec("id", "511 Idaho Traffic",
                      "https://511.idaho.gov/api/getevents?key={key}&format=json",
                      state="ID", env_key="T511_ID_KEY"),
-    "va": SystemSpec("va", "511 Virginia Traffic",
-                     "https://www.511virginia.org/api/getevents?key={key}&format=json",
-                     state="VA", env_key="T511_VA_KEY"),
     # one system covers CT/ME/MA/NH/RI/VT
     "ne6": SystemSpec("ne6", "New England 511 Traffic",
                       "https://newengland511.org/api/getevents?key={key}&format=json",
