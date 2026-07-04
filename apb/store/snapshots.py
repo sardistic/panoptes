@@ -10,12 +10,16 @@ rate baselines).
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 import time
 from pathlib import Path
 
-DB_PATH = Path("data/apb.sqlite")
+# On Railway a volume is mounted at /app/state (APB_DB_PATH points inside it) so
+# accumulated history survives deploys. It must NOT live under /app/data — a volume
+# there would shadow the committed catalogs baked into the image.
+DB_PATH = Path(os.environ.get("APB_DB_PATH", "data/apb.sqlite"))
 _lock = threading.Lock()
 _conn: sqlite3.Connection | None = None
 

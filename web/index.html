@@ -540,10 +540,13 @@ const HAZ_STYLE = {
   unrest:     {c:'#d83a3a', g:'U', label:'CIVIL UNREST'},
   disaster:   {c:'#c0392b', g:'X', label:'GDACS DISASTER'},
   rail:       {c:'#8f7ae5', g:'=', label:'RAIL DELAY'},
+  civil:      {c:'#ff2d40', g:'!', label:'CIVIL EMERGENCY'},
 };
 // Split NWS alerts (source='nws') into filterable sub-families by event name.
 function nwsSub(summary){
   const t=(summary||'').toLowerCase();
+  // IPAWS civil alerts relayed through NWS — never style these as weather
+  if(/civil danger|civil emergency|law enforcement warning|evacuation immediate|shelter in place|hazardous materials warning|911 telephone outage|child abduction|radiological|nuclear power plant|fire warning/.test(t)) return 'civil';
   if(/tsunami/.test(t)) return 'tsunami';
   if(/tornado/.test(t)) return 'tornado';
   if(/flood|hydrolog/.test(t)) return 'flood';
@@ -584,6 +587,7 @@ function hazCat(d){
       : d.event_type==='FL'?'flood' : 'disaster';
     case 'sigmet': return d.hazard==='ASH'?'volcano':'severe';
     case 'amtrak': return 'rail';
+    case 'squawk': return 'aircraft';
     default: return d.type==='traffic'?'traffic':'weather';
   }
 }
@@ -593,7 +597,7 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf, an, unr, gq, dis, sgm, rail] = await Promise.all([
+    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf, an, unr, gq, dis, sgm, rail, sqk] = await Promise.all([
       fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
@@ -616,10 +620,11 @@ async function loadHazards(){
       fetch(`/live/disasters`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/sigmets`).then(r=>r.json()).catch(()=>[]),
       fetch(`/live/rail`).then(r=>r.json()).catch(()=>[]),
+      fetch(`/live/squawks`).then(r=>r.json()).catch(()=>[]),
     ]);
     hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
                   ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly, ...wf, ...an, ...unr,
-                  ...gq, ...dis, ...sgm, ...rail]
+                  ...gq, ...dis, ...sgm, ...rail, ...sqk]
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
@@ -800,7 +805,7 @@ const HAZ_GROUPS = [
   ["Fire/Air",["fire","smoke","airquality","volcano","quake"]],
   ["Transport",["traffic","aircraft","tfr","delay","rail"]],
   ["Infra",  ["outage","declaration","disaster"]],
-  ["Civil",  ["unrest"]],
+  ["Civil",  ["unrest","civil"]],
 ];
 (function buildHazChips(){
   const bar=document.getElementById('hazFilter');

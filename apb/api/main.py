@@ -72,6 +72,7 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("sigmet", cad_mod.load_sigmet),
     ("chp", cad_mod.load_chp),
     ("amtrak", cad_mod.load_amtrak),
+    ("squawk", cad_mod.load_squawk),
 ]
 
 
@@ -515,6 +516,12 @@ def live_sigmets(max_age_hours: float = 0.0):
 def live_rail(max_age_hours: float = 0.0):
     """Amtrak trains running >= 1h late — a rail-corridor anomaly signal."""
     return _live_feed("amtrak", max_age_hours)
+
+
+@app.get("/live/squawks")
+def live_squawks(max_age_hours: float = 0.0):
+    """Aircraft currently squawking 7500/7600/7700. Usually empty; never ignorable."""
+    return _live_feed("squawk", max_age_hours)
 
 
 @app.get("/db/stats")

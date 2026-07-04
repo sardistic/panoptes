@@ -71,6 +71,15 @@ def _centroid(geom: dict | None) -> tuple[float | None, float | None]:
 # ── NWS severity (CAP) -> threat 0..1 ─────────────────────────────────────────
 _NWS_SEV = {"Extreme": 0.95, "Severe": 0.75, "Moderate": 0.5, "Minor": 0.3,
             "Unknown": 0.3}
+
+# Non-weather CAP events relayed through NWS (IPAWS). Rare and always urgent —
+# they must never be dropped for lacking polygon geometry or styled as weather.
+_CIVIL_EVENTS = {
+    "civil danger warning", "civil emergency message", "law enforcement warning",
+    "evacuation immediate", "shelter in place warning", "hazardous materials warning",
+    "911 telephone outage emergency", "child abduction emergency",
+    "radiological hazard warning", "nuclear power plant warning", "fire warning",
+}
 _SENTIMENT = ["calm", "routine", "elevated", "urgent", "distress"]
 
 
@@ -106,6 +115,20 @@ class HazardIngest:
 
     def __init__(self):
         self._client = httpx.Client(timeout=20.0, headers=_UA, follow_redirects=True)
+        self._zone_cache: dict[str, tuple] = {}   # zone URL -> (lat, lon)
+
+    def _zone_centroid(self, zone_url: str) -> tuple:
+        """Centroid of an NWS forecast zone (for alerts without polygon geometry).
+        Cached forever — zone shapes don't change."""
+        if zone_url in self._zone_cache:
+            return self._zone_cache[zone_url]
+        try:
+            g = self._client.get(zone_url).json().get("geometry")
+            out = _centroid(g)
+        except (httpx.HTTPError, ValueError):
+            out = (None, None)
+        self._zone_cache[zone_url] = out
+        return out
 
     def fetch(self, source: str) -> list[dict]:
         try:
@@ -142,14 +165,27 @@ class HazardIngest:
         out = []
         for f in feats:
             p = f.get("properties") or {}
+            event = p.get("event") or "Weather Alert"
+            civil = event.lower() in _CIVIL_EVENTS
+            threat = _NWS_SEV.get(p.get("severity"), 0.3)
             lat, lon = _centroid(f.get("geometry"))
             if lat is None or lon is None:
-                continue                      # many alerts are zone-only; skip those
-            threat = _NWS_SEV.get(p.get("severity"), 0.3)
-            event = p.get("event") or "Weather Alert"
-            out.append(_row(p.get("id") or f.get("id"), "nws", "weather",
-                            event, p.get("areaDesc"), lat, lon, threat,
-                            p.get("effective") or p.get("sent")))
+                # Zone-only alert. Routine weather isn't worth a lookup per zone,
+                # but civil/extreme alerts must never be dropped — resolve the
+                # first affected zone's centroid (cached).
+                zones = p.get("affectedZones") or []
+                if (civil or threat >= 0.9) and zones:
+                    lat, lon = self._zone_centroid(zones[0])
+                if lat is None or lon is None:
+                    continue
+            if civil:
+                threat = max(threat, 0.85)
+            row = _row(p.get("id") or f.get("id"), "nws",
+                       "suspicious" if civil else "weather",
+                       event, p.get("areaDesc"), lat, lon, threat,
+                       p.get("effective") or p.get("sent"))
+            row["civil"] = civil
+            out.append(row)
         return out
 
     def _eonet(self) -> list[dict]:
