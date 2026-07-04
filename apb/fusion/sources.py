@@ -47,6 +47,8 @@ def gather_signals(
         signals.extend(seed_recent(max_age_hours))
     signals.extend(social_store.recent(max_age_hours))   # live Bluesky + social RSS
     signals.extend(news_store.recent(max_age_hours))     # live news RSS
+    from apb.fusion.dedupe import dedupe_signals
+    signals = dedupe_signals(signals)   # one phenomenon != multi-source corroboration
     if kinds is not None:
         signals = [s for s in signals if s.source_kind.value in kinds]
     return signals

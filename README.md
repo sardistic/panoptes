@@ -53,7 +53,11 @@ register to unlock the keyed lanes.
   `/live/declarations`, `/live/outages`, `/live/unrest`, `/live/social` —
   per-lane live feeds.
 - `/live/emerging`, `/emerging`, `/baseline/anomalies` — surge / anomaly detection
-  against rolling baselines.
+  against rolling, seasonally-bucketed baselines.
+- `/events` — persisted fused events with lifecycle (stable uid, first_seen, age,
+  peak vs latest score, growing flag). New events over `APB_ALERT_SCORE` POST to
+  `APB_WEBHOOK_URL` exactly once (Discord webhooks supported).
+- `/status` — per-lane operational health (rows, freshness, backoff, buffers).
 - `/correlate`, `/feeds` — keyless news/context correlation (GDELT, BigDataCloud).
 - `/incidents`, `/activity` — stored, **PII-redacted** records.
 - `/health`, `/db/stats`, `/live/metros`.

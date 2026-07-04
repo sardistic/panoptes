@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # keep CI hermetic: no background pollers or live-network lanes
+      APB_POLLER_OFF: "1"
+      APB_BLUESKY_OFF: "1"
+      APB_NEWS_OFF: "1"
+      APB_GNEWS_OFF: "1"
+      APB_SOCIAL_RSS_OFF: "1"
+      APB_ADSB_OFF: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-web.txt pytest
+      - run: python -m pytest tests -q

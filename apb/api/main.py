@@ -76,11 +76,16 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
 ]
 
 
+_poller_beat = {"n": 0, "at": 0.0}      # /status: is the background loop alive?
+
+
 def _poller(interval: float = 120.0):
-    """Continuously snapshot the national stream into the DB so coverage/history grow."""
+    """Continuously snapshot the national stream into the DB so coverage/history grow,
+    persist fused events (lifecycle identity), and fire webhook alerts."""
     snapshots.conn()  # init
     n = 0
     while True:
+        _poller_beat.update(n=n, at=_time.time())
         try:
             wrote = snapshots.record(_cad.overview(limit_per=80, max_age_hours=168))
             n += 1
@@ -89,6 +94,21 @@ def _poller(interval: float = 120.0):
             log.info("snapshot %d: +%d rows, db=%s", n, wrote, snapshots.stats())
         except Exception as e:
             log.warning("poller error: %s", e)
+        try:
+            from apb.alerts.notify import send_pending
+            from apb.fusion.cluster import detect
+            from apb.fusion.sources import gather_signals
+            from apb.store import events as event_store
+            fused = detect(gather_signals(_cad, max_age_hours=6.0), min_count=2,
+                           min_sources=1, min_score=1.2, max_age_hours=6.0)
+            new = event_store.record(fused)
+            if n % 30 == 0:
+                event_store.prune()
+            if new:
+                log.info("event registry: +%d new (of %d active)", new, len(fused))
+            send_pending()
+        except Exception as e:
+            log.warning("event-registry error: %s", e)
         _time.sleep(interval)
 
 
@@ -132,6 +152,14 @@ def _startup() -> None:
             news_store.start(keep_unplaced=bool(os.environ.get("APB_NEWS_KEEP_UNPLACED")))
         except Exception as e:
             log.warning("news lane disabled: %s", e)
+
+    # Per-metro Google News incident headlines -> same buffer. APB_GNEWS_OFF to disable.
+    if not _off("APB_GNEWS_OFF"):
+        try:
+            from apb.fusion import news_store
+            news_store.start_gnews()
+        except Exception as e:
+            log.warning("gnews lane disabled: %s", e)
 
     # Keyless Reddit/Mastodon RSS poller -> shares the social buffer. APB_SOCIAL_RSS_OFF to disable.
     if not _off("APB_SOCIAL_RSS_OFF"):
@@ -496,8 +524,13 @@ def live_unrest(max_age_hours: float = 0.0):
 
 @app.get("/live/quakes_global")
 def live_quakes_global(max_age_hours: float = 24.0):
-    """EMSC global M4+ earthquakes (multi-agency, often earlier than USGS abroad)."""
-    return _live_feed("emsc", max_age_hours)
+    """EMSC global M4+ earthquakes (multi-agency, often earlier than USGS abroad).
+    Quakes USGS already carries are suppressed so the map shows one marker per event."""
+    from apb.fusion.dedupe import dedupe_signal_rows
+    emsc = _live_feed("emsc", max_age_hours)
+    usgs = _cad.fetch("hz_usgs")
+    kept = dedupe_signal_rows(usgs + emsc)
+    return [d for d in kept if d.get("source") == "emsc"]
 
 
 @app.get("/live/disasters")
@@ -524,10 +557,56 @@ def live_squawks(max_age_hours: float = 0.0):
     return _live_feed("squawk", max_age_hours)
 
 
+@app.get("/events")
+def events(max_age_hours: float = 24.0, limit: int = 200):
+    """Persisted fused events with lifecycle: stable uid, first_seen/last_seen,
+    age_min, peak vs latest score, growing flag. Written by the background poller —
+    this is the 'what has been happening' view, vs /live/fused's instantaneous one."""
+    from apb.store import events as event_store
+    return event_store.query(max_age_hours, limit)
+
+
 @app.get("/db/stats")
 def db_stats():
     """How much history the snapshot poller has accumulated."""
     return snapshots.stats()
+
+
+@app.get("/status")
+def status():
+    """Per-lane operational health: registered feeds by kind, backoff state, cache
+    freshness of the singleton lanes, buffer sizes, poller heartbeat. This is how a
+    silently-degraded lane (empty rows, stale timestamps) gets noticed."""
+    from collections import Counter
+    from apb.fusion import news_store, social_store
+    now = _time.time()
+    kinds = Counter(f.kind for f in CAD_FEEDS.values())
+    backing_off = sorted(m for m in _cad._fail if _cad._backing_off(m))
+    lanes = {}
+    for slug, feed in CAD_FEEDS.items():
+        if not feed.hidden or feed.kind in ("socrata", "arcgis", "pulsepoint",
+                                            "p2c", "southern"):
+            continue                       # singletons only; catalogs via `kinds`
+        hit = _cad._cache.get(slug)
+        rows = hit[1] if hit else None
+        freshest = max((d.get("ts") or 0 for d in rows), default=0) if rows else 0
+        lanes[slug] = {
+            "rows": len(rows) if rows is not None else None,   # None = not yet fetched
+            "cache_age_s": round(now - hit[0]) if hit else None,
+            "freshest_min": round((now - freshest) / 60) if freshest else None,
+            "backing_off": slug in backing_off,
+        }
+    return {
+        "feeds_total": len(CAD_FEEDS),
+        "feeds_by_kind": dict(kinds),
+        "backing_off": {"count": len(backing_off), "feeds": backing_off[:40]},
+        "lanes": lanes,
+        "buffers": {"social": social_store.stats(), "news": news_store.stats()},
+        "db": snapshots.stats(),
+        "poller": {"cycles": _poller_beat["n"],
+                   "last_beat_s": round(now - _poller_beat["at"]) if _poller_beat["at"] else None},
+        "response_cache": len(_resp_cache),
+    }
 
 
 @app.get("/baseline/anomalies")

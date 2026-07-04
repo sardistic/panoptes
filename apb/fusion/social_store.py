@@ -33,7 +33,20 @@ _SEEN_MAX = 50_000
 _started = False
 
 
-def add(signals: list[EventSignal]) -> None:
+_hydrated = False
+
+
+def _hydrate() -> None:
+    """Reload the persisted buffer once, so restarts don't blank the social layer."""
+    global _hydrated
+    if _hydrated:
+        return
+    _hydrated = True
+    from apb.store import sigbuf
+    add(sigbuf.load("social"), _persist=False)
+
+
+def add(signals: list[EventSignal], _persist: bool = True) -> None:
     if not signals:
         return
     with _lock:
@@ -45,6 +58,9 @@ def add(signals: list[EventSignal]) -> None:
         _buf.extend(fresh)
         if len(_buf) > _MAX:
             del _buf[:len(_buf) - _MAX]
+    if _persist and fresh:
+        from apb.store import sigbuf
+        sigbuf.save("social", fresh)
 
 
 def recent(max_age_hours: float = 24.0) -> list[EventSignal]:
@@ -102,6 +118,7 @@ def _rss_poll_once(keep_unplaced: bool) -> int:
 def start_rss(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
     """Launch the keyless Reddit/Mastodon RSS poller in a daemon thread. Independent of
     the Bluesky firehose (shares this buffer). No-op if already running."""
+    _hydrate()
     global _rss_started
     if _rss_started:
         return False
@@ -124,6 +141,7 @@ def start_rss(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
 def start(keep_unplaced: bool = False) -> bool:
     """Launch the Jetstream consumer in a daemon thread (auto-reconnect). No-op if
     already running or `websockets` is unavailable. Returns True if started."""
+    _hydrate()
     global _started
     if _started:
         return False

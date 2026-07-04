@@ -30,7 +30,20 @@ _SEEN_MAX = 50_000
 _started = False
 
 
-def add(signals: list[EventSignal]) -> None:
+_hydrated = False
+
+
+def _hydrate() -> None:
+    """Reload the persisted buffer once, so restarts don't blank the news layer."""
+    global _hydrated
+    if _hydrated:
+        return
+    _hydrated = True
+    from apb.store import sigbuf
+    add(sigbuf.load("news"), _persist=False)
+
+
+def add(signals: list[EventSignal], _persist: bool = True) -> None:
     if not signals:
         return
     with _lock:
@@ -42,6 +55,9 @@ def add(signals: list[EventSignal]) -> None:
         _buf.extend(fresh)
         if len(_buf) > _MAX:
             del _buf[:len(_buf) - _MAX]
+    if _persist and fresh:
+        from apb.store import sigbuf
+        sigbuf.save("news", fresh)
 
 
 def recent(max_age_hours: float = 24.0) -> list[EventSignal]:
@@ -78,8 +94,67 @@ def poll_once(keep_unplaced: bool = False) -> int:
     return len(_buf) - before
 
 
+_GNEWS_TERMS = ("police OR shooting OR fire OR explosion OR crash OR evacuation "
+                "OR emergency OR hazmat")
+_gnews_started = False
+
+
+def gnews_poll_once(max_metros: int = 40, per_metro: int = 5) -> int:
+    """Query Google News per metro ('\"Seattle\" (police OR fire ...)' when:1d) and
+    buffer the placed headlines. Reuses the correlator's cached gnews client, so
+    /correlate and this poller share one result cache."""
+    from apb.context import gdelt
+    from apb.fusion.places import places
+    if gdelt._gdelt is None:
+        gdelt._gdelt = gdelt.GDELT()
+    rows: list[dict] = []
+    seen_metros: set[str] = set()
+    for place, _aliases in places()[:max_metros]:
+        if place.metro in seen_metros:
+            continue
+        seen_metros.add(place.metro)
+        arts = gdelt._gdelt.gnews(f'"{place.name}" ({_GNEWS_TERMS})',
+                                  timespan="1d", maxrecords=per_metro)
+        for a in arts:
+            rows.append({"source": "gnews", "source_kind": "news",
+                         "text": a.get("title") or "", "url": a.get("url"),
+                         "created_at": a.get("at"),
+                         "lat": place.lat, "lon": place.lon, "metro": place.metro,
+                         "location": place.name, "confidence": 0.35,
+                         "domain": a.get("domain")})
+        time.sleep(1.5)                     # stay polite across ~40 metros
+    from apb.fusion.sources import social_text_signals
+    before = len(_buf)
+    add(social_text_signals(rows))
+    return len(_buf) - before
+
+
+def start_gnews(interval: float = 900.0) -> bool:
+    """Launch the per-metro Google News poller in a daemon thread. Complements the
+    generic RSS poller with metro-placed incident headlines. No-op if running."""
+    _hydrate()
+    global _gnews_started
+    if _gnews_started:
+        return False
+
+    def _run():
+        while True:
+            try:
+                n = gnews_poll_once()
+                log.info(f"gnews poll: +{n} signals, {stats()}")
+            except Exception as e:            # one bad poll must not kill the loop
+                log.warning(f"gnews poll error: {e}")
+            time.sleep(interval)
+
+    threading.Thread(target=_run, daemon=True).start()
+    _gnews_started = True
+    log.info("per-metro Google News poller started")
+    return True
+
+
 def start(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
     """Launch the RSS poller in a daemon thread. No-op if already running."""
+    _hydrate()
     global _started
     if _started:
         return False

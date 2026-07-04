@@ -8,12 +8,25 @@ built up history (apb/store/snapshots.py).
 Method: per metro, bucket incidents into fixed time windows, treat the most recent
 window as the observation and the trailing windows as the baseline (mean + std), and
 flag metros whose current count exceeds baseline by z_threshold std-devs.
+
+Seasonality: incident volume swings with time of day (rush hour, bar close) and
+weekday-vs-weekend. Once enough history exists, the baseline is restricted to
+trailing windows from a comparable time slot (same day-part and same weekday/weekend
+class); with thin history it falls back to all trailing windows so the detector
+still works on day one.
 """
 from __future__ import annotations
 
 import math
 import time
 from collections import defaultdict
+from datetime import datetime, timezone
+
+
+def _slot(ts: float) -> tuple[int, bool]:
+    """(day-part 0-3, is_weekend) — 6h day-parts: night/morning/afternoon/evening."""
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    return dt.hour // 6, dt.weekday() >= 5
 
 
 def detect_rate_anomalies(incidents: list[dict], window_hours: float = 1.0,
@@ -36,10 +49,16 @@ def detect_rate_anomalies(incidents: list[dict], window_hours: float = 1.0,
         if idx == 0:
             threat_now[m] = max(threat_now[m], d.get("threat_score", 0.0))
 
+    now_slot = _slot(now)
     out: list[dict] = []
     for metro, b in buckets.items():
         current = b.get(0, 0)
-        baseline = [b.get(i, 0) for i in range(1, max(b.keys(), default=0) + 1)]
+        n_windows = max(b.keys(), default=0) + 1
+        # seasonal baseline: only trailing windows in the same time slot as now
+        seasonal = [b.get(i, 0) for i in range(1, n_windows)
+                    if _slot(now - i * win) == now_slot]
+        baseline = (seasonal if len(seasonal) >= min_baseline
+                    else [b.get(i, 0) for i in range(1, n_windows)])
         if len(baseline) < min_baseline:
             continue                       # not enough history yet for this metro
         mean = sum(baseline) / len(baseline)
