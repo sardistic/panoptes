@@ -5,7 +5,8 @@ WORKDIR /app
 
 # Install only the web-service deps (fast build; no torch/whisper).
 COPY requirements-web.txt .
-RUN pip install --no-cache-dir -r requirements-web.txt
+RUN pip install --no-cache-dir -r requirements-web.txt \
+    && pip uninstall --yes setuptools wheel
 
 # App + discovery catalogs + web assets (data/*.json are loaded at startup).
 COPY . .
