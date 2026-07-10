@@ -18,9 +18,43 @@ _lock = threading.Lock()
 _vessels: dict[str, dict] = {}     # MMSI -> latest position row
 _MAX = 8000
 _started = False
+_stop = threading.Event()
+_thread: threading.Thread | None = None
+_pg_ready = False
+_pg_init_lock = threading.Lock()
+
+
+def _init_postgres() -> None:
+    global _pg_ready
+    if _pg_ready:
+        return
+    from apb.store import state
+    with _pg_init_lock:
+        if _pg_ready:
+            return
+        with state.pg_connection() as connection:
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS panoptes_vessels (
+                    call_id TEXT PRIMARY KEY, ts DOUBLE PRECISION NOT NULL,
+                    payload JSONB NOT NULL
+                )
+            """)
+            connection.execute("CREATE INDEX IF NOT EXISTS panoptes_vessel_ts "
+                               "ON panoptes_vessels(ts)")
+        _pg_ready = True
 
 
 def add(row: dict) -> None:
+    from apb.store import state
+    if state.is_postgres():
+        from psycopg.types.json import Jsonb
+        _init_postgres()
+        with state.pg_connection() as connection:
+            connection.execute("""
+                INSERT INTO panoptes_vessels(call_id, ts, payload) VALUES (%s,%s,%s)
+                ON CONFLICT(call_id) DO UPDATE SET ts=EXCLUDED.ts, payload=EXCLUDED.payload
+            """, (row["call_id"], row.get("ts") or time.time(), Jsonb(row)))
+        return
     with _lock:
         _vessels[row["call_id"]] = row
         if len(_vessels) > _MAX:    # drop oldest by timestamp
@@ -31,11 +65,27 @@ def add(row: dict) -> None:
 
 def recent(max_age_hours: float = 2.0) -> list[dict]:
     cutoff = time.time() - max_age_hours * 3600
+    from apb.store import state
+    if state.is_postgres():
+        _init_postgres()
+        with state.pg_connection() as connection:
+            rows = connection.execute(
+                "SELECT payload FROM panoptes_vessels WHERE ts >= %s "
+                "ORDER BY ts DESC LIMIT %s", (cutoff, _MAX)).fetchall()
+        return [row["payload"] for row in rows]
     with _lock:
         return [v for v in _vessels.values() if (v.get("ts") or 0) >= cutoff]
 
 
 def stats() -> dict:
+    from apb.store import state
+    if state.is_postgres():
+        _init_postgres()
+        with state.pg_connection() as connection:
+            count = connection.execute(
+                "SELECT COUNT(*) AS count FROM panoptes_vessels WHERE ts >= %s",
+                (time.time() - 7200,)).fetchone()["count"]
+        return {"vessels": count, "running": _started, "shared": True}
     with _lock:
         return {"vessels": len(_vessels), "running": _started}
 
@@ -58,17 +108,28 @@ def start() -> bool:
     async def _consume():
         from apb.ingest.aisstream import positions
         async for row in positions():
+            if _stop.is_set():
+                break
             add(row)
 
     def _run():
-        while True:
+        while not _stop.is_set():
             try:
                 asyncio.run(_consume())
             except Exception as e:
                 log.warning(f"stream dropped: {e}; reconnecting in 10s")
-                time.sleep(10)
+                _stop.wait(10)
 
-    threading.Thread(target=_run, daemon=True).start()
+    global _thread
+    _stop.clear()
+    _thread = threading.Thread(target=_run, daemon=True, name="apb-maritime")
+    _thread.start()
     _started = True
     log.info("maritime firehose started")
     return True
+
+
+def stop(timeout: float = 2.0) -> None:
+    _stop.set()
+    if _thread and _thread.is_alive():
+        _thread.join(timeout=timeout)

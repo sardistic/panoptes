@@ -39,6 +39,10 @@ def test_fusion_rewards_converging_sources():
     assert events[0].sources["cad"] == 1
     assert events[0].sources["social"] == 1
     assert events[0].types["fire"] == 2
+    assert events[0].assessment == "corroborated"
+    assert set(events[0].score_components) == {
+        "volume", "severity", "confidence", "diversity", "recency",
+    }
 
 
 def test_fusion_can_require_multiple_source_families():

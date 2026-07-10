@@ -1,14 +1,15 @@
 # Lean runtime deps for the Panoptes web service (Railway).
 # The live map + correlation API needs only these — NOT the transcription/inference
-# pipeline (faster-whisper/torch, anthropic) or the Postgres stack (sqlalchemy/psycopg),
-# which are in requirements.txt for local pipeline work.
-fastapi>=0.110
-uvicorn[standard]>=0.29
-httpx>=0.27
-cryptography>=42.0          # PulsePoint feed AES decrypt (apb/ingest/pulsepoint.py)
-pyyaml>=6.0
-pydantic>=2.6
-pydantic-settings>=2.2
+# pipeline (faster-whisper/torch, anthropic) or PostGIS/SQLAlchemy, which remain in
+# requirements.txt for local pipeline work. Psycopg alone supports shared web state.
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+httpx==0.28.1
+cryptography==46.0.4        # PulsePoint feed AES decrypt (apb/ingest/pulsepoint.py)
+pyyaml==6.0.2
+pydantic==2.11.7
+pydantic-settings==2.10.1
+psycopg[binary]==3.2.9      # optional shared runtime state (APB_STATE_DATABASE_URL)
 
 # Optional: install only on a collector worker that runs scripts/run_bluesky.py.
 # websockets>=12.0

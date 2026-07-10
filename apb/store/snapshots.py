@@ -16,25 +16,64 @@ import threading
 import time
 from pathlib import Path
 
+from apb.store import state
+
 # On Railway a volume is mounted at /app/state (APB_DB_PATH points inside it) so
 # accumulated history survives deploys. It must NOT live under /app/data — a volume
 # there would shadow the committed catalogs baked into the image.
 DB_PATH = Path(os.environ.get("APB_DB_PATH", "data/apb.sqlite"))
-_lock = threading.Lock()
+# One re-entrant lock protects the shared connection across snapshots, fused events,
+# and signal buffers.  Those modules all use this same SQLite transaction stream.
+db_lock = threading.RLock()
+_lock = db_lock  # compatibility for existing callers/tests
 _conn: sqlite3.Connection | None = None
+_pg_ready = False
+_pg_lock = threading.Lock()
+
+
+def _init_postgres() -> None:
+    global _pg_ready
+    if _pg_ready:
+        return
+    with _pg_lock:
+        if _pg_ready:
+            return
+        with state.pg_connection() as c:
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS panoptes_incidents (
+                    metro TEXT NOT NULL, call_id TEXT NOT NULL, type TEXT,
+                    summary TEXT, location TEXT, sentiment TEXT,
+                    threat_score DOUBLE PRECISION, emerging INTEGER,
+                    lat DOUBLE PRECISION, lon DOUBLE PRECISION, at TEXT, ts DOUBLE PRECISION,
+                    first_seen DOUBLE PRECISION, last_seen DOUBLE PRECISION,
+                    PRIMARY KEY (metro, call_id)
+                )
+            """)
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_ts ON panoptes_incidents(ts)")
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_metro ON panoptes_incidents(metro)")
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_threat ON panoptes_incidents(threat_score)")
+        _pg_ready = True
 
 
 def conn() -> sqlite3.Connection:
     global _conn
-    if _conn is None:
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-        _init(_conn)
-    return _conn
+    with db_lock:
+        if _conn is None:
+            DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+            _conn = sqlite3.connect(str(DB_PATH), check_same_thread=False,
+                                    timeout=10.0)
+            _conn.row_factory = sqlite3.Row
+            _conn.execute("PRAGMA journal_mode=WAL")
+            _conn.execute("PRAGMA busy_timeout=10000")
+            _conn.execute("PRAGMA foreign_keys=ON")
+            _init(_conn)
+        return _conn
 
 
 def _init(c: sqlite3.Connection) -> None:
+    version = c.execute("PRAGMA user_version").fetchone()[0]
+    if version > 1:
+        raise RuntimeError(f"database schema {version} is newer than this service supports")
     c.executescript("""
     CREATE TABLE IF NOT EXISTS incidents (
         metro TEXT, call_id TEXT, type TEXT, summary TEXT, location TEXT,
@@ -46,6 +85,7 @@ def _init(c: sqlite3.Connection) -> None:
     CREATE INDEX IF NOT EXISTS idx_inc_ts ON incidents(ts);
     CREATE INDEX IF NOT EXISTS idx_inc_metro ON incidents(metro);
     CREATE INDEX IF NOT EXISTS idx_inc_threat ON incidents(threat_score);
+    PRAGMA user_version=1;
     """)
     c.commit()
 
@@ -66,6 +106,19 @@ def record(incidents: list[dict]) -> int:
     ) for d in incidents if d.get("lat") is not None and d.get("call_id") is not None]
     if not rows:
         return 0
+    if state.is_postgres():
+        _init_postgres()
+        with state.pg_connection() as c:
+            with c.cursor() as cur:
+                cur.executemany("""
+                    INSERT INTO panoptes_incidents
+                        (metro, call_id, type, summary, location, sentiment,
+                         threat_score, emerging, lat, lon, at, ts, first_seen, last_seen)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(metro, call_id) DO UPDATE
+                    SET last_seen=EXCLUDED.last_seen
+                """, rows)
+        return len(rows)
     with _lock:
         c = conn()
         c.executemany("""
@@ -86,24 +139,48 @@ def query(max_age_hours: float = 24.0, metro: str | None = None,
            + ("AND metro = ? " if metro else "")
            + "ORDER BY COALESCE(ts, last_seen) DESC LIMIT ?")
     args = [cutoff] + ([metro] if metro else []) + [limit]
+    if state.is_postgres():
+        _init_postgres()
+        sql = ("SELECT * FROM panoptes_incidents WHERE COALESCE(ts, last_seen) >= %s "
+               + ("AND metro = %s " if metro else "")
+               + "ORDER BY COALESCE(ts, last_seen) DESC LIMIT %s")
+        with state.pg_connection() as c:
+            rows = c.execute(sql, args).fetchall()
+        return [dict(r) for r in rows]
     with _lock:
         rows = conn().execute(sql, args).fetchall()
     return [dict(r) for r in rows]
 
 
 def stats() -> dict:
+    if state.is_postgres():
+        _init_postgres()
+        with state.pg_connection() as c:
+            row = c.execute("""
+                SELECT COUNT(*) AS total, COUNT(DISTINCT metro) AS metros,
+                    COUNT(*) FILTER (WHERE COALESCE(ts,last_seen) >= %s) AS last_24h
+                FROM panoptes_incidents
+            """, (time.time() - 86400,)).fetchone()
+        return {"backend": "postgres", **dict(row)}
     with _lock:
         c = conn()
         total = c.execute("SELECT COUNT(*) FROM incidents").fetchone()[0]
         metros = c.execute("SELECT COUNT(DISTINCT metro) FROM incidents").fetchone()[0]
         day = c.execute("SELECT COUNT(*) FROM incidents WHERE COALESCE(ts,last_seen) >= ?",
                         (time.time() - 86400,)).fetchone()[0]
-    return {"total": total, "metros": metros, "last_24h": day}
+    return {"backend": "sqlite", "total": total, "metros": metros, "last_24h": day}
 
 
 def prune(max_age_days: float = 30.0) -> int:
     """Drop very old rows to keep the SQLite file bounded."""
     cutoff = time.time() - max_age_days * 86400
+    if state.is_postgres():
+        _init_postgres()
+        with state.pg_connection() as c:
+            result = c.execute(
+                "DELETE FROM panoptes_incidents WHERE COALESCE(ts, last_seen) < %s",
+                (cutoff,))
+            return result.rowcount
     with _lock:
         c = conn()
         n = c.execute("DELETE FROM incidents WHERE COALESCE(ts, last_seen) < ?",

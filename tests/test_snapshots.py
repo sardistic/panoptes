@@ -55,3 +55,13 @@ def test_prune_drops_only_ancient_rows(store):
 def test_dict_values_are_stringified(store):
     store.record([_row(call_id="d", location={"raw": "1st Ave"})])
     assert isinstance(store.query(max_age_hours=1)[0]["location"], str)
+
+
+def test_shared_connection_is_serialized_and_configured(store):
+    from apb.store import events, sigbuf
+    assert events._lock is store.db_lock
+    assert sigbuf._lock is store.db_lock
+    c = store.conn()
+    assert c.execute("PRAGMA busy_timeout").fetchone()[0] == 10_000
+    assert c.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    assert c.execute("PRAGMA user_version").fetchone()[0] == 1
