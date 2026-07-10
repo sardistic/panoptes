@@ -31,6 +31,8 @@ _MAX = 5000
 _seen: set[str] = set()
 _SEEN_MAX = 50_000
 _started = False
+_stop = threading.Event()
+_threads: list[threading.Thread] = []
 
 
 _hydrated = False
@@ -64,6 +66,9 @@ def add(signals: list[EventSignal], _persist: bool = True) -> None:
 
 
 def recent(max_age_hours: float = 24.0) -> list[EventSignal]:
+    from apb.store import sigbuf, state
+    if state.is_postgres():
+        return sigbuf.load("social", max_age_hours, limit=_MAX)
     cutoff = time.time() - max_age_hours * 3600
     with _lock:
         return [s for s in _buf if s.observed_at.timestamp() >= cutoff]
@@ -86,6 +91,8 @@ def _row(post, place) -> dict:
 async def _consume(keep_unplaced: bool) -> None:
     from apb.ingest.bluesky import BlueskyJetstream
     async for post in BlueskyJetstream().posts():
+        if _stop.is_set():
+            break
         place = resolve_place(post.text)
         if not place and not keep_unplaced:
             continue                      # only keep posts we can pin to a metro
@@ -124,15 +131,18 @@ def start_rss(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
         return False
 
     def _run():
-        while True:
+        while not _stop.is_set():
             try:
                 n = _rss_poll_once(keep_unplaced)
                 log.info(f"poll: +{n} signals, {stats()}")
             except Exception as e:            # one bad poll must not kill the loop
                 log.warning(f"poll error: {e}")
-            time.sleep(interval)
+            _stop.wait(interval)
 
-    threading.Thread(target=_run, daemon=True).start()
+    _stop.clear()
+    thread = threading.Thread(target=_run, daemon=True, name="apb-social-rss")
+    thread.start()
+    _threads.append(thread)
     _rss_started = True
     log.info("Reddit/Mastodon poller started")
     return True
@@ -152,14 +162,25 @@ def start(keep_unplaced: bool = False) -> bool:
         return False
 
     def _run():
-        while True:
+        while not _stop.is_set():
             try:
                 asyncio.run(_consume(keep_unplaced))
             except Exception as e:
                 log.warning(f"stream dropped: {e}; reconnecting in 10s")
-                time.sleep(10)
+                _stop.wait(10)
 
-    threading.Thread(target=_run, daemon=True).start()
+    _stop.clear()
+    thread = threading.Thread(target=_run, daemon=True, name="apb-bluesky")
+    thread.start()
+    _threads.append(thread)
     _started = True
     log.info("live firehose started")
     return True
+
+
+def stop(timeout: float = 2.0) -> None:
+    """Ask background consumers to stop and briefly wait for cooperative exit."""
+    _stop.set()
+    for thread in list(_threads):
+        if thread.is_alive():
+            thread.join(timeout=timeout)

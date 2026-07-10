@@ -1,5 +1,8 @@
 name: ci
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -8,6 +11,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # keep CI hermetic: no background pollers or live-network lanes
       APB_POLLER_OFF: "1"
@@ -22,5 +26,55 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -r requirements-web.txt pytest
+      - run: pip install -r requirements-web.txt pytest ruff pip-audit
+      - run: ruff check apb tests --select E9,F63,F7,F82
+      - run: pip-audit -r requirements-web.txt
       - run: python -m pytest tests -q
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t panoptes:ci .
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: panoptes:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+  postgres-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: apb
+          POSTGRES_PASSWORD: apb
+          POSTGRES_DB: apb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U apb -d apb"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      APB_STATE_DATABASE_URL: postgresql://apb:apb@localhost:5432/apb
+      APB_POLLER_OFF: "1"
+      APB_BLUESKY_OFF: "1"
+      APB_NEWS_OFF: "1"
+      APB_GNEWS_OFF: "1"
+      APB_SOCIAL_RSS_OFF: "1"
+      APB_ADSB_OFF: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-web.txt pytest
+      - run: python -m pytest tests/test_postgres_state.py -q

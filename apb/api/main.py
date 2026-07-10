@@ -9,28 +9,39 @@ tooling, and multi-worker servers behave predictably.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
+import asyncio
 import threading
 import time as _time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Annotated, Callable, Literal
+from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from apb.context.feeds import feeds_near
 from apb.ingest import cad as cad_mod
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import CadIngest
-from apb.store import snapshots
+from apb.store import snapshots, state
 
 log = logging.getLogger("apb.api")
+
+# Shared request bounds. Public endpoints fan out to third-party feeds, so accepting
+# unbounded windows and limits is both an availability risk and an accidental footgun.
+Hours = Annotated[float, Query(ge=0.0, le=24.0 * 31)]
+WindowHours = Annotated[float, Query(gt=0.0, le=24.0 * 7)]
+Latitude = Annotated[float, Query(ge=-90.0, le=90.0)]
+Longitude = Annotated[float, Query(ge=-180.0, le=180.0)]
 
 
 def _off(flag: str) -> bool:
@@ -77,6 +88,10 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
 
 
 _poller_beat = {"n": 0, "at": 0.0}      # /status: is the background loop alive?
+_poller_stop = threading.Event()
+_poller_thread: threading.Thread | None = None
+_poller_leader = False
+_poller_election_error: str | None = None
 
 
 def _poller(interval: float = 120.0):
@@ -84,7 +99,7 @@ def _poller(interval: float = 120.0):
     persist fused events (lifecycle identity), and fire webhook alerts."""
     snapshots.conn()  # init
     n = 0
-    while True:
+    while not _poller_stop.is_set():
         _poller_beat.update(n=n, at=_time.time())
         try:
             wrote = snapshots.record(_cad.overview(limit_per=80, max_age_hours=168))
@@ -109,17 +124,15 @@ def _poller(interval: float = 120.0):
             send_pending()
         except Exception as e:
             log.warning("event-registry error: %s", e)
-        _time.sleep(interval)
+        _poller_stop.wait(interval)
 
 
 _started = False
 
 
 def _startup() -> None:
-    """Register feeds and launch background workers. Idempotent per process; run more
-    than one worker/process only with APB_POLLER_OFF set everywhere but one, or each
-    will poll upstreams and write the SQLite history independently."""
-    global _started
+    """Register feeds and launch workers; shared-state deployments elect one leader."""
+    global _started, _poller_thread, _poller_leader, _poller_election_error
     if _started:
         return
     _started = True
@@ -133,12 +146,26 @@ def _startup() -> None:
     log.info("live CAD feeds: %d (%s)", len(CAD_FEEDS),
              ", ".join(f"{k} +{v}" for k, v in counts.items()))
 
+    try:
+        _poller_leader = state.acquire_poller_leadership()
+        _poller_election_error = None
+    except Exception as exc:
+        log.error("worker leadership check failed: %s", exc)
+        _poller_leader = False
+        _poller_election_error = str(exc)
+
     if not _off("APB_POLLER_OFF"):
-        threading.Thread(target=_poller, daemon=True).start()
+        if _poller_leader:
+            _poller_stop.clear()
+            _poller_thread = threading.Thread(target=_poller, daemon=True,
+                                              name="apb-snapshot-poller")
+            _poller_thread.start()
+        else:
+            log.info("shared-state follower: another instance owns the poller")
 
     # Keyless live Bluesky firehose -> rolling social-signal buffer for /live/fused.
     # Default ON (websockets ships with uvicorn[standard]); APB_BLUESKY_OFF to disable.
-    if not _off("APB_BLUESKY_OFF"):
+    if _poller_leader and not _off("APB_BLUESKY_OFF"):
         try:
             from apb.fusion import social_store
             social_store.start(keep_unplaced=bool(os.environ.get("APB_BLUESKY_KEEP_UNPLACED")))
@@ -146,7 +173,7 @@ def _startup() -> None:
             log.warning("bluesky lane disabled: %s", e)
 
     # Keyless news-RSS poller -> rolling news-signal buffer. APB_NEWS_OFF to disable.
-    if not _off("APB_NEWS_OFF"):
+    if _poller_leader and not _off("APB_NEWS_OFF"):
         try:
             from apb.fusion import news_store
             news_store.start(keep_unplaced=bool(os.environ.get("APB_NEWS_KEEP_UNPLACED")))
@@ -154,7 +181,7 @@ def _startup() -> None:
             log.warning("news lane disabled: %s", e)
 
     # Per-metro Google News incident headlines -> same buffer. APB_GNEWS_OFF to disable.
-    if not _off("APB_GNEWS_OFF"):
+    if _poller_leader and not _off("APB_GNEWS_OFF"):
         try:
             from apb.fusion import news_store
             news_store.start_gnews()
@@ -162,7 +189,7 @@ def _startup() -> None:
             log.warning("gnews lane disabled: %s", e)
 
     # Keyless Reddit/Mastodon RSS poller -> shares the social buffer. APB_SOCIAL_RSS_OFF to disable.
-    if not _off("APB_SOCIAL_RSS_OFF"):
+    if _poller_leader and not _off("APB_SOCIAL_RSS_OFF"):
         try:
             from apb.fusion import social_store
             social_store.start_rss(keep_unplaced=bool(os.environ.get("APB_SOCIAL_RSS_KEEP_UNPLACED")))
@@ -171,7 +198,7 @@ def _startup() -> None:
 
     # Optional aisstream maritime firehose -> rolling vessel buffer for /live/maritime.
     # Needs AISSTREAM_KEY + `pip install websockets`; kept out of the lean prod image.
-    if os.environ.get("AISSTREAM_KEY"):
+    if _poller_leader and os.environ.get("AISSTREAM_KEY"):
         from apb.fusion import maritime_store
         maritime_store.start()
 
@@ -181,7 +208,17 @@ async def _lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     _startup()
-    yield
+    try:
+        yield
+    finally:
+        _poller_stop.set()
+        from apb.fusion import maritime_store, news_store, social_store
+        social_store.stop()
+        news_store.stop()
+        maritime_store.stop()
+        if _poller_thread and _poller_thread.is_alive():
+            _poller_thread.join(timeout=5.0)
+        state.release_poller_leadership()
 
 
 # DB stack (sqlalchemy/geoalchemy/psycopg) is imported lazily so the live/map UI and
@@ -195,7 +232,8 @@ def _db():
 
 app = FastAPI(title="APB", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
+    CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"], allow_credentials=False,
 )
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
@@ -204,13 +242,35 @@ _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 # Cheap abuse protection + client caching. The map UI polls /live/* endpoints;
 # per-IP throttling keeps one bad client from monopolizing the fetch/cluster
 # work, and Cache-Control lets browsers/proxies absorb repeat hits.
-_RATE_PER_MIN = int(os.environ.get("APB_RATE_LIMIT", "300"))  # 0 disables
+try:
+    _RATE_PER_MIN = max(0, int(os.environ.get("APB_RATE_LIMIT", "300")))
+except ValueError:
+    log.warning("invalid APB_RATE_LIMIT; using 300")
+    _RATE_PER_MIN = 300
 _hits: dict[str, deque] = defaultdict(deque)
 _hits_lock = threading.Lock()
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Content-Security-Policy": " ".join((
+        "default-src 'self';", "base-uri 'self';", "object-src 'none';",
+        "frame-ancestors 'none';", "script-src 'self' 'unsafe-inline' https://unpkg.com;",
+        "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
+        "font-src 'self' https://fonts.gstatic.com;",
+        "img-src 'self' data: https://*.basemaps.cartocdn.com;",
+        "connect-src 'self';",
+    )),
+}
 
 
 @app.middleware("http")
 async def _throttle_and_cache(request: Request, call_next):
+    started_at = _time.perf_counter()
+    request_id = request.headers.get("x-request-id", "")[:80]
+    if not request_id or not all(c.isalnum() or c in "-_." for c in request_id):
+        request_id = uuid4().hex
     if _RATE_PER_MIN and request.url.path != "/health":
         ip = request.client.host if request.client else "?"
         now = _time.time()
@@ -220,14 +280,30 @@ async def _throttle_and_cache(request: Request, call_next):
                 q.popleft()
             if len(q) >= _RATE_PER_MIN:
                 return JSONResponse({"error": "rate limited"}, status_code=429,
-                                    headers={"Retry-After": "30"})
+                                    headers={"Retry-After": "30", "X-Request-ID": request_id,
+                                             **_SECURITY_HEADERS})
             q.append(now)
-            if len(_hits) > 10_000:      # bound memory under IP churn
-                _hits.clear()
+            if len(_hits) > 10_000:      # evict stale/old clients without resetting all
+                stale = [key for key, hits in _hits.items()
+                         if not hits or hits[-1] < now - 60.0]
+                for key in stale:
+                    _hits.pop(key, None)
+                while len(_hits) > 10_000:
+                    _hits.pop(next(iter(_hits)))
     resp = await call_next(request)
-    if (request.method == "GET" and "cache-control" not in resp.headers
+    if (request.method == "GET" and request.url.path != "/live/stream"
+            and "cache-control" not in resp.headers
             and request.url.path.startswith(("/live/", "/baseline/"))):
         resp.headers["Cache-Control"] = "public, max-age=15"
+    for header, value in _SECURITY_HEADERS.items():
+        resp.headers.setdefault(header, value)
+    elapsed_ms = (_time.perf_counter() - started_at) * 1000
+    resp.headers.setdefault("X-Request-ID", request_id)
+    resp.headers.setdefault("Server-Timing", f"app;dur={elapsed_ms:.1f}")
+    if request.url.path not in ("/health", "/health/ready"):
+        log.info("request id=%s method=%s path=%s status=%d elapsed_ms=%.1f",
+                 request_id, request.method, request.url.path,
+                 resp.status_code, elapsed_ms)
     return resp
 
 
@@ -258,13 +334,41 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/health/ready")
+def readiness():
+    """Dependency-aware readiness without making external network calls."""
+    reasons: list[str] = []
+    try:
+        db = snapshots.stats()
+    except Exception as exc:
+        log.warning("readiness database check failed: %s", exc)
+        db = None
+        reasons.append("database unavailable")
+    poller = {"enabled": not _off("APB_POLLER_OFF"),
+              "leader": _poller_leader,
+              "election_error": _poller_election_error,
+              "thread_alive": bool(_poller_thread and _poller_thread.is_alive()),
+              "last_beat_s": (round(_time.time() - _poller_beat["at"])
+                              if _poller_beat["at"] else None)}
+    if poller["enabled"] and poller["leader"] and not poller["thread_alive"]:
+        reasons.append("poller stopped")
+    if poller["election_error"]:
+        reasons.append("poller election unavailable")
+    if (poller["enabled"] and poller["leader"] and poller["last_beat_s"] is not None
+            and poller["last_beat_s"] > 600):
+        reasons.append("poller stale")
+    body = {"status": "ready" if not reasons else "not_ready",
+            "reasons": reasons, "database": db, "poller": poller}
+    return body if not reasons else JSONResponse(body, status_code=503)
+
+
 @app.get("/incidents")
 def incidents(
     metro: str | None = None,
     incident_type: str | None = None,
-    min_threat: float = 0.0,
-    minutes: int = 60,
-    limit: int = 200,
+    min_threat: float = Query(0.0, ge=0.0, le=1.0),
+    minutes: int = Query(60, ge=1, le=60 * 24 * 31),
+    limit: int = Query(200, ge=1, le=1000),
 ):
     """Recent incidents, filterable. Powers the map/list UI."""
     select, Session, _, IncidentRow, engine = _db()
@@ -298,7 +402,9 @@ def incidents(
 
 
 @app.get("/activity")
-def activity(metro: str | None = None, minutes: int = 30, anomalous_only: bool = False):
+def activity(metro: str | None = None,
+             minutes: int = Query(30, ge=1, le=60 * 24 * 7),
+             anomalous_only: bool = False):
     """Activity-first signal: recent per-talkgroup windows. Works on encrypted systems
     (metadata-only). Powers the map's heat/volume layer."""
     select, Session, ActivityRow, _, engine = _db()
@@ -324,7 +430,8 @@ def activity(metro: str | None = None, minutes: int = 30, anomalous_only: bool =
 
 
 @app.get("/emerging")
-def emerging(metro: str | None = None, minutes: int = 30):
+def emerging(metro: str | None = None,
+             minutes: int = Query(30, ge=1, le=60 * 24 * 7)):
     """Incidents flagged by the anomaly/clustering layer as emerging threats."""
     select, Session, _, IncidentRow, engine = _db()
     since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
@@ -342,8 +449,10 @@ def emerging(metro: str | None = None, minutes: int = 30):
 
 
 @app.get("/live/incidents")
-def live_incidents(metro: str = "seattle", limit: int = 400,
-                   max_age_hours: float = 0.0):
+def live_incidents(metro: str = Query("seattle", min_length=1, max_length=80,
+                                     pattern=r"^[a-zA-Z0-9_-]+$"),
+                   limit: int = Query(400, ge=1, le=1000),
+                   max_age_hours: Hours = 0.0):
     """Real live CAD/911 dispatch (geocoded). max_age_hours>0 keeps only incidents
     within that window (0 = no time filter)."""
     rows = _cad.fetch(metro, limit)
@@ -354,7 +463,8 @@ def live_incidents(metro: str = "seattle", limit: int = 400,
 
 
 @app.get("/live/overview")
-def live_overview(limit_per: int = 60, max_age_hours: float = 72.0):
+def live_overview(limit_per: int = Query(60, ge=1, le=200),
+                  max_age_hours: Hours = 72.0):
     """National aggregate: live fetch UNIONed with accumulated DB history (dedup), so
     coverage grows over time instead of being limited to each feed's latest page."""
     def _build():
@@ -366,8 +476,49 @@ def live_overview(limit_per: int = 60, max_age_hours: float = 72.0):
     return _cached(("overview", limit_per, max_age_hours), 20.0, _build)
 
 
+def _stream_snapshot(metro: str, max_age_hours: float) -> dict:
+    rows = (live_overview(limit_per=60, max_age_hours=max_age_hours)
+            if metro == "__all__" else
+            live_incidents(metro=metro, limit=400, max_age_hours=max_age_hours))
+    return {"metro": metro, "max_age_hours": max_age_hours,
+            "sent_at": _time.time(), "incidents": rows}
+
+
+@app.get("/live/stream")
+async def live_stream(request: Request,
+                      metro: str = Query("__all__", min_length=1, max_length=80,
+                                         pattern=r"^(?:__all__|[a-zA-Z0-9_-]+)$"),
+                      max_age_hours: Hours = 24.0):
+    """Server-Sent Events incident snapshots; unchanged cycles become keepalives."""
+    async def generate():
+        last_digest = ""
+        yield "retry: 5000\n\n"
+        while not await request.is_disconnected():
+            try:
+                payload = await asyncio.to_thread(_stream_snapshot, metro, max_age_hours)
+                body = json.dumps(payload, separators=(",", ":"), default=str)
+                digest = hashlib.sha256(json.dumps(
+                    payload["incidents"], separators=(",", ":"), default=str
+                ).encode()).hexdigest()
+                if digest != last_digest:
+                    yield f"event: snapshot\ndata: {body}\n\n"
+                    last_digest = digest
+                else:
+                    yield f": keepalive {_time.time():.0f}\n\n"
+            except Exception as exc:
+                log.warning("SSE snapshot failed for %s: %s", metro, exc)
+                yield "event: upstream_error\ndata: {}\n\n"
+            await asyncio.sleep(15.0)
+
+    return StreamingResponse(generate(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-store", "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+
+
 @app.get("/live/hazards")
-def live_hazards(source: str | None = None, max_age_hours: float = 24.0):
+def live_hazards(source: str | None = Query(None, max_length=30),
+                 max_age_hours: Hours = 24.0):
     """No-key national hazard/event feeds (USGS quakes, NWS alerts, NASA EONET).
     `source` filters to one of: usgs, nws, eonet. These also seed the correlation layer."""
     from apb.ingest.hazard import SOURCES
@@ -384,7 +535,7 @@ def live_hazards(source: str | None = None, max_age_hours: float = 24.0):
 
 @app.get("/live/traffic")
 def live_traffic(system: str | None = None, include_planned: bool = False,
-                 max_age_hours: float = 0.0):
+                 max_age_hours: Hours = 0.0):
     """State DOT 511 traffic incidents (crashes/hazards/closures). `system` filters to a
     state key (e.g. 'ny'). Planned roadwork excluded unless include_planned=true."""
     from apb.ingest.traffic511 import SYSTEMS
@@ -409,7 +560,8 @@ def live_aircraft():
 
 
 @app.get("/live/declarations")
-def live_declarations(source: str | None = None, max_age_hours: float = 0.0):
+def live_declarations(source: str | None = Query(None, max_length=30),
+                      max_age_hours: Hours = 0.0):
     """Authority event signals: FAA Temporary Flight Restrictions + FEMA disaster
     declarations. `source` filters to 'faa_tfr' or 'fema'. These anchor the
     correlation layer (a TFR/declaration explains a local surge)."""
@@ -436,31 +588,31 @@ def _live_feed(slug: str, max_age_hours: float) -> list[dict]:
 
 
 @app.get("/live/fire")
-def live_fire(max_age_hours: float = 0.0):
+def live_fire(max_age_hours: Hours = 0.0):
     """NASA FIRMS active-fire pixels (VIIRS). Empty unless FIRMS_MAP_KEY is configured."""
     return _live_feed("firms", max_age_hours)
 
 
 @app.get("/live/outages")
-def live_outages(max_age_hours: float = 0.0):
+def live_outages(max_age_hours: Hours = 0.0):
     """ODIN current power outages (county-level), largest first."""
     return _live_feed("odin", max_age_hours)
 
 
 @app.get("/live/flood")
-def live_flood(max_age_hours: float = 0.0):
+def live_flood(max_age_hours: Hours = 0.0):
     """NOAA NWPS river gauges currently at/above flood 'action' stage."""
     return _live_feed("usgs_flood", max_age_hours)
 
 
 @app.get("/live/airquality")
-def live_airquality(max_age_hours: float = 0.0):
+def live_airquality(max_age_hours: Hours = 0.0):
     """OpenAQ PM2.5 spikes (Unhealthy+). Empty unless OPENAQ_KEY is configured."""
     return _live_feed("openaq", max_age_hours)
 
 
 @app.get("/live/maritime")
-def live_maritime(max_age_hours: float = 2.0):
+def live_maritime(max_age_hours: Hours = 2.0):
     """Live AIS vessel positions (US coastal). Empty unless AISSTREAM_KEY is configured."""
     from apb.fusion import maritime_store
     out = maritime_store.recent(max_age_hours)
@@ -469,61 +621,61 @@ def live_maritime(max_age_hours: float = 2.0):
 
 
 @app.get("/live/volcano")
-def live_volcano(max_age_hours: float = 0.0):
+def live_volcano(max_age_hours: Hours = 0.0):
     """USGS elevated-status volcanoes (aviation color code / alert level)."""
     return _live_feed("volcano", max_age_hours)
 
 
 @app.get("/live/smoke")
-def live_smoke(max_age_hours: float = 0.0):
+def live_smoke(max_age_hours: Hours = 0.0):
     """NOAA HMS satellite smoke plumes (Light/Medium/Heavy)."""
     return _live_feed("hms_smoke", max_age_hours)
 
 
 @app.get("/live/marine")
-def live_marine(max_age_hours: float = 0.0):
+def live_marine(max_age_hours: Hours = 0.0):
     """NDBC buoys currently reporting high seas / gale-force winds."""
     return _live_feed("ndbc", max_age_hours)
 
 
 @app.get("/live/storm_reports")
-def live_storm_reports(max_age_hours: float = 0.0):
+def live_storm_reports(max_age_hours: Hours = 0.0):
     """SPC preliminary storm reports (observed tornado/hail/wind), today."""
     return _live_feed("spc", max_age_hours)
 
 
 @app.get("/live/cyclones")
-def live_cyclones(max_age_hours: float = 0.0):
+def live_cyclones(max_age_hours: Hours = 0.0):
     """NHC active tropical cyclones (position/intensity). Empty out of season."""
     return _live_feed("nhc", max_age_hours)
 
 
 @app.get("/live/airport_delays")
-def live_airport_delays(max_age_hours: float = 0.0):
+def live_airport_delays(max_age_hours: Hours = 0.0):
     """FAA airport ground delays, ground stops, and closures with reason."""
     return _live_feed("faa_delay", max_age_hours)
 
 
 @app.get("/live/wildfires")
-def live_wildfires(max_age_hours: float = 0.0):
+def live_wildfires(max_age_hours: Hours = 0.0):
     """NIFC WFIGS active named wildfire incidents (acreage / % contained)."""
     return _live_feed("nifc_fire", max_age_hours)
 
 
 @app.get("/live/airnow")
-def live_airnow(max_age_hours: float = 0.0):
+def live_airnow(max_age_hours: Hours = 0.0):
     """AirNow official AQI readings (Unhealthy+). Empty unless AIRNOW_KEY is set."""
     return _live_feed("airnow", max_age_hours)
 
 
 @app.get("/live/unrest")
-def live_unrest(max_age_hours: float = 0.0):
+def live_unrest(max_age_hours: Hours = 0.0):
     """ACLED civil-unrest events. Empty unless ACLED_KEY + ACLED_EMAIL are set."""
     return _live_feed("acled", max_age_hours)
 
 
 @app.get("/live/quakes_global")
-def live_quakes_global(max_age_hours: float = 24.0):
+def live_quakes_global(max_age_hours: Hours = 24.0):
     """EMSC global M4+ earthquakes (multi-agency, often earlier than USGS abroad).
     Quakes USGS already carries are suppressed so the map shows one marker per event."""
     from apb.fusion.dedupe import dedupe_signal_rows
@@ -534,31 +686,58 @@ def live_quakes_global(max_age_hours: float = 24.0):
 
 
 @app.get("/live/disasters")
-def live_disasters(max_age_hours: float = 0.0):
+def live_disasters(max_age_hours: Hours = 0.0):
     """GDACS Orange/Red global disaster alerts (EQ/TC/flood/wildfire/volcano)."""
     return _live_feed("gdacs", max_age_hours)
 
 
 @app.get("/live/sigmets")
-def live_sigmets(max_age_hours: float = 0.0):
+def live_sigmets(max_age_hours: Hours = 0.0):
     """AWC SIGMETs in effect: convective/turbulence/icing/ash airspace hazards."""
     return _live_feed("sigmet", max_age_hours)
 
 
 @app.get("/live/rail")
-def live_rail(max_age_hours: float = 0.0):
+def live_rail(max_age_hours: Hours = 0.0):
     """Amtrak trains running >= 1h late — a rail-corridor anomaly signal."""
     return _live_feed("amtrak", max_age_hours)
 
 
 @app.get("/live/squawks")
-def live_squawks(max_age_hours: float = 0.0):
+def live_squawks(max_age_hours: Hours = 0.0):
     """Aircraft currently squawking 7500/7600/7700. Usually empty; never ignorable."""
     return _live_feed("squawk", max_age_hours)
 
 
+@app.get("/live/hazards/all")
+def live_hazards_all(request: Request, max_age_hours: Hours = 24.0):
+    """One browser-friendly aggregate for every optional hazard family."""
+    def _build():
+        rows: list[dict] = []
+        rows.extend(live_hazards(source=None, max_age_hours=max_age_hours))
+        rows.extend(live_traffic(system=None, include_planned=False,
+                                 max_age_hours=max_age_hours))
+        rows.extend(live_aircraft())
+        rows.extend(live_declarations(source=None, max_age_hours=max_age_hours))
+        for fn in (live_fire, live_outages, live_flood, live_airquality,
+                   live_maritime, live_volcano, live_smoke, live_marine,
+                   live_storm_reports, live_cyclones, live_airport_delays,
+                   live_wildfires, live_airnow, live_unrest, live_quakes_global,
+                   live_disasters, live_sigmets, live_rail, live_squawks):
+            rows.extend(fn(max_age_hours=max_age_hours))
+        rows.sort(key=lambda d: d.get("ts") or 0, reverse=True)
+        return rows[:10_000]
+    rows = _cached(("hazards_all", max_age_hours), 20.0, _build)
+    encoded = json.dumps(rows, separators=(",", ":"), default=str).encode()
+    etag = '"' + hashlib.sha256(encoded).hexdigest()[:24] + '"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(encoded, media_type="application/json", headers={"ETag": etag})
+
+
 @app.get("/events")
-def events(max_age_hours: float = 24.0, limit: int = 200):
+def events(max_age_hours: Hours = 24.0,
+           limit: int = Query(200, ge=1, le=1000)):
     """Persisted fused events with lifecycle: stable uid, first_seen/last_seen,
     age_min, peak vs latest score, growing flag. Written by the background poller —
     this is the 'what has been happening' view, vs /live/fused's instantaneous one."""
@@ -604,14 +783,17 @@ def status():
         "buffers": {"social": social_store.stats(), "news": news_store.stats()},
         "db": snapshots.stats(),
         "poller": {"cycles": _poller_beat["n"],
+                   "leader": _poller_leader,
+                   "election_error": _poller_election_error,
                    "last_beat_s": round(now - _poller_beat["at"]) if _poller_beat["at"] else None},
         "response_cache": len(_resp_cache),
     }
 
 
 @app.get("/baseline/anomalies")
-def baseline_anomalies(window_hours: float = 1.0, lookback_hours: float = 72.0,
-                       z: float = 2.0):
+def baseline_anomalies(window_hours: WindowHours = 1.0,
+                       lookback_hours: WindowHours = 72.0,
+                       z: float = Query(2.0, ge=0.0, le=20.0)):
     """Rate-anomaly detection from accumulated history: metros whose incident rate in
     the most recent `window_hours` is >= z std-devs above their own trailing baseline."""
     from apb.infer.baseline import detect_rate_anomalies
@@ -626,8 +808,9 @@ def baseline_anomalies(window_hours: float = 1.0, lookback_hours: float = 72.0,
 
 
 @app.get("/live/emerging")
-def live_emerging(min_count: int = 3, threat_floor: float = 0.5,
-                  max_age_hours: float = 24.0):
+def live_emerging(min_count: int = Query(3, ge=2, le=100),
+                  threat_floor: float = Query(0.5, ge=0.0, le=1.0),
+                  max_age_hours: Hours = 24.0):
     """Emerging events: spatial clusters of converging, elevated-severity incidents
     from the RECENT live stream (default last 24h)."""
     from apb.infer.cluster import detect
@@ -649,9 +832,11 @@ def _parse_kinds(kinds: str | None) -> set[str] | None:
 
 
 @app.get("/live/signals")
-def live_signals(limit_per: int = 60, max_age_hours: float = 24.0,
+def live_signals(limit_per: int = Query(60, ge=1, le=200),
+                 max_age_hours: Hours = 24.0,
                  include_seed: bool = True, include_live: bool = True,
-                 kinds: str | None = None):
+                 kinds: str | None = Query(None, max_length=200,
+                                           pattern=r"^[a-zA-Z0-9_, -]*$")):
     """Normalized source signals across CAD/history plus optional local seed rows.
 
     This is the source-fusion substrate: every sensor becomes the same shape before
@@ -672,10 +857,14 @@ def live_signals(limit_per: int = 60, max_age_hours: float = 24.0,
 
 
 @app.get("/live/fused")
-def live_fused(min_count: int = 2, min_sources: int = 1, min_score: float = 1.2,
-               max_age_hours: float = 24.0, limit_per: int = 20,
+def live_fused(min_count: int = Query(2, ge=2, le=100),
+               min_sources: int = Query(1, ge=1, le=20),
+               min_score: float = Query(1.2, ge=0.0, le=100.0),
+               max_age_hours: Hours = 24.0,
+               limit_per: int = Query(20, ge=1, le=200),
                include_seed: bool = True, include_live: bool = True,
-               kinds: str | None = None):
+               kinds: str | None = Query(None, max_length=200,
+                                         pattern=r"^[a-zA-Z0-9_, -]*$")):
     """Cross-source event clusters ranked by surge score.
 
     Unlike /live/emerging, this is built for APB's broader goal: radio/CAD/social/
@@ -697,7 +886,8 @@ def live_fused(min_count: int = 2, min_sources: int = 1, min_score: float = 1.2,
 
 
 @app.get("/live/social")
-def live_social(max_age_hours: float = 24.0, limit: int = 800):
+def live_social(max_age_hours: Hours = 24.0,
+                limit: int = Query(800, ge=1, le=5000)):
     """Placed social/news signals (seed + live Bluesky buffer) for the map social layer.
     Rendered as their own markers so the firehose is visible even without CAD corroboration."""
     from apb.fusion.signals import dict_signal
@@ -720,7 +910,8 @@ def live_metros():
 
 
 @app.get("/feeds")
-def feeds(lat: float, lon: float, radius_m: float = 800.0):
+def feeds(lat: Latitude, lon: Longitude,
+          radius_m: float = Query(800.0, ge=50.0, le=20_000.0)):
     """On-demand public feeds near an incident (cameras/traffic). Not stored."""
     return [f.__dict__ for f in feeds_near(lat, lon, radius_m)]
 
@@ -745,8 +936,10 @@ def _local_news(lat: float, lon: float, radius_km: float = 60.0,
 
 
 @app.get("/correlate")
-def correlate(lat: float, lon: float, types: str | None = None,
-              timespan: str = "3d"):
+def correlate(lat: Latitude, lon: Longitude,
+              types: str | None = Query(None, max_length=200,
+                                        pattern=r"^[a-zA-Z0-9_, -]*$"),
+              timespan: Literal["1h", "6h", "12h", "1d", "3d", "7d"] = "3d"):
     """Spike -> likely cause: local news-RSS headlines near the point (instant) plus
     recent GDELT news for the place/types (free, no key, heavily rate-limited).
     `types` = comma-separated incident types from the cluster (shapes the news query)."""

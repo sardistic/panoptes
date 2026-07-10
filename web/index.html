@@ -64,6 +64,8 @@
     font-size:11px;font-weight:500;letter-spacing:.02em;cursor:pointer}
   #window{font-family:var(--mono)}
   button:hover,select:hover{border-color:var(--line-3);color:var(--txt)}
+  select:focus-visible,button:focus-visible,.row:focus-visible,.hchip:focus-visible,.hglbl:focus-visible{
+    outline:2px solid var(--amber);outline-offset:2px}
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
   /* own deck, right of the side panel; single row that scrolls instead of wrapping */
@@ -207,6 +209,20 @@
   body.compact select,body.compact button{height:24px}
   body.compact .pill{height:24px}
 
+  @media (max-width:760px){
+    #classbar b{letter-spacing:.16em}
+    #top{left:8px;right:8px;top:28px;gap:8px;padding:9px;max-height:31vh;
+      overflow:auto;align-content:flex-start}
+    #top .spacer{display:none}
+    #top .brand{font-size:15px}
+    #top .sub,#legend,#footer{display:none}
+    #top .ctl{flex:1 1 42%;min-width:130px}
+    #top select{width:100%;max-width:none}
+    #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
+    #hazFilter{left:8px;right:8px;top:calc(31vh + 38px);max-height:18vh;overflow:auto}
+    .leaflet-top.leaflet-right{top:35vh;right:8px}
+    .leaflet-control-attribution{display:none}
+  }
 
   @media (prefers-reduced-motion:reduce){
     .dot,.tdot,.surge-halo span,.ping span{animation:none!important}
@@ -240,12 +256,12 @@
     <option value="0.7">HIGH ≥0.70</option>
   </select></label>
   <label class="ctl">Alerts<span class="segwrap">
-    <button id="spikesBtn" class="on" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
-    <button id="surgesBtn" class="on" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
-    <button id="hazardsBtn" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
+    <button id="spikesBtn" class="on" aria-pressed="true" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
+    <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
+    <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
   </span></label>
   <span class="spacer"></span>
-  <span class="pill"><span class="dot"></span><span id="status">LIVE</span></span>
+  <span class="pill"><span class="dot"></span><span id="status" role="status" aria-live="polite">LIVE</span></span>
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
     <span id="alertCount">0</span> SURGE</span>
 </div>
@@ -255,7 +271,7 @@
 
 <div id="side" class="hud">
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
-  <div id="count">0<small> in view</small></div>
+  <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
   <div id="feed"></div>
 </div>
 
@@ -281,6 +297,19 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
+'use strict';
+
+// Every feed is untrusted input, even when it comes from a public authority.
+// Keep HTML templates readable while escaping all values that cross into them.
+const esc = value => String(value ?? '').replace(/[&<>"]/g, ch => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'
+}[ch]));
+const safeLink = value => {
+  try {
+    const u = new URL(String(value || ''), window.location.origin);
+    return ['http:', 'https:'].includes(u.protocol) ? u.href : '';
+  } catch (_) { return ''; }
+};
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
@@ -302,7 +331,7 @@ let fusedLayer = L.layerGroup().addTo(map);   // multi-source corroborated event
 let socialLayer = L.layerGroup().addTo(map);  // social/news firehose posts
 let hazardLayer = L.layerGroup().addTo(map);  // quakes / weather / wildfire / traffic / aircraft
 
-let paused = false, timer = null;
+let paused = false, eventStream = null, fallbackTimer = null;
 let currentData = [];          // last fetched incident set (full scope)
 let emergingClusters = [];     // last fetched emerging clusters
 let fusedEvents = [];          // multi-source fused events (/live/fused)
@@ -347,13 +376,13 @@ function refreshTypeOptions(){
   const sel = document.getElementById('type');
   const keep = sel.value;
   const types = [...new Set(currentData.map(d=>d.type))].sort();
-  sel.innerHTML = '<option value="">ALL TYPES</option>' +
-    types.map(t=>`<option value="${t}">${t.replace(/_/g,' ').toUpperCase()}</option>`).join('');
+  sel.replaceChildren(new Option('ALL TYPES', ''));
+  types.forEach(t=>sel.add(new Option(String(t).replace(/_/g,' ').toUpperCase(), String(t))));
   sel.value = types.includes(keep) ? keep : '';
 }
 
 // ── data load (fetch once; draw() handles filters/viewport without refetch) ───
-async function load(){
+async function load(providedData=null){
   if(paused) return;
   const metro = document.getElementById('metro').value;
   const w = winHours();
@@ -362,8 +391,14 @@ async function load(){
   else if(LIVE_METROS.has(metro)){ url=`/live/incidents?metro=${metro}&max_age_hours=${w}`; label=`LIVE · ${winLabel()}`; }
   else { return; }
 
-  let data=[];
-  try{ data = await (await fetch(url)).json(); }
+  let data=providedData;
+  try{
+    if(data===null){
+      const response=await fetch(url);
+      if(!response.ok) throw new Error(`incidents ${response.status}`);
+      data=await response.json();
+    }
+  }
   catch(e){ document.getElementById('status').textContent='OFFLINE'; return; }
   document.getElementById('status').textContent = label;
   currentData = data.filter(d=>d.lat!=null && d.lon!=null);
@@ -430,9 +465,10 @@ function draw(){
   fusedEvents.filter(e=>e.lat!=null && fb.contains([e.lat,e.lon])).forEach(e=>{
     const m=L.circleMarker([e.lat,e.lon],{radius:9+Math.min(13,e.count/3),
       color:'#d7dde5',weight:2,fill:false,opacity:.9});
-    m.bindTooltip(`CORROBORATED · ${Object.keys(e.sources||{}).join('+')} · ${e.count} signals`,{direction:'top'});
+    m.bindTooltip(`CORROBORATED · ${esc(Object.keys(e.sources||{}).join('+'))} · ${Number(e.count)||0} signals`,{direction:'top'});
     m.on('click',()=>showCorrelation(e.lat,e.lon,Object.keys(e.types||{}).slice(0,3).join(','),
-      `<div class="meta">${Object.entries(e.sources||{}).map(([k,v])=>k+' '+v).join(' · ')} · conf ${(+e.confidence).toFixed(2)}</div>`));
+      `<div class="meta">${esc(String(e.assessment||'single_source').replace(/_/g,' '))} · score ${(+e.surge_score).toFixed(2)} · `
+      +`${esc(Object.entries(e.sources||{}).map(([k,v])=>k+' '+v).join(' · '))} · conf ${(+e.confidence).toFixed(2)} · severity ${(+e.mean_severity).toFixed(2)}</div>`));
     m.addTo(fusedLayer);
   });
   // social/news firehose — teal diamonds; glow when near official CAD activity (city radius)
@@ -441,7 +477,7 @@ function draw(){
     const corro = currentData.some(d=>Math.abs(d.lat-s.lat)<0.25 && Math.abs(d.lon-s.lon)<0.25);
     const m=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'soc'+(corro?' corro':''),
       html:'<i></i>',iconSize:[0,0]})});
-    m.bindTooltip(`SOCIAL · ${s.source||'bluesky'}${corro?' · near official activity':''}`,{direction:'top'});
+    m.bindTooltip(`SOCIAL · ${esc(s.source||'bluesky')}${corro?' · near official activity':''}`,{direction:'top'});
     m.on('click',()=>openSocial(s,corro));
     m.addTo(socialLayer);
   });
@@ -463,11 +499,14 @@ function renderIncidentPanel(scoped){
   const feed=document.getElementById('feed'); feed.innerHTML='';
   scoped.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,50).forEach(d=>{
     const row=document.createElement('div'); row.className='row';
-    row.innerHTML=`<div class="t"><span class="ty">${d.type}`
+    row.innerHTML=`<div class="t"><span class="ty">${esc(d.type)}`
       +`${d.emerging?'<span class="badge">EMERGING</span>':''}</span>`
       +`<span class="sev ${sevClass(d.threat_score)}">${d.threat_score.toFixed(2)}</span></div>`
-      +`<div class="loc">${d.location||'—'} · ${d.sentiment} <span class="ago">${ago(d.ts)}</span></div>`;
+      +`<div class="loc">${esc(d.location||'—')} · ${esc(d.sentiment)} <span class="ago">${esc(ago(d.ts))}</span></div>`;
     row.onclick=()=>{ map.flyTo([d.lat,d.lon],15); openIncident(d); };
+    row.tabIndex=0;
+    row.setAttribute('role','button');
+    row.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); row.click(); } };
     feed.appendChild(row);
   });
 }
@@ -486,12 +525,15 @@ function renderEmergingPanel(scoped){
   cl.slice(0,30).forEach((c,i)=>{
     const row=document.createElement('div'); row.className='row'+(i===0?' recent':'');
     const t=Object.keys(c.types).slice(0,2).join(', ');
-    row.innerHTML=`<div class="t"><span class="ty">${t}`
+    row.innerHTML=`<div class="t"><span class="ty">${esc(t)}`
       +`${i===0?'<span class="badge new">MOST RECENT</span>':''}</span>`
       +`<span class="sev ${sevClass(c.peak_threat)}">${c.score}</span></div>`
-      +`<div class="loc">${cityName(c.metro)} · ${c.count} incidents · peak ${c.peak_threat} `
-      +`<span class="ago">${ago(c.latest_ts)}</span></div>`;
+      +`<div class="loc">${esc(cityName(c.metro))} · ${Number(c.count)||0} incidents · peak ${Number(c.peak_threat)||0} `
+      +`<span class="ago">${esc(ago(c.latest_ts))}</span></div>`;
     row.onclick=()=>onEmergingClick(c);
+    row.tabIndex=0;
+    row.setAttribute('role','button');
+    row.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); row.click(); } };
     feed.appendChild(row);
   });
 }
@@ -597,34 +639,9 @@ async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
   try{
-    const [hz, tr, air, decl, fire, out, fld, aq, mar, vol, smk, mrn, spcr, cyc, dly, wf, an, unr, gq, dis, sgm, rail, sqk] = await Promise.all([
-      fetch(`/live/hazards?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/traffic?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/aircraft`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/declarations?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/fire?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/outages?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/flood?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/airquality?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/maritime`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/volcano?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/smoke?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/marine?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/storm_reports?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/cyclones?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/airport_delays?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/wildfires?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/airnow?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/unrest?max_age_hours=${w}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/quakes_global?max_age_hours=${Math.max(w,24)}`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/disasters`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/sigmets`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/rail`).then(r=>r.json()).catch(()=>[]),
-      fetch(`/live/squawks`).then(r=>r.json()).catch(()=>[]),
-    ]);
-    hazardData = [...hz, ...tr, ...air, ...decl, ...fire, ...out, ...fld, ...aq, ...mar,
-                  ...vol, ...smk, ...mrn, ...spcr, ...cyc, ...dly, ...wf, ...an, ...unr,
-                  ...gq, ...dis, ...sgm, ...rail, ...sqk]
+    const response=await fetch(`/live/hazards/all?max_age_hours=${Math.max(w,24)}`);
+    if(!response.ok) throw new Error(`hazard aggregate ${response.status}`);
+    hazardData = (await response.json())
       .filter(d=>d.lat!=null && d.lon!=null)
       .map(d=>({...d, _cat:hazCat(d)}));
   }catch(e){ hazardData=[]; }
@@ -639,25 +656,25 @@ function drawHazards(){
     const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'haz',iconSize:[8,8],
       iconAnchor:[4,4],
       html:`<i style="--hc:${st.c}"></i>`})});
-    m.bindTooltip(`${st.label}${d.source?' · '+d.source:''}`,{direction:'top'});
+    m.bindTooltip(`${esc(st.label)}${d.source?' · '+esc(d.source):''}`,{direction:'top'});
     m.on('click',()=>L.popup({maxWidth:300}).setLatLng([d.lat,d.lon]).setContent(
-      `<div class="pop"><div class="kick" style="color:${st.c}">${st.label}</div>`
-      +`<div class="sum">${(d.summary||'').slice(0,220)}</div>`
-      +`<div class="meta">${(d.location||'')} · sev ${(+d.threat_score).toFixed(2)} · ${ago(d.ts)}</div>`
+      `<div class="pop"><div class="kick" style="color:${st.c}">${esc(st.label)}</div>`
+      +`<div class="sum">${esc((d.summary||'').slice(0,220))}</div>`
+      +`<div class="meta">${esc(d.location||'')} · sev ${(+d.threat_score).toFixed(2)} · ${esc(ago(d.ts))}</div>`
       +`</div>`).openOn(map));
     m.addTo(hazardLayer);
   });
 }
 function openSocial(s, corro){
   const bsky = s.url && s.url.startsWith('at://');
-  const link = bsky ? `https://bsky.app/profile/${s.url.split('/')[2]}/post/${s.url.split('/').pop()}` : s.url;
+  const link = safeLink(bsky ? `https://bsky.app/profile/${encodeURIComponent(s.url.split('/')[2]||'')}/post/${encodeURIComponent(s.url.split('/').pop()||'')}` : s.url);
   const t = s.observed_at ? ago(new Date(s.observed_at).getTime()/1000) : '';
   L.popup({maxWidth:300}).setLatLng([s.lat,s.lon]).setContent(
-    `<div class="pop"><div class="kick" style="color:#37c0d8">Social · ${s.source||'bluesky'}</div>`
-    +`<div class="sum">${(s.summary||'').slice(0,200)}</div>`
-    +`<div class="meta">${(s.metro||s.location_text||'').replace(/^geo_/,'').replace(/_/g,' ')} · ${t}`
+    `<div class="pop"><div class="kick" style="color:#37c0d8">Social · ${esc(s.source||'bluesky')}</div>`
+    +`<div class="sum">${esc((s.summary||'').slice(0,200))}</div>`
+    +`<div class="meta">${esc((s.metro||s.location_text||'').replace(/^geo_/,'').replace(/_/g,' '))} · ${esc(t)}`
     +`${corro?' · near official activity':''}</div>`
-    +(link?`<div class="meta"><a href="${link}" target="_blank" style="color:#37c0d8">view source ↗</a></div>`:'')
+    +(link?`<div class="meta"><a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="color:#37c0d8">view source ↗</a></div>`:'')
     +`</div>`).openOn(map);
 }
 
@@ -677,7 +694,7 @@ async function loadAlerts(){
   surgeAlerts.forEach(a=>{
     const m=L.marker(a._c,{icon:L.divIcon({className:'surge-halo',iconSize:[0,0],
       html:'<span></span>'})});
-    m.bindTooltip(`SURGE · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg (${a.zscore}σ)`,
+    m.bindTooltip(`SURGE · ${esc(surgeName(a))} · ${Number(a.current)||0} now vs ${Number(a.baseline_mean)||0} avg (${Number(a.zscore)||0}σ)`,
       {direction:'top'});
     m.on('click',()=>focusSurge(a)); m.addTo(alertLayer);
   });
@@ -686,7 +703,7 @@ const surgeName = a => (a.name||a.metro||'').replace(/^(ag_|pp_|p2c_|ss_)/,'');
 function focusSurge(a){                          // select a surge: zoom + correlate to news
   map.flyTo(a._c,11);
   showCorrelation(a._c[0],a._c[1],'',
-    `<div class="meta">surge · ${surgeName(a)} · ${a.current} now vs ${a.baseline_mean} avg · ${a.zscore}σ</div>`);
+    `<div class="meta">surge · ${esc(surgeName(a))} · ${Number(a.current)||0} now vs ${Number(a.baseline_mean)||0} avg · ${Number(a.zscore)||0}σ</div>`);
 }
 
 // ── new-incident pings (scoped to view) ──────────────────────────────────────
@@ -712,9 +729,13 @@ function resetScope(){ seenIds.clear(); primed=false; pingLayer.clearLayers(); }
 
 // ── news correlation (shared by spikes, surge alerts, and incidents) ─────────
 function artRows(arts,n){
-  return arts.slice(0,n).map(a=>`<div class="art">`
-    +`<a href="${a.url}" target="_blank">${(a.title||'(untitled)').slice(0,92)}</a>`
-    +`<div class="src">${a.domain||''}${a.at?' · '+ago(new Date(a.at).getTime()/1000):''}</div></div>`).join('');
+  return arts.slice(0,n).map(a=>{
+    const url=safeLink(a.url);
+    const title=esc((a.title||'(untitled)').slice(0,92));
+    const source=esc(a.domain||'')+esc(a.at?' · '+ago(new Date(a.at).getTime()/1000):'');
+    return `<div class="art">${url?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${title}</a>`:`<span>${title}</span>`}`
+      +`<div class="src">${source}</div></div>`;
+  }).join('');
 }
 // r = /correlate payload: {articles (GDELT), local (news-RSS buffer), throttled}
 function articlesHtml(r){
@@ -743,7 +764,7 @@ function showCorrelation(lat,lon,types,headerHtml){
     .openOn(map);
   fetchCorrelation(lat,lon,types).then(r=>{
     if(!map.hasLayer(pop)) return;              // user closed it while we searched
-    const place=r.place?`${r.place}${r.state?', '+r.state:''}`:'this area';
+    const place=esc(r.place?`${r.place}${r.state?', '+r.state:''}`:'this area');
     pop.setContent(`<div class="pop"><div class="kick">Possible Cause</div>`
       +`<div class="ttl">${place}</div>`+(headerHtml||'')
       +(r.error?'<div class="empty">news search failed — retry shortly</div>':articlesHtml(r))+`</div>`);
@@ -754,17 +775,17 @@ function onEmergingClick(c){
   map.flyTo([c.lat,c.lon],12);
   const types=Object.keys(c.types||{}).slice(0,3).join(',');
   showCorrelation(c.lat,c.lon,types,
-    `<div class="meta">${c.count} converging · ${Object.keys(c.types||{})[0]||''}</div>`);
+    `<div class="meta">${Number(c.count)||0} converging · ${esc(Object.keys(c.types||{})[0]||'')}</div>`);
 }
 
 async function openIncident(d){
   let feeds=[];
   try{ feeds = await (await fetch(`/feeds?lat=${d.lat}&lon=${d.lon}&radius_m=1000`)).json(); }catch(e){}
   const cls=sevClass(d.threat_score);
-  const base=`<div class="pop"><div class="ttl">${d.type.replace(/_/g,' ').toUpperCase()}`
+  const base=`<div class="pop"><div class="ttl">${esc(String(d.type||'incident').replace(/_/g,' ').toUpperCase())}`
     +`<span class="chip ${cls}">${d.threat_score.toFixed(2)}</span></div>`
-    +(d.summary?`<div class="sum">${d.summary}</div>`:'')
-    +`<div class="meta">${d.location||''} · ${d.sentiment} · ${ago(d.ts)}</div>`
+    +(d.summary?`<div class="sum">${esc(d.summary)}</div>`:'')
+    +`<div class="meta">${esc(d.location||'')} · ${esc(d.sentiment)} · ${esc(ago(d.ts))}</div>`
     +`<div class="meta">${feeds.length?`${feeds.length} nearby feed(s)`:'no public feeds nearby'}</div>`;
   const pop=L.popup().setLatLng([d.lat,d.lon])
     .setContent(base+`<div class="meta" style="opacity:.55">checking news…</div></div>`)
@@ -784,17 +805,19 @@ document.getElementById('metro').onchange=e=>{
   if(v==='__all__') map.fitBounds(US_BOUNDS,{padding:[20,20]});
   else if(CENTERS[v]) map.flyTo(CENTERS[v],12);
   else fitNext=true;
-  load();
+  load(); restartStream();
 };
-document.getElementById('window').onchange=()=>{ resetScope(); load(); };
+document.getElementById('window').onchange=()=>{ resetScope(); load(); restartStream(); };
 document.getElementById('type').onchange=draw;
 document.getElementById('minThreat').onchange=draw;
 document.getElementById('spikesBtn').onclick=e=>{
   showSpikes=!showSpikes; e.currentTarget.classList.toggle('on',showSpikes);
+  e.currentTarget.setAttribute('aria-pressed',String(showSpikes));
   draw();                       // toggles the threat-throb pulse on the dots
 };
 document.getElementById('surgesBtn').onclick=e=>{
   showSurges=!showSurges; e.currentTarget.classList.toggle('on',showSurges);
+  e.currentTarget.setAttribute('aria-pressed',String(showSurges));
   if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
 };
 // Filter chips grouped by domain (built once; shown only while HAZARDS is on).
@@ -813,32 +836,39 @@ const HAZ_GROUPS = [
     const st=HAZ_STYLE[cat]; if(!st) return null;
     const chip=document.createElement('span');
     chip.className='hchip on'; chip.dataset.cat=cat;
+    chip.tabIndex=0; chip.setAttribute('role','button'); chip.setAttribute('aria-pressed','true');
     chip.style.setProperty('--hcc',st.c);
     chip.innerHTML=`<i></i>${st.label.split(' ')[0]}`;
     chip.title=st.label;
     chip.onclick=()=>{
       if(hazCats.has(cat)) hazCats.delete(cat); else hazCats.add(cat);
       chip.classList.toggle('on',hazCats.has(cat));
+      chip.setAttribute('aria-pressed',String(hazCats.has(cat)));
       drawHazards();              // filter already-loaded data, no refetch
     };
+    chip.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chip.click(); } };
     return chip;
   };
   HAZ_GROUPS.forEach(([name,cats])=>{
     const grp=document.createElement('span'); grp.className='hgrp';
     const lbl=document.createElement('span'); lbl.className='hglbl'; lbl.textContent=name;
+    lbl.tabIndex=0; lbl.setAttribute('role','button');
     const chips=cats.map(chipFor).filter(Boolean);
     lbl.onclick=()=>{                // group toggle: all-off if any on, else all-on
       const anyOn=cats.some(c=>hazCats.has(c));
       cats.forEach((c,i)=>{ anyOn?hazCats.delete(c):hazCats.add(c);
-        chips[i] && chips[i].classList.toggle('on',hazCats.has(c)); });
+        if(chips[i]){ chips[i].classList.toggle('on',hazCats.has(c));
+          chips[i].setAttribute('aria-pressed',String(hazCats.has(c))); } });
       drawHazards();
     };
+    lbl.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); lbl.click(); } };
     grp.appendChild(lbl); chips.forEach(c=>grp.appendChild(c));
     bar.appendChild(grp);
   });
 })();
 document.getElementById('hazardsBtn').onclick=async e=>{
   showHazards=!showHazards; e.currentTarget.classList.toggle('on',showHazards);
+  e.currentTarget.setAttribute('aria-pressed',String(showHazards));
   document.getElementById('hazFilter').style.display=showHazards?'flex':'none';
   if(!showHazards){ hazardData=[]; hazardLayer.clearLayers(); }
   else { await loadHazards(); }
@@ -867,12 +897,48 @@ async function loadMetros(){
   });
 }
 
+// The server owns the 15-second cadence; browsers receive changed snapshots over one
+// long-lived connection. A slow safety refresh preserves service behind SSE-hostile
+// proxies and on older browsers without returning to high-frequency polling.
+function restartStream(){
+  if(eventStream){ eventStream.close(); eventStream=null; }
+  if(fallbackTimer){ clearInterval(fallbackTimer); fallbackTimer=null; }
+  if(paused) return;
+  fallbackTimer=setInterval(load,60000);
+  if(!window.EventSource) return;
+  const metro=document.getElementById('metro').value;
+  const hours=winHours();
+  eventStream=new EventSource(`/live/stream?metro=${encodeURIComponent(metro)}&max_age_hours=${encodeURIComponent(hours)}`);
+  eventStream.addEventListener('snapshot',event=>{
+    try{
+      const payload=JSON.parse(event.data);
+      if(payload.metro===document.getElementById('metro').value) load(payload.incidents||[]);
+    }catch(_){ document.getElementById('status').textContent='STREAM ERROR'; }
+  });
+  eventStream.addEventListener('upstream_error',()=>{
+    document.getElementById('status').textContent='UPSTREAM DEGRADED';
+  });
+  eventStream.onerror=()=>{
+    document.getElementById('status').textContent='RECONNECTING';
+  };
+}
+
+document.addEventListener('visibilitychange',()=>{
+  paused=document.hidden;
+  if(paused){
+    if(eventStream){ eventStream.close(); eventStream=null; }
+    if(fallbackTimer){ clearInterval(fallbackTimer); fallbackTimer=null; }
+  }else{
+    load(); restartStream();
+  }
+});
+
 (async ()=>{
   await loadMetros();
   document.getElementById('metro').value='__all__';   // default: live national overview
   map.fitBounds(US_BOUNDS,{padding:[20,20]});
   await load();
-  timer=setInterval(load,15000);
+  restartStream();
 })();
 </script>
 </body>

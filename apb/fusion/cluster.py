@@ -26,6 +26,8 @@ class FusedEvent:
     latest_ts: float
     summaries: list[str] = field(default_factory=list)
     signal_ids: list[str] = field(default_factory=list)
+    assessment: str = "single_source"
+    score_components: dict[str, float] = field(default_factory=dict)
 
 
 def detect(
@@ -90,6 +92,14 @@ def detect(
             latest_ts=latest,
             summaries=[p.summary for p in pts_sorted[:5]],
             signal_ids=[p.signal_id for p in pts_sorted[:30]],
+            assessment=("corroborated" if source_count >= 2 else "single_source"),
+            score_components={
+                "volume": round(volume, 3),
+                "severity": round(0.35 + mean_sev, 3),
+                "confidence": round(0.5 + mean_conf, 3),
+                "diversity": round(diversity, 3),
+                "recency": round(recency, 3),
+            },
         ))
 
     events.sort(key=lambda e: e.surge_score, reverse=True)

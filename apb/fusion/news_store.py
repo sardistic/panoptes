@@ -28,6 +28,8 @@ _MAX = 4000
 _seen: set[str] = set()
 _SEEN_MAX = 50_000
 _started = False
+_stop = threading.Event()
+_threads: list[threading.Thread] = []
 
 
 _hydrated = False
@@ -61,6 +63,9 @@ def add(signals: list[EventSignal], _persist: bool = True) -> None:
 
 
 def recent(max_age_hours: float = 24.0) -> list[EventSignal]:
+    from apb.store import sigbuf, state
+    if state.is_postgres():
+        return sigbuf.load("news", max_age_hours, limit=_MAX)
     cutoff = time.time() - max_age_hours * 3600
     with _lock:
         return [s for s in _buf if s.observed_at.timestamp() >= cutoff]
@@ -110,6 +115,8 @@ def gnews_poll_once(max_metros: int = 40, per_metro: int = 5) -> int:
     rows: list[dict] = []
     seen_metros: set[str] = set()
     for place, _aliases in places()[:max_metros]:
+        if _stop.is_set():
+            break
         if place.metro in seen_metros:
             continue
         seen_metros.add(place.metro)
@@ -122,7 +129,8 @@ def gnews_poll_once(max_metros: int = 40, per_metro: int = 5) -> int:
                          "lat": place.lat, "lon": place.lon, "metro": place.metro,
                          "location": place.name, "confidence": 0.35,
                          "domain": a.get("domain")})
-        time.sleep(1.5)                     # stay polite across ~40 metros
+        if _stop.wait(1.5):
+            break                           # stay polite across ~40 metros
     from apb.fusion.sources import social_text_signals
     before = len(_buf)
     add(social_text_signals(rows))
@@ -138,15 +146,18 @@ def start_gnews(interval: float = 900.0) -> bool:
         return False
 
     def _run():
-        while True:
+        while not _stop.is_set():
             try:
                 n = gnews_poll_once()
                 log.info(f"gnews poll: +{n} signals, {stats()}")
             except Exception as e:            # one bad poll must not kill the loop
                 log.warning(f"gnews poll error: {e}")
-            time.sleep(interval)
+            _stop.wait(interval)
 
-    threading.Thread(target=_run, daemon=True).start()
+    _stop.clear()
+    thread = threading.Thread(target=_run, daemon=True, name="apb-google-news")
+    thread.start()
+    _threads.append(thread)
     _gnews_started = True
     log.info("per-metro Google News poller started")
     return True
@@ -160,15 +171,26 @@ def start(interval: float = 300.0, keep_unplaced: bool = False) -> bool:
         return False
 
     def _run():
-        while True:
+        while not _stop.is_set():
             try:
                 n = poll_once(keep_unplaced)
                 log.info(f"poll: +{n} signals, {stats()}")
             except Exception as e:            # one bad poll must not kill the loop
                 log.warning(f"poll error: {e}")
-            time.sleep(interval)
+            _stop.wait(interval)
 
-    threading.Thread(target=_run, daemon=True).start()
+    _stop.clear()
+    thread = threading.Thread(target=_run, daemon=True, name="apb-news-rss")
+    thread.start()
+    _threads.append(thread)
     _started = True
     log.info("RSS poller started")
     return True
+
+
+def stop(timeout: float = 2.0) -> None:
+    """Ask background pollers to stop and briefly wait for cooperative exit."""
+    _stop.set()
+    for thread in list(_threads):
+        if thread.is_alive():
+            thread.join(timeout=timeout)
