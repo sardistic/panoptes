@@ -28,7 +28,7 @@
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
   .incident-field{pointer-events:none;mix-blend-mode:screen;opacity:.88}
-  .environment-field{pointer-events:none;mix-blend-mode:soft-light;opacity:.58}
+  .environment-field{pointer-events:none;mix-blend-mode:soft-light;opacity:.64}
   .leaflet-container,.leaflet-interactive{cursor:crosshair!important}
   /* candle-dust grain over the basemap */
   #map::after{content:"";position:absolute;inset:0;z-index:300;pointer-events:none;
@@ -854,7 +854,7 @@ const EnvironmentField=L.Layer.extend({
   setData(data){this._data=data||[];this.redraw();},
   redraw(){
     if(!this._map||!this._canvas)return;
-    const m=this._map,size=m.getSize(),dpr=Math.min(1.25,window.devicePixelRatio||1),z=m.getZoom();
+    const m=this._map,size=m.getSize(),dpr=Math.min(1.1,window.devicePixelRatio||1),z=m.getZoom();
     this._canvas.width=Math.round(size.x*dpr);this._canvas.height=Math.round(size.y*dpr);
     this._canvas.style.width=`${size.x}px`;this._canvas.style.height=`${size.y}px`;
     L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
@@ -871,14 +871,48 @@ const EnvironmentField=L.Layer.extend({
         Math.hypot(a.lat-c.lat,a.lon-c.lng)-Math.hypot(b.lat-c.lat,b.lon-c.lng))[0];
       visible.push({d,p:L.point(size.x/2,size.y/2),local:true});
     }
+    const field=[];
     for(const {d,p,local} of visible){
       const scores=environmentScores(d),dominant=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
       if(!dominant||dominant[1]<.06)continue;
       const rgb=hexRgb(ENV_COLORS[dominant[0]]),strength=dominant[1],r=local?Math.max(size.x,size.y)*.72:radius;
-      const alpha=(local?.035:.018)+strength*(local?.045:.07);
+      const alpha=(local?.03:.014)+strength*(local?.04:.055);
       const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
       g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
       ctx.fillStyle=g;ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
+      field.push({p,rgb,strength,local});
+    }
+    // A restrained contour mesh makes the environment legible as a field, not a
+    // second set of event dots. Nearby model cells are joined with curved, fading
+    // strokes; at street scale the nearest cell becomes two quiet isobar-like marks.
+    ctx.lineCap='round';ctx.lineWidth=.75;
+    for(let i=0;i<field.length;i++){
+      const a=field[i];
+      if(a.local){
+        const span=Math.min(size.x,size.y)*.28,curve=span*.10;
+        ctx.strokeStyle=`rgba(${a.rgb.join(',')},${.055+a.strength*.07})`;
+        for(const off of [-7,7]){
+          ctx.beginPath();ctx.moveTo(a.p.x-span,a.p.y+off+curve);
+          ctx.bezierCurveTo(a.p.x-span*.35,a.p.y+off-curve,a.p.x+span*.35,a.p.y+off-curve,a.p.x+span,a.p.y+off+curve);
+          ctx.stroke();
+        }
+        continue;
+      }
+      let best=null,bestD=Infinity;
+      for(let j=i+1;j<field.length;j++){
+        if(field[j].local)continue;
+        const dx=field[j].p.x-a.p.x,dy=field[j].p.y-a.p.y,dist=Math.hypot(dx,dy);
+        if(dist<bestD){best=field[j];bestD=dist;}
+      }
+      if(!best||bestD>radius*2.35)continue;
+      const dx=best.p.x-a.p.x,dy=best.p.y-a.p.y,bend=Math.min(18,bestD*.12);
+      const nx=-dy/bestD*bend,ny=dx/bestD*bend;
+      const gradient=ctx.createLinearGradient(a.p.x,a.p.y,best.p.x,best.p.y);
+      gradient.addColorStop(0,`rgba(${a.rgb.join(',')},${.045+a.strength*.055})`);
+      gradient.addColorStop(1,`rgba(${best.rgb.join(',')},${.045+best.strength*.055})`);
+      ctx.strokeStyle=gradient;ctx.beginPath();ctx.moveTo(a.p.x,a.p.y);
+      ctx.bezierCurveTo(a.p.x+dx*.34+nx,a.p.y+dy*.34+ny,a.p.x+dx*.66+nx,a.p.y+dy*.66+ny,best.p.x,best.p.y);
+      ctx.stroke();
     }
   }
 });

@@ -464,33 +464,33 @@ def live_incidents(metro: str = Query("seattle", min_length=1, max_length=80,
                                      pattern=r"^[a-zA-Z0-9_-]+$"),
                    limit: int = Query(400, ge=1, le=1000),
                    max_age_hours: Hours = 0.0):
-    """Real live CAD/911 dispatch (geocoded). max_age_hours>0 keeps only incidents
-    within that window (0 = no time filter)."""
-    rows = _cad.fetch(metro, limit)
-    if max_age_hours > 0:
-        cutoff = _time.time() - max_age_hours * 3600
-        rows = [d for d in rows if d.get("ts") and d["ts"] >= cutoff]
-    return rows
+    """Recent CAD/911 dispatch from the local collector snapshot.
+
+    Display requests must never wait on an upstream provider.  The background
+    poller owns collection; this route is deliberately a fast database read.
+    ``0`` retains the old no-window behavior within the bounded snapshot store.
+    """
+    age = max_age_hours if max_age_hours > 0 else 24.0 * 30
+    return snapshots.query(age, metro=metro, limit=limit)
 
 
 @app.get("/live/overview")
 def live_overview(limit_per: int = Query(60, ge=1, le=200),
                   max_age_hours: Hours = 72.0):
-    """National aggregate: live fetch UNIONed with accumulated DB history (dedup), so
-    coverage grows over time instead of being limited to each feed's latest page."""
+    """National aggregate from accumulated history.
+
+    ``limit_per`` remains for API compatibility; collection limits belong to the
+    background poller, while interactive reads stay independent of upstream speed.
+    """
     def _build():
-        live = _cad.overview(limit_per, max_age_hours)
-        merged = {(d["metro"], str(d["call_id"])): d for d in snapshots.query(max_age_hours)}
-        for d in live:                       # live wins on conflict (freshest)
-            merged[(d["metro"], str(d["call_id"]))] = d
-        return list(merged.values())
-    return _cached(("overview", limit_per, max_age_hours), 20.0, _build)
+        return snapshots.query(max_age_hours, limit=8000)
+    return _cached(("overview-snapshot", max_age_hours), 10.0, _build)
 
 
 def _stream_snapshot(metro: str, max_age_hours: float) -> dict:
-    rows = (live_overview(limit_per=60, max_age_hours=max_age_hours)
-            if metro == "__all__" else
-            live_incidents(metro=metro, limit=400, max_age_hours=max_age_hours))
+    rows = snapshots.query(max_age_hours,
+                           metro=None if metro == "__all__" else metro,
+                           limit=8000 if metro == "__all__" else 400)
     return {"metro": metro, "max_age_hours": max_age_hours,
             "sent_at": _time.time(), "incidents": rows}
 
@@ -842,10 +842,11 @@ def live_emerging(min_count: int = Query(3, ge=2, le=100),
     from apb.infer.cluster import detect
 
     def _build():
-        clusters = detect(_cad.overview(max_age_hours=max_age_hours),
+        clusters = detect(snapshots.query(max_age_hours, limit=8000),
                           min_count=min_count, threat_floor=threat_floor)
         return [c.__dict__ for c in clusters]
-    return _cached(("emerging", min_count, threat_floor, max_age_hours), 20.0, _build)
+    return _cached(("emerging-snapshot", min_count, threat_floor, max_age_hours), 20.0,
+                   _build)
 
 
 def _parse_kinds(kinds: str | None) -> set[str] | None:

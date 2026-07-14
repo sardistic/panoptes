@@ -87,11 +87,25 @@ def test_hazard_aggregate_is_offline_safe(client, monkeypatch):
 
 def test_sse_snapshot_selects_national_or_metro(monkeypatch):
     from apb.api import main
-    monkeypatch.setattr(main, "live_overview",
-                        lambda limit_per, max_age_hours: [{"call_id": "national"}])
-    monkeypatch.setattr(main, "live_incidents",
-                        lambda metro, limit, max_age_hours: [{"call_id": metro}])
+    calls = []
+    def query(max_age_hours, metro=None, limit=8000):
+        calls.append((max_age_hours, metro, limit))
+        return [{"call_id": metro or "national"}]
+    monkeypatch.setattr(main.snapshots, "query", query)
     assert main._stream_snapshot("__all__", 1)["incidents"][0]["call_id"] == "national"
     local = main._stream_snapshot("seattle", 1)
     assert local["metro"] == "seattle"
     assert local["incidents"][0]["call_id"] == "seattle"
+    assert calls == [(1, None, 8000), (1, "seattle", 400)]
+
+
+def test_display_routes_never_fetch_upstream(client, monkeypatch):
+    from apb.api import main
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("interactive display route attempted an upstream fetch")
+    monkeypatch.setattr(main._cad, "fetch", forbidden)
+    monkeypatch.setattr(main._cad, "overview", forbidden)
+    assert client.get("/live/incidents", params={"metro": "seattle",
+                                                   "max_age_hours": 24}).status_code == 200
+    assert client.get("/live/overview", params={"max_age_hours": 24}).status_code == 200
+    assert client.get("/live/emerging", params={"max_age_hours": 24}).status_code == 200
