@@ -124,14 +124,6 @@
     background:none;border:1px solid var(--red);color:var(--red);margin-left:7px;font-weight:600}
   .badge.new{border-color:var(--amber);color:var(--amber)}
 
-  /* ── legend (bottom-right) ── */
-  #legend{bottom:16px;right:16px;padding:13px 16px;font-size:10px;color:var(--dim)}
-  #legend .bar{height:6px;width:184px;border-radius:0;margin:9px 0 5px;
-    background:linear-gradient(90deg,#39434f,var(--steel),var(--amber),var(--red))}
-  #legend .ends{display:flex;justify-content:space-between;font-family:var(--mono);
-    font-size:9px;letter-spacing:.1em;color:var(--dim)}
-  #legend .hint{margin-top:8px;color:var(--dimmer);font-size:9px;letter-spacing:.03em;max-width:210px;line-height:1.5}
-
   /* ── footer credit ── */
   #footer{bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;
     gap:9px;padding:7px 14px;font:500 9.5px/1 var(--mono);color:var(--dim);letter-spacing:.05em;white-space:nowrap}
@@ -156,7 +148,7 @@
     border:0!important;width:28px;height:28px;line-height:28px;font-size:15px}
   .leaflet-control-zoom a:hover{background:var(--raise)!important;color:var(--txt)!important}
   .leaflet-control-zoom a+a{border-top:1px solid var(--line)!important}
-  .leaflet-control-attribution{margin:0 16px 126px 0!important;padding:4px 7px!important;
+  .leaflet-control-attribution{margin:0 16px 12px 0!important;padding:4px 7px!important;
     background:rgba(9,11,9,.88)!important;color:#8a7f5c!important;border:1px solid #35311f;
     border-radius:2px;font:500 8px/1.2 var(--mono)!important}
   .leaflet-control-attribution a{color:#c4b382!important;text-decoration:none}
@@ -231,7 +223,7 @@
       overflow:auto;align-content:flex-start}
     #top .spacer{display:none}
     #top .brand{font-size:15px}
-    #top .sub,#legend,#footer{display:none}
+    #top .sub,#footer{display:none}
     #top .ctl{flex:1 1 42%;min-width:130px}
     #top select{width:100%;max-width:none}
     #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
@@ -290,13 +282,6 @@
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
   <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
   <div id="feed"></div>
-</div>
-
-<div id="legend" class="hud">
-  <span class="lab">Threat Intensity</span>
-  <div class="bar"></div>
-  <div class="ends"><span>LOW</span><span>CRITICAL</span></div>
-  <div class="hint">red = incident (color/throb = threat) · ◆ teal = social post (glows near official activity) · ◯ ring = corroborated</div>
 </div>
 
 <div id="footer" class="hud">
@@ -1291,13 +1276,18 @@ let goesLayers=null, goesTimer=null;
 const GOES_SATS=['GOES-West_ABI_GeoColor','GOES-East_ABI_GeoColor'];
 const goesUrl=l=>`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${l}/default/default/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png?v=${Math.floor(Date.now()/6e5)}`;
 function goesRefresh(){ if(goesLayers) goesLayers.forEach((t,i)=>t.setUrl(goesUrl(GOES_SATS[i]))); }
+// own pane: guaranteed above the GL basemap (tilePane, z auto) regardless of load
+// order — GOES starts before the async atlas style resolves — and below the sky panes
+map.createPane('goes');
+map.getPane('goes').style.zIndex = 210;
+map.getPane('goes').style.pointerEvents = 'none';
 function setGoes(on){
   const btn=document.getElementById('goesBtn');
   btn.classList.toggle('on',on);
   btn.setAttribute('aria-pressed',String(on));
   if(on && !goesLayers){
     goesLayers=GOES_SATS.map(l=>L.tileLayer(goesUrl(l),
-      {maxNativeZoom:7,maxZoom:19,opacity:.5,attribution:'GOES © NOAA / NASA GIBS'}).addTo(map));
+      {pane:'goes',maxNativeZoom:7,maxZoom:19,opacity:.65,attribution:'GOES © NOAA / NASA GIBS'}).addTo(map));
     goesTimer=setInterval(()=>{ if(!document.hidden) goesRefresh(); },600000);
   }else if(!on && goesLayers){
     clearInterval(goesTimer); goesTimer=null;

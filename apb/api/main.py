@@ -254,13 +254,23 @@ _SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    # The map stack dictates most of this: MapLibre boots its worker from a blob:
+    # URL (worker-src), fetches the Carto style JSON + vector tiles/sprites/glyphs,
+    # the Terrarium DEM (s3.amazonaws.com) and VIIRS night lights via fetch
+    # (connect-src), and feeds its sky-mask image source from data: URLs; Leaflet
+    # loads GOES GeoColor tiles from GIBS as plain <img> (img-src).
     "Content-Security-Policy": " ".join((
         "default-src 'self';", "base-uri 'self';", "object-src 'none';",
-        "frame-ancestors 'none';", "script-src 'self' 'unsafe-inline' https://unpkg.com;",
+        "frame-ancestors 'none';",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com;",
+        "worker-src 'self' blob:;", "child-src 'self' blob:;",
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
         "font-src 'self' https://fonts.gstatic.com;",
-        "img-src 'self' data: https://*.basemaps.cartocdn.com;",
-        "connect-src 'self';",
+        "img-src 'self' data: blob: https://*.basemaps.cartocdn.com"
+        " https://gibs.earthdata.nasa.gov;",
+        "connect-src 'self' data: https://basemaps.cartocdn.com"
+        " https://*.basemaps.cartocdn.com https://s3.amazonaws.com"
+        " https://gibs.earthdata.nasa.gov;",
     )),
 }
 
