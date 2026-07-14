@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" />
 <style>
   :root{
     --bg:#090b0f; --panel:#0d1015; --panel-2:#11151b; --raise:#161b22;
@@ -25,8 +26,18 @@
     font-family:var(--font);font-size:13px;overflow:hidden;-webkit-font-smoothing:antialiased}
   .mono{font-family:var(--mono);font-feature-settings:"tnum" 1}
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
-  #map{position:absolute;inset:0;background:#070809}
-  .leaflet-container{background:#070809;font-family:var(--font)}
+  #map{position:absolute;inset:0;background:#12140f}
+  /* candle-dust grain over the basemap */
+  #map::after{content:"";position:absolute;inset:0;z-index:300;pointer-events:none;
+    background-image:radial-gradient(circle,rgba(228,192,118,.5) 0 .4px,transparent .65px),
+      radial-gradient(circle,rgba(0,0,0,.6) 0 .5px,transparent .75px);
+    background-position:0 0,3px 4px;background-size:7px 7px,9px 9px;
+    opacity:.13;mix-blend-mode:soft-light}
+  /* heavy vignette: the map reads like a lit table in a dark room */
+  #map::before{content:"";position:absolute;inset:0;z-index:299;pointer-events:none;
+    background:radial-gradient(ellipse 120% 92% at 50% 42%,transparent 58%,rgba(2,3,2,.38) 100%)}
+  .leaflet-container{background:#12140f;font-family:var(--font)}
+  .maplibregl-map,.maplibregl-canvas{font-family:var(--font);outline:none}
 
   /* ── classification banner ── */
   #classbar{position:absolute;top:0;left:0;right:0;height:22px;z-index:1100;
@@ -145,6 +156,10 @@
     border:0!important;width:28px;height:28px;line-height:28px;font-size:15px}
   .leaflet-control-zoom a:hover{background:var(--raise)!important;color:var(--txt)!important}
   .leaflet-control-zoom a+a{border-top:1px solid var(--line)!important}
+  .leaflet-control-attribution{margin:0 16px 126px 0!important;padding:4px 7px!important;
+    background:rgba(9,11,9,.88)!important;color:#8a7f5c!important;border:1px solid #35311f;
+    border-radius:2px;font:500 8px/1.2 var(--mono)!important}
+  .leaflet-control-attribution a{color:#c4b382!important;text-decoration:none}
 
   /* ── popups ── */
   .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);
@@ -199,6 +214,7 @@
   .haz i{display:block;width:7px;height:7px;font-size:0;background:var(--hc);border-radius:50%;
     box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
   button#hazardsBtn.on .led{background:#37c0d8}
+  button#goesBtn.on .led{background:#7fb8e0}
 
   /* ── compact density ── */
   body.compact #side{width:300px}
@@ -221,7 +237,7 @@
     #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
     #hazFilter{left:8px;right:8px;top:calc(31vh + 38px);max-height:18vh;overflow:auto}
     .leaflet-top.leaflet-right{top:35vh;right:8px}
-    .leaflet-control-attribution{display:none}
+    .leaflet-control-attribution{margin:0 8px calc(34vh + 14px) 0!important;font-size:7px!important}
   }
 
   @media (prefers-reduced-motion:reduce){
@@ -259,6 +275,7 @@
     <button id="spikesBtn" class="on" aria-pressed="true" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
+    <button id="goesBtn" class="on" aria-pressed="true" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
   </span></label>
   <span class="spacer"></span>
   <span class="pill"><span class="dot"></span><span id="status" role="status" aria-live="polite">LIVE</span></span>
@@ -296,6 +313,8 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
 <script>
 'use strict';
 
@@ -313,11 +332,400 @@ const safeLink = value => {
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
-const map = L.map('map',{zoomControl:false,attributionControl:false,preferCanvas:true})
+const map = L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true})
   .setView([39.5, -98.35], 4);   // canvas renderer: thousands of incident dots stay fast
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a> · Terrain <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen/AWS</a> · Lights <a href="https://earthdata.nasa.gov/gibs">NASA</a>');
 L.control.zoom({position:'topright'}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  {maxZoom:19}).addTo(map);
+
+// Zoom ramp for the city-lights glow; f scales overall intensity so the breathing
+// animation can swell the whole ramp without touching the zoom fade-out.
+const lightsRamp = f => ['interpolate',['linear'],['zoom'],3,.68*f,7,.58*f,10,.3*f,12,0];
+
+// Dark-fantasy cartography over Carto's dark-matter vectors: near-black ink land,
+// abyssal water with a glowing antique coast rule, ember roads, dashed gold marches,
+// and real terrain via keyless Terrarium DEM tiles lit like candlelight from the NW.
+function atlasStyle(sourceStyle){
+  const style = structuredClone(sourceStyle);
+  style.name = 'Panoptes Umbral Atlas';
+  const ink = '#14170f', abyss = '#080b0f', gold = '#b0a173';
+  let waterFill = null, forestSource = null, forestInsert = -1, backgroundIndex = 0;
+
+  style.sources['panoptes-dem'] = {
+    type:'raster-dem', encoding:'terrarium', tileSize:256, maxzoom:13,
+    tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+    attribution:'Terrain: Mapzen/AWS'
+  };
+  // NASA earth-at-night: settlements glow like scattered embers on the black land
+  style.sources['panoptes-nightlights'] = {
+    type:'raster', tileSize:256, maxzoom:8,
+    tiles:['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_CityLights_2012/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg'],
+    attribution:'City lights: NASA GIBS'
+  };
+
+  style.layers.forEach((layer, index) => {
+    if(layer.ref) return;
+    const id = String(layer.id || '').toLowerCase();
+    const sourceLayer = String(layer['source-layer'] || '').toLowerCase();
+    const isWater = sourceLayer.includes('water') || id.includes('water');
+    const isRoad = sourceLayer.includes('transportation') || /road|street|motorway|bridge|tunnel/.test(id);
+    const isBoundary = sourceLayer.includes('boundary') || id.includes('boundary');
+    const isPark = /park|nature|reserve/.test(id);
+
+    layer.paint ||= {};
+    if(layer.type === 'background'){
+      layer.paint['background-color'] = ink;
+      backgroundIndex = index;
+    }else if(layer.type === 'fill'){
+      if(isWater){
+        layer.paint['fill-color'] = abyss;
+        layer.paint['fill-opacity'] = 1;
+        delete layer.paint['fill-outline-color'];
+        waterFill ||= {layer, index};
+      }else if(sourceLayer === 'landcover'){
+        layer.paint['fill-color'] = ['match',['get','class'],
+          ['wood','forest'],'#212816',['grass','scrub'],'#252415',['sand'],'#2a2517','#1e1e14'];
+        layer.paint['fill-opacity'] = .5;
+        forestSource ||= layer;
+        forestInsert = index;
+      }else if(isPark){
+        layer.paint['fill-color'] = '#252e19';
+        layer.paint['fill-opacity'] = .42;
+      }else if(sourceLayer.includes('building')){
+        layer.paint['fill-color'] = '#24261b';
+        layer.paint['fill-opacity'] = .45;
+      }else{
+        layer.paint['fill-color'] = ink;
+        layer.paint['fill-opacity'] = layer.paint['fill-opacity'] ?? .15;
+      }
+    }else if(layer.type === 'line'){
+      if(isWater){
+        layer.paint['line-color'] = '#1e2c35';
+        layer.paint['line-opacity'] = .45;
+      }else if(isBoundary){
+        layer.layout = {...(layer.layout||{}), visibility:'none'};   // no borders on the umbral chart
+      }else if(isRoad){
+        const casing = /case|casing/.test(id);
+        layer.paint['line-color'] = casing ? '#060705'
+          : /motorway|trunk/.test(id) ? '#4e4128' : '#2e2b1f';
+        layer.paint['line-opacity'] = casing ? .6 : /motorway|trunk/.test(id) ? .45 : .26;
+      }else{
+        layer.paint['line-color'] = '#232118';
+        layer.paint['line-opacity'] = .3;
+      }
+    }else if(layer.type === 'symbol'){
+      const waterLabel = isWater || /marine|ocean|sea/.test(id);
+      layer.paint['text-color'] = waterLabel ? '#48596a' : gold;
+      layer.paint['text-halo-color'] = waterLabel ? abyss : '#0a0b08';
+      layer.paint['text-halo-width'] = 1.2;
+      layer.paint['text-halo-blur'] = .5;
+      layer.paint['text-opacity'] = .85;
+    }
+  });
+
+  // City lights sit directly on the background; the hillshade's shadows and amber
+  // highlights draw over them (cities are mostly flat, so the glow survives), and the
+  // opaque abyss water above both keeps oceans clean. Lights fade out by street zoom,
+  // where the 8-zoom raster would smear.
+  style.layers.splice(backgroundIndex + 1, 0, {
+    id:'umbral-city-lights', type:'raster', source:'panoptes-nightlights',
+    paint:{
+      'raster-opacity':lightsRamp(1),
+      'raster-contrast':.15,
+      'raster-saturation':-.3,
+      'raster-hue-rotate':-12
+    }
+  },{
+    id:'umbral-hillshade', type:'hillshade', source:'panoptes-dem',
+    paint:{
+      'hillshade-exaggeration':.85,
+      'hillshade-shadow-color':'rgba(0,0,0,.8)',
+      'hillshade-highlight-color':'rgba(190,48,56,.38)',
+      'hillshade-accent-color':'rgba(168,32,44,.22)',
+      'hillshade-illumination-direction':340,
+      'hillshade-illumination-anchor':'map'
+    }
+  });
+  if(waterFill && waterFill.index >= backgroundIndex) waterFill.index += 2;
+  if(forestInsert >= backgroundIndex) forestInsert += 2;
+
+  if(waterFill){
+    const base = waterFill.layer;
+    const coast = {
+      id:'atlas-coast-double-rule',type:'line',source:base.source,
+      'source-layer':base['source-layer'],minzoom:base.minzoom,maxzoom:base.maxzoom,
+      paint:{'line-color':'rgba(196,179,130,.3)','line-width':.6,'line-gap-width':2,'line-opacity':.6}
+    };
+    if(base.filter) coast.filter = base.filter;
+    style.layers.splice(waterFill.index + 1, 0, coast);
+    if(forestInsert > waterFill.index) forestInsert++;
+  }
+  if(forestSource){
+    style.layers.splice(forestInsert + 1, 0, {
+      id:'atlas-forest-engraving',type:'fill',source:forestSource.source,
+      'source-layer':forestSource['source-layer'],
+      filter:['match',['get','class'],['wood','forest'],true,false],
+      paint:{'fill-color':'#293418','fill-opacity':.55}
+    });
+  }
+  return style;
+}
+
+function installAtlasTextures(gl){
+  // aged black paper: mostly darkness, a scatter of gold dust, faint contour-esque strokes
+  const paper = document.createElement('canvas');
+  paper.width = paper.height = 64;
+  const pctx = paper.getContext('2d');
+  pctx.fillStyle = '#14170f';
+  pctx.fillRect(0,0,64,64);
+  let seed = 7319;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for(let i=0;i<900;i++){
+    const shade = random()>.42 ? '0,0,0' : '216,178,102';
+    pctx.fillStyle = `rgba(${shade},${(.02 + random()*.05).toFixed(3)})`;
+    const size = random()>.94 ? 1.2 : .55;
+    pctx.fillRect(random()*64,random()*64,size,size);
+  }
+  pctx.strokeStyle = 'rgba(196,168,100,.035)';
+  pctx.lineWidth = .45;
+  for(let y=7;y<64;y+=13){
+    pctx.beginPath();pctx.moveTo(0,y);pctx.bezierCurveTo(18,y-2,43,y+2,64,y-.5);pctx.stroke();
+  }
+  gl.addImage('atlas-parchment',pctx.getImageData(0,0,64,64),{pixelRatio:1});
+  const background = gl.getStyle().layers.find(layer => layer.type === 'background');
+  if(background) gl.setPaintProperty(background.id,'background-pattern','atlas-parchment');
+
+  const forest = document.createElement('canvas');
+  forest.width = forest.height = 16;
+  const ctx = forest.getContext('2d');
+  ctx.strokeStyle = 'rgba(126,148,86,.5)';ctx.lineWidth = 1;
+  [[3,4],[11,2],[7,11],[15,9]].forEach(([x,y]) => {
+    ctx.beginPath();ctx.moveTo(x-2,y+2);ctx.lineTo(x,y-2);ctx.lineTo(x+2,y+2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-1.5,y);ctx.lineTo(x,y-3);ctx.lineTo(x+1.5,y);ctx.stroke();
+  });
+  gl.addImage('atlas-tree-hatch',ctx.getImageData(0,0,16,16),{pixelRatio:1});
+  if(gl.getLayer('atlas-forest-engraving'))
+    gl.setPaintProperty('atlas-forest-engraving','fill-pattern','atlas-tree-hatch');
+}
+
+// The settlements shimmer rather than fade: contrast and peak brightness wander
+// (dim fringes flicker while the bright cores stay lit) and opacity barely moves,
+// so the low point never reads as a washed-out overlay. Raster paint transitions
+// (300ms default) smooth the ~12fps steps into a continuous candle-flicker.
+function breatheCityLights(gl){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let last = 0;
+  const tick = now => {
+    if(!gl.getLayer('umbral-city-lights')) return;
+    if(now - last > 80){
+      last = now;
+      const t = now/1000;
+      const flick = .5*Math.sin(t*1.9) + .3*Math.sin(t*3.7+1.3) + .2*Math.sin(t*.41);
+      gl.setPaintProperty('umbral-city-lights','raster-contrast', .18 + .09*flick);
+      gl.setPaintProperty('umbral-city-lights','raster-brightness-max', .92 + .08*Math.sin(t*.27));
+      gl.setPaintProperty('umbral-city-lights','raster-opacity', lightsRamp(1 + .06*Math.sin(t*.61+.7)));
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
+  .then(response => {
+    if(!response.ok) throw new Error(`atlas style ${response.status}`);
+    return response.json();
+  })
+  .then(sourceStyle => {
+    const atlas = L.maplibreGL({style:atlasStyle(sourceStyle),interactive:false}).addTo(map);
+    const gl = atlas.getMaplibreMap();
+    gl.once('load',() => { installAtlasTextures(gl); breatheCityLights(gl);
+      glMapRef = gl; updateCelestial(); });
+  })
+  .catch(error => {
+    console.warn('Umbral atlas unavailable; using fallback tiles.',error);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  });
+
+// ── celestial lighting: the map is lit by the real sky ──────────────────────
+// Not tinted films: a two-channel lighting rig. A SCREEN-blended pane ADDS light
+// (golden day warmth, the blazing terminator ember, glint on water — the basemap
+// brightens through it), and a MULTIPLY-blended pane REMOVES it (night deepens to
+// indigo; blacks stay black instead of graying out). Identity colors — black for
+// screen, white for multiply — make full daylight a true no-op.
+map.createPane('skylight'); map.createPane('skydark');
+map.getPane('skylight').style.cssText += ';z-index:351;mix-blend-mode:screen;pointer-events:none';
+map.getPane('skydark').style.cssText  += ';z-index:352;mix-blend-mode:multiply;pointer-events:none';
+const RAD = Math.PI/180;
+const skyDays = () => Date.now()/86400000 + 2440587.5 - 2451545;   // days since J2000
+const gmstDeg = d => ((280.46061837 + 360.98564736629*d) % 360 + 360) % 360;
+function sunEq(d){
+  const L = 280.460 + .9856474*d, g = (357.528 + .9856003*d)*RAD;
+  const lam = (L + 1.915*Math.sin(g) + .02*Math.sin(2*g))*RAD, eps = 23.439*RAD;
+  return {dec:Math.asin(Math.sin(eps)*Math.sin(lam)),
+          ra:Math.atan2(Math.cos(eps)*Math.sin(lam), Math.cos(lam))/RAD};
+}
+function moonEq(d){
+  const L = (218.316 + 13.176396*d)*RAD, M = (134.963 + 13.064993*d)*RAD,
+        F = (93.272 + 13.22935*d)*RAD;
+  const lam = L + 6.289*RAD*Math.sin(M), beta = 5.128*RAD*Math.sin(F), eps = 23.439*RAD;
+  return {dec:Math.asin(Math.sin(beta)*Math.cos(eps) + Math.cos(beta)*Math.sin(eps)*Math.sin(lam)),
+          ra:Math.atan2(Math.sin(lam)*Math.cos(eps) - Math.tan(beta)*Math.sin(eps), Math.cos(lam))/RAD};
+}
+// altitude/azimuth (azimuth from north, clockwise) of a body seen from [lat,lon]
+function altAz(eq, d, lat, lon){
+  const H = ((gmstDeg(d) + lon - eq.ra)%360)*RAD, phi = lat*RAD;
+  const alt = Math.asin(Math.sin(phi)*Math.sin(eq.dec) + Math.cos(phi)*Math.cos(eq.dec)*Math.cos(H));
+  const az = Math.atan2(Math.sin(H), Math.cos(H)*Math.sin(phi) - Math.tan(eq.dec)*Math.cos(phi))/RAD + 180;
+  return {alt:alt/RAD, az:(az + 360)%360};
+}
+// One offscreen pass computes per-pixel sun altitude across the world (in mercator
+// rows, so every consumer maps it linearly) and renders three canvases: the GL
+// day-mask that hides city lights under sunlight, and the screen/multiply lighting
+// pair. Sky colour comes from piecewise ramps over sun altitude, baked into a LUT.
+const SKY_W = 512, SKY_H = 512, MERC_LAT = 85.051129;
+const maskCanvas = document.createElement('canvas');
+const lightCanvas = document.createElement('canvas');
+const darkCanvas = document.createElement('canvas');
+[maskCanvas, lightCanvas, darkCanvas].forEach(c => { c.width = SKY_W; c.height = SKY_H; });
+// The sunset line is NOT geometric altitude 0°: atmospheric refraction lifts the
+// solar disc ~34′ at the horizon, and sunset is defined by the UPPER LIMB touching
+// it (+16′ semi-diameter) — the sun has visibly set when its centre reaches −0.833°.
+// Below that runs the defined twilight ladder: civil −6° (terrain still sky-lit),
+// nautical −12° (horizon gone), astronomical −18° (sky fully dark).
+const SUNSET_ALT = -0.833;
+// What the sun ADDS (screen blend: black = nothing added) — and dawn ≠ dusk.
+// Evening air carries a day's worth of convected aerosols, dust and moisture, so
+// sunsets burn deeper red-orange; overnight the boundary layer settles and dawns
+// come through cleaner, cooler air — pale rose-gold with a violet cast. Each
+// terminator limb gets its own ramp, blended where the limbs meet at the
+// noon/midnight meridians (where sunrise and sunset literally merge).
+const DUSK_STOPS = [[-90,0,0,0],[-11,0,0,0],[-6,14,4,10],[-2.8,40,14,16],
+  [-0.833,74,32,14],[2.2,64,34,14],[8,36,24,10],[20,14,10,5],[90,10,8,4]];
+const DAWN_STOPS = [[-90,0,0,0],[-11,0,0,0],[-6,12,6,16],[-2.8,34,18,28],
+  [-0.833,64,34,26],[2.2,54,34,20],[8,32,24,12],[20,13,10,6],[90,10,8,4]];
+// what the night TAKES AWAY (multiply blend: white = nothing removed), keyed to
+// the twilight definitions — full dark arrives only past astronomical twilight
+const DARK_STOPS = [[-90,112,122,174],[-18,112,122,174],[-12,150,152,192],
+  [-6,200,196,210],[-0.833,244,241,240],[1,255,255,255],[90,255,255,255]];
+// the ground itself under sunlight — the day mask is painted as sunlit soil, not a
+// glow veil. This is what makes daylight interact with the map: the land warms and
+// lifts exactly where the sun stands, and the hillshade carves shadows into it.
+// Warm umber by day (G ≤ R — no green cast), blushing at true sunset.
+const GROUND_STOPS = [[-90,20,23,15],[-9,20,23,15],[-2.8,34,28,17],
+  [-0.833,44,33,18],[4,38,34,20],[15,35,33,19],[90,35,33,19]];
+function skyRamp(stops, alt){
+  let a = stops[0], b = stops[stops.length-1];
+  for(let k = 1; k < stops.length; k++)
+    if(alt <= stops[k][0]){ a = stops[k-1]; b = stops[k]; break; }
+  const t = b[0] === a[0] ? 0 : (alt - a[0])/(b[0] - a[0]);
+  return [1,2,3].map(j => a[j] + (b[j] - a[j])*t);
+}
+const SKY_N = 1024, SKY_LUT = (() => {            // indexed by sin(altitude)
+  const dusk = new Uint8ClampedArray(SKY_N*3), dawn = new Uint8ClampedArray(SKY_N*3),
+        dark = new Uint8ClampedArray(SKY_N*3), ground = new Uint8ClampedArray(SKY_N*3);
+  for(let k = 0; k < SKY_N; k++){
+    const alt = Math.asin(-1 + 2*k/(SKY_N - 1))/RAD;
+    skyRamp(DUSK_STOPS, alt).forEach((v,j) => dusk[k*3+j] = v);
+    skyRamp(DAWN_STOPS, alt).forEach((v,j) => dawn[k*3+j] = v);
+    skyRamp(DARK_STOPS, alt).forEach((v,j) => dark[k*3+j] = v);
+    skyRamp(GROUND_STOPS, alt).forEach((v,j) => ground[k*3+j] = v);
+  }
+  return {dusk, dawn, dark, ground};
+})();
+function paintSky(sun, G){
+  const mctx = maskCanvas.getContext('2d'),
+        lctx = lightCanvas.getContext('2d'),
+        dctx = darkCanvas.getContext('2d');
+  const mimg = mctx.createImageData(SKY_W, SKY_H),
+        limg = lctx.createImageData(SKY_W, SKY_H),
+        dimg = dctx.createImageData(SKY_W, SKY_H);
+  const sinD = Math.sin(sun.dec), cosD = Math.cos(sun.dec);
+  const cosH = new Float64Array(SKY_W), wMorn = new Float64Array(SKY_W);
+  for(let x = 0; x < SKY_W; x++){
+    const H = ((G - 180 + 360*(x + .5)/SKY_W - sun.ra)%360)*RAD;
+    cosH[x] = Math.cos(H);
+    // which limb of the terminator: sin H < 0 -> local morning (sun rising there)
+    let w = (.15 - Math.sin(H))/.3;
+    w = w < 0 ? 0 : w > 1 ? 1 : w;
+    wMorn[x] = w*w*(3 - 2*w);
+  }
+  // city lights ignite through dusk, centred on true (refracted) sunset
+  const DAY_HI = Math.sin((SUNSET_ALT+5)*RAD), DAY_LO = Math.sin((SUNSET_ALT-8)*RAD);
+  for(let y = 0; y < SKY_H; y++){
+    const lat = 2*Math.atan(Math.exp(Math.PI*(1 - 2*(y + .5)/SKY_H))) - Math.PI/2;
+    const s1 = Math.sin(lat)*sinD, s2 = Math.cos(lat)*cosD;
+    for(let x = 0; x < SKY_W; x++){
+      const sa = s1 + s2*cosH[x];                // sin(sun altitude) at this pixel
+      const i = (y*SKY_W + x)*4;
+      const k = 3*Math.round((sa + 1)*.5*(SKY_N - 1));
+      let dm = (sa - DAY_LO)/(DAY_HI - DAY_LO);
+      dm = dm < 0 ? 0 : dm > 1 ? 1 : dm; dm = dm*dm*(3 - 2*dm);
+      mimg.data[i] = SKY_LUT.ground[k]; mimg.data[i+1] = SKY_LUT.ground[k+1];
+      mimg.data[i+2] = SKY_LUT.ground[k+2]; mimg.data[i+3] = dm*255;
+      const wm = wMorn[x], we = 1 - wm;
+      limg.data[i]   = SKY_LUT.dusk[k]*we   + SKY_LUT.dawn[k]*wm;
+      limg.data[i+1] = SKY_LUT.dusk[k+1]*we + SKY_LUT.dawn[k+1]*wm;
+      limg.data[i+2] = SKY_LUT.dusk[k+2]*we + SKY_LUT.dawn[k+2]*wm;
+      limg.data[i+3] = 255;
+      dimg.data[i] = SKY_LUT.dark[k]; dimg.data[i+1] = SKY_LUT.dark[k+1];
+      dimg.data[i+2] = SKY_LUT.dark[k+2]; dimg.data[i+3] = 255;
+    }
+  }
+  mctx.putImageData(mimg, 0, 0); lctx.putImageData(limg, 0, 0); dctx.putImageData(dimg, 0, 0);
+}
+let glMapRef = null, lightOverlay = null, darkOverlay = null;
+function relightTerrain(){
+  if(!glMapRef) return;
+  const d = skyDays(), sun = sunEq(d), c = map.getCenter();
+  const s = altAz(sun, d, c.lat, c.lng), m = altAz(moonEq(d), d, c.lat, c.lng);
+  // scattered skylight keeps terrain sun-lit until civil twilight ends (−6°)
+  const body = s.alt > -6 ? s : m;
+  const moonlit = s.alt <= -6 && m.alt > 0;
+  // low sun sets the ridgelines on fire; high sun settles into the deep panoptes red
+  const t = Math.max(0, Math.min(1, (14 - s.alt)/14));
+  const mix = (a,b) => Math.round(a + (b - a)*t);
+  try{
+    glMapRef.setPaintProperty('umbral-hillshade','hillshade-illumination-direction',Math.round(body.az));
+    // relief deepens through the day and peaks at golden hour (long-shadow feel)
+    glMapRef.setPaintProperty('umbral-hillshade','hillshade-exaggeration',
+      moonlit ? .7 : +(0.8 + .15*t).toFixed(2));
+    glMapRef.setPaintProperty('umbral-hillshade','hillshade-highlight-color',
+      moonlit ? 'rgba(160,185,225,.45)'
+              : `rgba(${mix(212,255)},${mix(62,120)},${mix(52,44)},${(.48 + .14*t).toFixed(2)})`);
+    glMapRef.setPaintProperty('umbral-hillshade','hillshade-accent-color',
+      moonlit ? 'rgba(130,155,200,.26)'
+              : `rgba(${mix(185,226)},${mix(45,74)},${mix(48,36)},.3)`);
+  }catch(_){}
+}
+function updateCelestial(){
+  const d = skyDays(), sun = sunEq(d), G = gmstDeg(d);
+  paintSky(sun, G);
+  const skyBounds = [[-MERC_LAT,-180],[MERC_LAT,180]];
+  if(!lightOverlay){
+    lightOverlay = L.imageOverlay(lightCanvas.toDataURL(), skyBounds,
+      {pane:'skylight', interactive:false}).addTo(map);
+    darkOverlay = L.imageOverlay(darkCanvas.toDataURL(), skyBounds,
+      {pane:'skydark', interactive:false}).addTo(map);
+  }else{
+    lightOverlay.setUrl(lightCanvas.toDataURL());
+    darkOverlay.setUrl(darkCanvas.toDataURL());
+  }
+  if(glMapRef){
+    const maskUrl = maskCanvas.toDataURL();
+    const daySrc = glMapRef.getSource('panoptes-daylight');
+    if(daySrc) daySrc.updateImage({url:maskUrl});
+    else{
+      glMapRef.addSource('panoptes-daylight',{type:'image',url:maskUrl,
+        coordinates:[[-180,MERC_LAT],[180,MERC_LAT],[180,-MERC_LAT],[-180,-MERC_LAT]]});
+      glMapRef.addLayer({id:'umbral-daylight-mask',type:'raster',source:'panoptes-daylight',
+        paint:{'raster-opacity':1,'raster-fade-duration':0}},'umbral-hillshade');
+    }
+  }
+  relightTerrain();
+}
+setInterval(updateCelestial, 60000);
+map.on('moveend', relightTerrain);               // light azimuth depends on where you look
+updateCelestial();
 
 let heat = L.heatLayer([], {radius:30, blur:22, maxZoom:14, max:1.0,
   gradient:{0.0:'#39434f',0.4:'#5d6a78',0.65:'#e0a030',0.85:'#a8202c',1.0:'#a8202c'}})
@@ -875,6 +1283,29 @@ document.getElementById('hazardsBtn').onclick=async e=>{
   draw();                         // quakes/weather/wildfire/traffic/aircraft/declarations layer
 };
 document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
+// Live GOES GeoColor (NASA GIBS, keyless). ON by default; GIBS's `default` time
+// endpoint always serves the newest ~10-min frame, so a stamp that ticks once per
+// frame window re-requests tiles each cycle (and on tab return) to stay live.
+// Sits under the sky-lighting panes, so the celestial grade applies to real clouds.
+let goesLayers=null, goesTimer=null;
+const GOES_SATS=['GOES-West_ABI_GeoColor','GOES-East_ABI_GeoColor'];
+const goesUrl=l=>`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${l}/default/default/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png?v=${Math.floor(Date.now()/6e5)}`;
+function goesRefresh(){ if(goesLayers) goesLayers.forEach((t,i)=>t.setUrl(goesUrl(GOES_SATS[i]))); }
+function setGoes(on){
+  const btn=document.getElementById('goesBtn');
+  btn.classList.toggle('on',on);
+  btn.setAttribute('aria-pressed',String(on));
+  if(on && !goesLayers){
+    goesLayers=GOES_SATS.map(l=>L.tileLayer(goesUrl(l),
+      {maxNativeZoom:7,maxZoom:19,opacity:.5,attribution:'GOES © NOAA / NASA GIBS'}).addTo(map));
+    goesTimer=setInterval(()=>{ if(!document.hidden) goesRefresh(); },600000);
+  }else if(!on && goesLayers){
+    clearInterval(goesTimer); goesTimer=null;
+    goesLayers.forEach(l=>map.removeLayer(l)); goesLayers=null;
+  }
+}
+document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
+setGoes(true);
 
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
@@ -929,7 +1360,7 @@ document.addEventListener('visibilitychange',()=>{
     if(eventStream){ eventStream.close(); eventStream=null; }
     if(fallbackTimer){ clearInterval(fallbackTimer); fallbackTimer=null; }
   }else{
-    load(); restartStream();
+    load(); restartStream(); goesRefresh();
   }
 });
 
