@@ -258,7 +258,7 @@ _SECURITY_HEADERS = {
     # URL (worker-src), fetches the Carto style JSON + vector tiles/sprites/glyphs,
     # the Terrarium DEM (s3.amazonaws.com) and VIIRS night lights via fetch
     # (connect-src), and feeds its sky-mask image source from data: URLs; Leaflet
-    # loads GOES GeoColor tiles from GIBS as plain <img> (img-src).
+    # loads GOES GeoColor and the IEM/NWS NEXRAD mosaic as plain <img> tiles.
     "Content-Security-Policy": " ".join((
         "default-src 'self';", "base-uri 'self';", "object-src 'none';",
         "frame-ancestors 'none';",
@@ -267,10 +267,10 @@ _SECURITY_HEADERS = {
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
         "font-src 'self' https://fonts.gstatic.com;",
         "img-src 'self' data: blob: https://*.basemaps.cartocdn.com"
-        " https://gibs.earthdata.nasa.gov;",
+        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
         "connect-src 'self' data: https://basemaps.cartocdn.com"
         " https://*.basemaps.cartocdn.com https://s3.amazonaws.com"
-        " https://gibs.earthdata.nasa.gov;",
+        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
     )),
 }
 

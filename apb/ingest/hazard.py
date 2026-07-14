@@ -185,6 +185,24 @@ class HazardIngest:
                        event, p.get("areaDesc"), lat, lon, threat,
                        p.get("effective") or p.get("sent"))
             row["civil"] = civil
+            # Keep the operational CAP intelligence for the client. Previously the
+            # map reduced a warning to a title and centroid, discarding what people
+            # need to act: timing, confidence, expected impact, and instructions.
+            row.update({
+                "event": event,
+                "headline": p.get("headline"),
+                "description": p.get("description"),
+                "instruction": p.get("instruction"),
+                "severity": p.get("severity"),
+                "certainty": p.get("certainty"),
+                "urgency": p.get("urgency"),
+                "response": p.get("response"),
+                "onset": p.get("onset"),
+                "ends": p.get("ends"),
+                "expires": p.get("expires"),
+                "sender_name": p.get("senderName"),
+                "geometry": f.get("geometry"),
+            })
             out.append(row)
         return out
 

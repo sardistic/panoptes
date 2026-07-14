@@ -207,6 +207,7 @@
     box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
   button#hazardsBtn.on .led{background:#37c0d8}
   button#goesBtn.on .led{background:#7fb8e0}
+  button#radarBtn.on .led{background:#62cf72;box-shadow:0 0 7px rgba(98,207,114,.65)}
 
   /* ── compact density ── */
   body.compact #side{width:300px}
@@ -267,6 +268,7 @@
     <button id="spikesBtn" class="on" aria-pressed="true" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
+    <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
     <button id="goesBtn" class="on" aria-pressed="true" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
   </span></label>
   <span class="spacer"></span>
@@ -712,8 +714,15 @@ setInterval(updateCelestial, 60000);
 map.on('moveend', relightTerrain);               // light azimuth depends on where you look
 updateCelestial();
 
-let heat = L.heatLayer([], {radius:30, blur:22, maxZoom:14, max:1.0,
-  gradient:{0.0:'#39434f',0.4:'#5d6a78',0.65:'#e0a030',0.85:'#a8202c',1.0:'#a8202c'}})
+// City lights are the ambient baseline. Incidents lift out of them as a living,
+// time-decaying activity field: broad candle-gold volume plus a tighter red core.
+// Ordinary points only resolve at street zoom; the national view reads as energy,
+// not a pinboard.
+let heat = L.heatLayer([], {radius:34, blur:29, maxZoom:15, max:1.0, minOpacity:.08,
+  gradient:{0.0:'#3e493f',0.28:'#756b42',0.58:'#d49a32',0.82:'#b4432e',1.0:'#a8202c'}})
+  .addTo(map);
+let spikeHeat = L.heatLayer([], {radius:21, blur:16, maxZoom:15, max:1.0, minOpacity:.04,
+  gradient:{0.0:'#66452d',0.48:'#df8d2c',0.78:'#c73335',1.0:'#f05a52'}})
   .addTo(map);
 let markers   = L.layerGroup().addTo(map);
 let throbLayer = L.layerGroup().addTo(map);   // DOM dots that pulse by threat level
@@ -816,6 +825,25 @@ const DOT_R = z => z<6 ? 2 : z<9 ? 2.6 : z<12 ? 4 : 6;
 const THROB_MIN = 0.8;      // only genuinely severe incidents pulse (shootings, fires,
                             // assaults at peak) — keeps the map calm, throb = real spikes
 const THROB_CAP = 60;       // hard cap on simultaneously-pulsing dots (most severe first)
+let activityPoints = [];
+
+function eventWeight(d, now, breathe=true){
+  const windowSeconds=Math.max(300, +winHours()*3600);
+  const age=Math.max(0, now-(+d.ts||now));
+  const recency=Math.max(.16, Math.exp(-age/(windowSeconds*.42)));
+  const seed=String(d.call_id||'').split('').reduce((n,c)=>(n*31+c.charCodeAt(0))%997,17);
+  const pulse=breathe ? .91+.09*Math.sin(now/5.2+seed) : 1;
+  return Math.min(1, (.2+.8*(+d.threat_score||0))*recency*pulse);
+}
+
+function drawActivityField(){
+  const now=Date.now()/1000, z=map.getZoom();
+  heat.setOptions({radius:z<6?22:z<9?30:38,blur:z<6?20:z<9?25:30});
+  spikeHeat.setOptions({radius:z<6?13:z<9?18:24,blur:z<6?12:z<9?15:18});
+  heat.setLatLngs(activityPoints.map(d=>[d.lat,d.lon,eventWeight(d,now)]));
+  spikeHeat.setLatLngs(activityPoints.filter(d=>d.threat_score>=.62)
+    .map(d=>[d.lat,d.lon,eventWeight(d,now)*Math.max(0,(d.threat_score-.5)*2)]));
+}
 
 // a DOM dot that pulses faster as threat rises — a thin same-colour ring, no glow
 function throbDot(d, z){
@@ -834,9 +862,8 @@ function draw(){
   const scoped = inView(applyFilters(currentData));
   markers.clearLayers(); throbLayer.clearLayers();
   const z = map.getZoom();
-  // tight density heat UNDERLAY — keeps the heatmap glow without smearing over detail
-  heat.setOptions({radius: z<7?14:20, blur: z<7?11:15, max:1.0, minOpacity:0.18, maxZoom:15});
-  heat.setLatLngs(scoped.map(d=>[d.lat, d.lon, Math.max(0.12, d.threat_score)]));
+  activityPoints=scoped;
+  drawActivityField();
   // the most severe incidents pulse (capped for perf); everything else = static dot
   const hot = showSpikes
     ? scoped.filter(d=>d.threat_score>=THROB_MIN)
@@ -846,6 +873,7 @@ function draw(){
   const base = DOT_R(z);
   scoped.forEach(d=>{
     if(hotSet.has(d)) return;                // rendered as a throb dot below
+    if(z<11) return;                         // field first; points resolve at street zoom
     const hi = d.threat_score>=0.7;
     L.circleMarker([d.lat,d.lon],{radius: base+(hi?1.5:0), stroke:false,
       fillColor:sevColor(d.threat_score), fillOpacity: hi?0.9:0.5})
@@ -1046,15 +1074,32 @@ function drawHazards(){
   hazardData.filter(d=>b.contains([d.lat,d.lon]) && hazCats.has(d._cat))
     .slice(0,1200).forEach(d=>{
     const st = HAZ_STYLE[d._cat] || HAZ_STYLE.weather;
+    const tooltip=`${esc(d.event||st.label)}${d.source?' · '+esc(d.source):''}`;
+    const popupHtml=()=>`<div class="pop"><div class="kick" style="color:${st.c}">${esc(st.label)}</div>`
+      +`<div class="sum">${esc((d.headline||d.summary||'').slice(0,260))}</div>`
+      +(d.description?`<div class="meta">${esc(d.description.slice(0,520))}</div>`:'')
+      +(d.instruction?`<div class="sum" style="color:${st.c}">${esc(d.instruction.slice(0,360))}</div>`:'')
+      +`<div class="meta">${esc(d.location||'')} · ${esc(d.severity||'severity '+(+d.threat_score).toFixed(2))}`
+      +`${d.urgency?' · '+esc(d.urgency):''}${d.certainty?' · '+esc(d.certainty):''} · ${esc(ago(d.ts))}</div>`
+      +(d.expires?`<div class="meta">expires ${esc(new Date(d.expires).toLocaleString())}</div>`:'')
+      +`</div>`;
+    // CAP polygon is the intelligence. Render its actual warning footprint; use a
+    // point only for zone-only alerts where NWS did not publish polygon geometry.
+    if(d.source==='nws' && d.geometry && /Polygon/.test(d.geometry.type||'')){
+      const area=L.geoJSON(d.geometry,{style:{color:st.c,weight:1.25,opacity:.82,
+        fillColor:st.c,fillOpacity:.11,dashArray:d.certainty==='Observed'?null:'4 3'}});
+      area.bindTooltip(tooltip,{sticky:true});
+      area.on('click',e=>L.popup({maxWidth:340}).setLatLng(e.latlng)
+        .setContent(popupHtml()).openOn(map));
+      area.addTo(hazardLayer);
+      return;
+    }
     const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'haz',iconSize:[8,8],
       iconAnchor:[4,4],
       html:`<i style="--hc:${st.c}"></i>`})});
-    m.bindTooltip(`${esc(st.label)}${d.source?' · '+esc(d.source):''}`,{direction:'top'});
-    m.on('click',()=>L.popup({maxWidth:300}).setLatLng([d.lat,d.lon]).setContent(
-      `<div class="pop"><div class="kick" style="color:${st.c}">${esc(st.label)}</div>`
-      +`<div class="sum">${esc((d.summary||'').slice(0,220))}</div>`
-      +`<div class="meta">${esc(d.location||'')} · sev ${(+d.threat_score).toFixed(2)} · ${esc(ago(d.ts))}</div>`
-      +`</div>`).openOn(map));
+    m.bindTooltip(tooltip,{direction:'top'});
+    m.on('click',()=>L.popup({maxWidth:340}).setLatLng([d.lat,d.lon])
+      .setContent(popupHtml()).openOn(map));
     m.addTo(hazardLayer);
   });
 }
@@ -1268,6 +1313,28 @@ document.getElementById('hazardsBtn').onclick=async e=>{
   draw();                         // quakes/weather/wildfire/traffic/aircraft/declarations layer
 };
 document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
+// Current CONUS NEXRAD base reflectivity. IEM mosaics the NWS radar network into
+// one cache-friendly WMS; refresh the image on the native five-minute cadence.
+map.createPane('radar');
+map.getPane('radar').style.zIndex=215;
+map.getPane('radar').style.pointerEvents='none';
+map.getPane('radar').style.mixBlendMode='screen';
+let radarLayer=null, radarTimer=null;
+function setRadar(on){
+  const btn=document.getElementById('radarBtn');
+  btn.classList.toggle('on',on); btn.setAttribute('aria-pressed',String(on));
+  if(on && !radarLayer){
+    radarLayer=L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi?',{
+      layers:'nexrad-n0q-900913',format:'image/png',transparent:true,opacity:.58,
+      pane:'radar',attribution:'NEXRAD mosaic © NOAA / Iowa Environmental Mesonet'
+    }).addTo(map);
+    radarTimer=setInterval(()=>{ if(!document.hidden && radarLayer)
+      radarLayer.setParams({_refresh:Math.floor(Date.now()/300000)}); },300000);
+  }else if(!on && radarLayer){
+    clearInterval(radarTimer); radarTimer=null; map.removeLayer(radarLayer); radarLayer=null;
+  }
+}
+document.getElementById('radarBtn').onclick=()=>setRadar(!radarLayer);
 // Live GOES GeoColor (NASA GIBS, keyless). ON by default; GIBS's `default` time
 // endpoint always serves the newest ~10-min frame, so a stamp that ticks once per
 // frame window re-requests tiles each cycle (and on tab return) to stay live.
@@ -1296,6 +1363,11 @@ function setGoes(on){
 }
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
 setGoes(true);
+
+// Keep the field subtly alive between data snapshots. The animation changes only
+// intensity, never position, and respects the same reduced-motion contract as CSS.
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  setInterval(()=>{ if(!document.hidden && activityPoints.length) drawActivityField(); },1400);
 
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view

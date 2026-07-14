@@ -17,6 +17,14 @@ def test_hazards_use_one_browser_request():
     assert "fetch(`/live/traffic?" not in HTML
 
 
+def test_activity_field_and_radar_are_first_class_layers():
+    assert "function drawActivityField()" in HTML
+    assert "if(z<11) return" in HTML
+    assert "nexrad-n0q-900913" in HTML
+    assert "id=\"radarBtn\"" in HTML
+    assert "L.geoJSON(d.geometry" in HTML
+
+
 def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML
