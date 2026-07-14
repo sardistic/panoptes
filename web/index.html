@@ -28,7 +28,7 @@
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
   .incident-field{pointer-events:none;mix-blend-mode:screen;opacity:.88}
-  .environment-field{pointer-events:none;mix-blend-mode:soft-light;opacity:.64}
+  .environment-field{pointer-events:none;mix-blend-mode:screen;opacity:.8}
   .leaflet-container,.leaflet-interactive{cursor:crosshair!important}
   /* candle-dust grain over the basemap */
   #map::after{content:"";position:absolute;inset:0;z-index:300;pointer-events:none;
@@ -837,12 +837,21 @@ const ENV_COLORS={thermal:'#b7836b',moisture:'#668791',rain:'#527c98',uv:'#b49b6
 function environmentScores(d){
   const apparent=+d.apparent_c||+d.temperature_c||0,dew=+d.dewpoint_c||0,rh=+d.humidity||0;
   return {
-    thermal:Math.max(0,Math.min(1,(apparent-27)/14))*Math.max(.45,rh/100),
-    moisture:Math.max(0,Math.min(1,(dew-16)/12))*Math.max(.35,rh/100),
-    rain:Math.min(1,((+d.rain_6h_mm||0)+(+d.precipitation_mm||0)*2)/28),
+    // Continuous ambient signals, not alert thresholds: ordinary weather should
+    // still leave a readable fingerprint while extremes simply become stronger.
+    thermal:Math.max(.06,Math.min(1,(apparent+6)/44)),
+    moisture:Math.max(.04,Math.min(1,(dew+8)/34))*(.55+.45*Math.min(1,rh/100)),
+    rain:Math.min(1,((+d.rain_6h_mm||0)+(+d.precipitation_mm||0)*2)/18),
     uv:Math.min(1,(+d.uv||0)/11),
-    aqi:Math.max(0,Math.min(1,((+d.us_aqi||0)-45)/155))
+    aqi:Math.max(.025,Math.min(1,(+d.us_aqi||0)/180))
   };
+}
+function environmentVisual(d){
+  const scores=environmentScores(d),entries=Object.entries(scores),total=entries.reduce((n,e)=>n+Math.pow(e[1],1.35),0)||1;
+  const rgb=[0,1,2].map(channel=>Math.round(entries.reduce((n,[kind,value])=>
+    n+hexRgb(ENV_COLORS[kind])[channel]*Math.pow(value,1.35),0)/total));
+  const peak=Math.max(...entries.map(e=>e[1])),mean=entries.reduce((n,e)=>n+e[1],0)/entries.length;
+  return {scores,rgb,strength:Math.min(1,.16+peak*.64+mean*.28)};
 }
 const EnvironmentField=L.Layer.extend({
   initialize(){this._data=[];},
@@ -859,7 +868,7 @@ const EnvironmentField=L.Layer.extend({
     this._canvas.style.width=`${size.x}px`;this._canvas.style.height=`${size.y}px`;
     L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
     const ctx=this._canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
-    const radius=z<5?115:z<7?100:82,visible=[];
+    const radius=z<5?160:z<7?135:96,visible=[];
     for(const d of this._data){
       const p=m.latLngToContainerPoint([d.lat,d.lon]);
       if(p.x>-radius&&p.y>-radius&&p.x<size.x+radius&&p.y<size.y+radius)visible.push({d,p});
@@ -873,24 +882,24 @@ const EnvironmentField=L.Layer.extend({
     }
     const field=[];
     for(const {d,p,local} of visible){
-      const scores=environmentScores(d),dominant=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
-      if(!dominant||dominant[1]<.06)continue;
-      const rgb=hexRgb(ENV_COLORS[dominant[0]]),strength=dominant[1],r=local?Math.max(size.x,size.y)*.72:radius;
-      const alpha=(local?.03:.014)+strength*(local?.04:.055);
+      const {rgb,strength}=environmentVisual(d),r=local?Math.max(size.x,size.y)*.72:radius;
+      const alpha=(local?.025:.022)+strength*(local?.08:.105);
       const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
-      g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
+      g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);
+      g.addColorStop(.52,`rgba(${rgb.join(',')},${alpha*.42})`);
+      g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
       ctx.fillStyle=g;ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
       field.push({p,rgb,strength,local});
     }
     // A restrained contour mesh makes the environment legible as a field, not a
     // second set of event dots. Nearby model cells are joined with curved, fading
     // strokes; at street scale the nearest cell becomes two quiet isobar-like marks.
-    ctx.lineCap='round';ctx.lineWidth=.75;
+    ctx.lineCap='round';ctx.lineWidth=1;
     for(let i=0;i<field.length;i++){
       const a=field[i];
       if(a.local){
         const span=Math.min(size.x,size.y)*.28,curve=span*.10;
-        ctx.strokeStyle=`rgba(${a.rgb.join(',')},${.055+a.strength*.07})`;
+        ctx.strokeStyle=`rgba(${a.rgb.join(',')},${.11+a.strength*.12})`;
         for(const off of [-7,7]){
           ctx.beginPath();ctx.moveTo(a.p.x-span,a.p.y+off+curve);
           ctx.bezierCurveTo(a.p.x-span*.35,a.p.y+off-curve,a.p.x+span*.35,a.p.y+off-curve,a.p.x+span,a.p.y+off+curve);
@@ -908,8 +917,8 @@ const EnvironmentField=L.Layer.extend({
       const dx=best.p.x-a.p.x,dy=best.p.y-a.p.y,bend=Math.min(18,bestD*.12);
       const nx=-dy/bestD*bend,ny=dx/bestD*bend;
       const gradient=ctx.createLinearGradient(a.p.x,a.p.y,best.p.x,best.p.y);
-      gradient.addColorStop(0,`rgba(${a.rgb.join(',')},${.045+a.strength*.055})`);
-      gradient.addColorStop(1,`rgba(${best.rgb.join(',')},${.045+best.strength*.055})`);
+      gradient.addColorStop(0,`rgba(${a.rgb.join(',')},${.09+a.strength*.11})`);
+      gradient.addColorStop(1,`rgba(${best.rgb.join(',')},${.09+best.strength*.11})`);
       ctx.strokeStyle=gradient;ctx.beginPath();ctx.moveTo(a.p.x,a.p.y);
       ctx.bezierCurveTo(a.p.x+dx*.34+nx,a.p.y+dy*.34+ny,a.p.x+dx*.66+nx,a.p.y+dy*.66+ny,best.p.x,best.p.y);
       ctx.stroke();
