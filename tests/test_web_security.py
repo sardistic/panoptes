@@ -19,10 +19,17 @@ def test_hazards_use_one_browser_request():
 
 def test_activity_field_and_radar_are_first_class_layers():
     assert "function drawActivityField()" in HTML
-    assert "if(z<11) return" in HTML
+    assert "function incidentTick(d,z)" in HTML
     assert "nexrad-n0q-900913" in HTML
     assert "id=\"radarBtn\"" in HTML
     assert "L.geoJSON(d.geometry" in HTML
+
+
+def test_map_animation_budget_and_emerging_fallback():
+    assert "breatheCityLights" not in HTML
+    assert "setInterval(()=>{ if(!document.hidden && activityPoints.length)" not in HTML
+    assert "EMERGING EVENTS · NATIONAL" in HTML
+    assert "officialCells=new Set" in HTML
 
 
 def test_live_updates_use_sse_with_slow_fallback():

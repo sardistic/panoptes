@@ -187,11 +187,6 @@
   @keyframes ping{0%{transform:scale(.3);opacity:.9}100%{transform:scale(5);opacity:0}}
   @keyframes fade{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
 
-  /* ── threat-throb: severe incidents pulse scale/opacity (no glow) ── */
-  .tdot{display:block;border-radius:50%;pointer-events:auto;cursor:pointer;
-    animation-name:throb;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
-  @keyframes throb{0%,100%{transform:scale(.7);opacity:.55}50%{transform:scale(1.15);opacity:1}}
-
   /* ── surge: soft pulsing area glow (the one kept data pulse) ── */
   .surge-halo span{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;
     border-radius:50%;pointer-events:auto;cursor:pointer;
@@ -234,7 +229,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.tdot,.surge-halo span,.ping span{animation:none!important}
+    .dot,.surge-halo span,.ping span{animation:none!important}
   }
 </style>
 </head>
@@ -265,7 +260,7 @@
     <option value="0.7">HIGH ≥0.70</option>
   </select></label>
   <label class="ctl">Alerts<span class="segwrap">
-    <button id="spikesBtn" class="on" aria-pressed="true" title="pulse high-threat incidents"><span class="led"></span>SPIKES</button>
+    <button id="spikesBtn" class="on" aria-pressed="true" title="emphasize high-threat activity"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
@@ -495,26 +490,15 @@ function installAtlasTextures(gl){
     gl.setPaintProperty('atlas-forest-engraving','fill-pattern','atlas-tree-hatch');
 }
 
-// The settlements shimmer rather than fade: contrast and peak brightness wander
-// (dim fringes flicker while the bright cores stay lit) and opacity barely moves,
-// so the low point never reads as a washed-out overlay. Raster paint transitions
-// (300ms default) smooth the ~12fps steps into a continuous candle-flicker.
-function breatheCityLights(gl){
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  let last = 0;
-  const tick = now => {
-    if(!gl.getLayer('umbral-city-lights')) return;
-    if(now - last > 80){
-      last = now;
-      const t = now/1000;
-      const flick = .5*Math.sin(t*1.9) + .3*Math.sin(t*3.7+1.3) + .2*Math.sin(t*.41);
-      gl.setPaintProperty('umbral-city-lights','raster-contrast', .18 + .09*flick);
-      gl.setPaintProperty('umbral-city-lights','raster-brightness-max', .92 + .08*Math.sin(t*.27));
-      gl.setPaintProperty('umbral-city-lights','raster-opacity', lightsRamp(1 + .06*Math.sin(t*.61+.7)));
-    }
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
+// Lighting is an indicator, not ambient animation. Visible incident energy raises
+// city-light contrast and brightness when data changes; the GPU is otherwise idle.
+let cityLightLevel=-1;
+function setCityLightSignal(gl, level=0){
+  if(!gl?.getLayer('umbral-city-lights') || Math.abs(level-cityLightLevel)<.04) return;
+  cityLightLevel=level;
+  gl.setPaintProperty('umbral-city-lights','raster-contrast',.16+.16*level);
+  gl.setPaintProperty('umbral-city-lights','raster-brightness-max',.9+.1*level);
+  gl.setPaintProperty('umbral-city-lights','raster-opacity',lightsRamp(1+.12*level));
 }
 
 fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
@@ -525,8 +509,8 @@ fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
   .then(sourceStyle => {
     const atlas = L.maplibreGL({style:atlasStyle(sourceStyle),interactive:false}).addTo(map);
     const gl = atlas.getMaplibreMap();
-    gl.once('load',() => { installAtlasTextures(gl); breatheCityLights(gl);
-      glMapRef = gl; updateCelestial(); });
+    gl.once('load',() => { installAtlasTextures(gl); glMapRef = gl;
+      cityLightLevel=-1; setCityLightSignal(gl,0); updateCelestial(); });
   })
   .catch(error => {
     console.warn('Umbral atlas unavailable; using fallback tiles.',error);
@@ -569,7 +553,7 @@ function altAz(eq, d, lat, lon){
 // rows, so every consumer maps it linearly) and renders three canvases: the GL
 // day-mask that hides city lights under sunlight, and the screen/multiply lighting
 // pair. Sky colour comes from piecewise ramps over sun altitude, baked into a LUT.
-const SKY_W = 512, SKY_H = 512, MERC_LAT = 85.051129;
+const SKY_W = 256, SKY_H = 256, MERC_LAT = 85.051129;
 const maskCanvas = document.createElement('canvas');
 const lightCanvas = document.createElement('canvas');
 const darkCanvas = document.createElement('canvas');
@@ -710,7 +694,7 @@ function updateCelestial(){
   }
   relightTerrain();
 }
-setInterval(updateCelestial, 60000);
+setInterval(updateCelestial, 300000);           // sky changes slowly; avoid minute-scale stalls
 map.on('moveend', relightTerrain);               // light azimuth depends on where you look
 updateCelestial();
 
@@ -725,7 +709,6 @@ let spikeHeat = L.heatLayer([], {radius:21, blur:16, maxZoom:15, max:1.0, minOpa
   gradient:{0.0:'#66452d',0.48:'#df8d2c',0.78:'#c73335',1.0:'#f05a52'}})
   .addTo(map);
 let markers   = L.layerGroup().addTo(map);
-let throbLayer = L.layerGroup().addTo(map);   // DOM dots that pulse by threat level
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
 let alertLayer = L.layerGroup().addTo(map);
@@ -821,19 +804,14 @@ async function load(providedData=null){
 
 // ── draw: filtered + viewport-scoped render, city bubbles vs incident detail ──
 // dot size grows with zoom so dots stay readable from country to street level
-const DOT_R = z => z<6 ? 2 : z<9 ? 2.6 : z<12 ? 4 : 6;
-const THROB_MIN = 0.8;      // only genuinely severe incidents pulse (shootings, fires,
-                            // assaults at peak) — keeps the map calm, throb = real spikes
-const THROB_CAP = 60;       // hard cap on simultaneously-pulsing dots (most severe first)
+const HIGH_THREAT = 0.8;
 let activityPoints = [];
 
-function eventWeight(d, now, breathe=true){
+function eventWeight(d, now){
   const windowSeconds=Math.max(300, +winHours()*3600);
   const age=Math.max(0, now-(+d.ts||now));
   const recency=Math.max(.16, Math.exp(-age/(windowSeconds*.42)));
-  const seed=String(d.call_id||'').split('').reduce((n,c)=>(n*31+c.charCodeAt(0))%997,17);
-  const pulse=breathe ? .91+.09*Math.sin(now/5.2+seed) : 1;
-  return Math.min(1, (.2+.8*(+d.threat_score||0))*recency*pulse);
+  return Math.min(1, (.2+.8*(+d.threat_score||0))*recency);
 }
 
 function drawActivityField(){
@@ -841,45 +819,34 @@ function drawActivityField(){
   heat.setOptions({radius:z<6?22:z<9?30:38,blur:z<6?20:z<9?25:30});
   spikeHeat.setOptions({radius:z<6?13:z<9?18:24,blur:z<6?12:z<9?15:18});
   heat.setLatLngs(activityPoints.map(d=>[d.lat,d.lon,eventWeight(d,now)]));
-  spikeHeat.setLatLngs(activityPoints.filter(d=>d.threat_score>=.62)
-    .map(d=>[d.lat,d.lon,eventWeight(d,now)*Math.max(0,(d.threat_score-.5)*2)]));
+  spikeHeat.setLatLngs(showSpikes ? activityPoints.filter(d=>d.threat_score>=.62)
+    .map(d=>[d.lat,d.lon,eventWeight(d,now)*Math.max(0,(d.threat_score-.5)*2)]) : []);
+  const energy=activityPoints.reduce((n,d)=>n+eventWeight(d,now),0);
+  setCityLightSignal(glMapRef,Math.min(1,Math.log1p(energy)/Math.log(90)));
 }
 
-// a DOM dot that pulses faster as threat rises — a thin same-colour ring, no glow
-function throbDot(d, z){
-  const t = d.threat_score, col = sevColor(t);
-  const s = (z<7?7:9) + t*5;                 // bigger with threat
-  const dur = (2.3 - t*1.4).toFixed(2);      // higher threat -> faster pulse
-  const m = L.marker([d.lat,d.lon],{icon:L.divIcon({className:'tdot-wrap',
-    iconSize:[s,s], iconAnchor:[s/2,s/2],
-    html:`<i class="tdot" style="width:${s}px;height:${s}px;background:${col};`
-      +`box-shadow:0 0 0 1px ${col};animation-duration:${dur}s"></i>`})});
-  m.on('click',()=>openIncident(d));
-  return m;
+// At detail zoom incidents resolve as short light ticks, not a field of static dots.
+// Geographic length is calculated from screen pixels so ticks remain crisp by zoom.
+function incidentTick(d,z){
+  const t=+d.threat_score||0, px=3+t*7;
+  const metresPerPixel=156543.03*Math.cos(d.lat*Math.PI/180)/Math.pow(2,z);
+  const dy=px*metresPerPixel/111320;
+  return L.polyline([[d.lat-dy*.5,d.lon],[d.lat+dy*.5,d.lon]],{
+    color:sevColor(t),weight:t>=HIGH_THREAT?2.4:1.5,opacity:.45+.5*t,
+    lineCap:'round',interactive:true
+  }).on('click',()=>openIncident(d));
 }
 
 function draw(){
   const scoped = inView(applyFilters(currentData));
-  markers.clearLayers(); throbLayer.clearLayers();
+  markers.clearLayers();
   const z = map.getZoom();
   activityPoints=scoped;
   drawActivityField();
-  // the most severe incidents pulse (capped for perf); everything else = static dot
-  const hot = showSpikes
-    ? scoped.filter(d=>d.threat_score>=THROB_MIN)
-            .sort((a,b)=>b.threat_score-a.threat_score).slice(0, THROB_CAP)
-    : [];
-  const hotSet = new Set(hot);
-  const base = DOT_R(z);
   scoped.forEach(d=>{
-    if(hotSet.has(d)) return;                // rendered as a throb dot below
-    if(z<11) return;                         // field first; points resolve at street zoom
-    const hi = d.threat_score>=0.7;
-    L.circleMarker([d.lat,d.lon],{radius: base+(hi?1.5:0), stroke:false,
-      fillColor:sevColor(d.threat_score), fillOpacity: hi?0.9:0.5})
-      .on('click',()=>openIncident(d)).addTo(markers);
+    if(z<10 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
+    incidentTick(d,z).addTo(markers);
   });
-  hot.forEach(d=>throbLayer.addLayer(throbDot(d, z)));
   // multi-source corroborated events: a bright open ring, distinct from red dots
   fusedLayer.clearLayers();
   const fb=map.getBounds();
@@ -894,8 +861,16 @@ function draw(){
   });
   // social/news firehose — teal diamonds; glow when near official CAD activity (city radius)
   socialLayer.clearLayers();
-  socialPosts.filter(s=>s.lat!=null && fb.contains([s.lat,s.lon])).forEach(s=>{
-    const corro = currentData.some(d=>Math.abs(d.lat-s.lat)<0.25 && Math.abs(d.lon-s.lon)<0.25);
+  const officialCells=new Set(currentData.map(d=>`${Math.floor(d.lat*4)},${Math.floor(d.lon*4)}`));
+  const nearOfficial=s=>{
+    const y=Math.floor(s.lat*4),x=Math.floor(s.lon*4);
+    for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++)
+      if(officialCells.has(`${y+dy},${x+dx}`)) return true;
+    return false;
+  };
+  socialPosts.filter(s=>s.lat!=null && fb.contains([s.lat,s.lon]))
+    .map(s=>({s,corro:nearOfficial(s)}))
+    .filter(x=>z>=8||x.corro).slice(0,z>=8?500:120).forEach(({s,corro})=>{
     const m=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'soc'+(corro?' corro':''),
       html:'<i></i>',iconSize:[0,0]})});
     m.bindTooltip(`SOCIAL · ${esc(s.source||'bluesky')}${corro?' · near official activity':''}`,{direction:'top'});
@@ -904,7 +879,7 @@ function draw(){
   });
   drawHazards();
   updateCount(scoped);
-  if(isNational()) renderEmergingPanel(scoped);
+  if(isNational()) renderEmergingPanel();
   else renderIncidentPanel(scoped);
 }
 
@@ -932,17 +907,18 @@ function renderIncidentPanel(scoped){
   });
 }
 
-function renderEmergingPanel(scoped){
-  document.getElementById('sideTitle').textContent='EMERGING EVENTS';
+function renderEmergingPanel(){
   emergingLayer.clearLayers();
   const b=map.getBounds();
-  // viewport-scoped + most-recent first
-  const cl = emergingClusters.filter(c=>b.contains([c.lat,c.lon]))
+  const visible=emergingClusters.filter(c=>b.contains([c.lat,c.lon]));
+  const fallback=!visible.length && emergingClusters.length;
+  document.getElementById('sideTitle').textContent=fallback?'EMERGING EVENTS · NATIONAL':'EMERGING EVENTS · IN VIEW';
+  const cl=(fallback?emergingClusters:visible).slice()
     .sort((a,b)=>(b.latest_ts||0)-(a.latest_ts||0));
   // spikes are shown on the map by the throbbing high-threat dots (see draw());
   // this panel is the ranked, most-recent-first list with click-to-correlate.
   const feed=document.getElementById('feed'); feed.innerHTML='';
-  if(!cl.length){ feed.innerHTML='<div class="loc" style="padding:8px 0">no emerging clusters in view</div>'; }
+  if(!cl.length){ feed.innerHTML='<div class="loc" style="padding:8px 0">no emerging clusters reported</div>'; }
   cl.slice(0,30).forEach((c,i)=>{
     const row=document.createElement('div'); row.className='row'+(i===0?' recent':'');
     const t=Object.keys(c.types).slice(0,2).join(', ');
@@ -1251,7 +1227,7 @@ document.getElementById('minThreat').onchange=draw;
 document.getElementById('spikesBtn').onclick=e=>{
   showSpikes=!showSpikes; e.currentTarget.classList.toggle('on',showSpikes);
   e.currentTarget.setAttribute('aria-pressed',String(showSpikes));
-  draw();                       // toggles the threat-throb pulse on the dots
+  draw();                       // toggles high-threat cores and detail ticks
 };
 document.getElementById('surgesBtn').onclick=e=>{
   showSurges=!showSurges; e.currentTarget.classList.toggle('on',showSurges);
@@ -1363,12 +1339,6 @@ function setGoes(on){
 }
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
 setGoes(true);
-
-// Keep the field subtly alive between data snapshots. The animation changes only
-// intensity, never position, and respects the same reduced-motion contract as CSS.
-if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  setInterval(()=>{ if(!document.hidden && activityPoints.length) drawActivityField(); },1400);
-
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
 let moveT=null;
