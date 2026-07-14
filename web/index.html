@@ -64,6 +64,12 @@
     color:var(--txt-2);height:26px;padding:0 11px;border:1px solid var(--line-2);
     border-radius:3px;background:var(--panel-2);text-transform:uppercase}
   #status{letter-spacing:.14em}
+  #loadPill{color:var(--amber);border-color:rgba(224,160,48,.45);max-width:270px}
+  #loadPill[hidden]{display:none}
+  #loadText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loadmark{width:7px;height:7px;border:1px solid var(--amber);display:block;
+    animation:loadstep 1s steps(2,end) infinite}
+  @keyframes loadstep{50%{background:var(--amber);transform:rotate(45deg)}}
   #alertPill{cursor:pointer}
   .dot{width:7px;height:7px;border-radius:0;background:var(--red);
     box-shadow:none;animation:pulse 1.7s steps(1) infinite}
@@ -229,7 +235,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.surge-halo span,.ping span{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span{animation:none!important}
   }
 </style>
 </head>
@@ -267,6 +273,8 @@
     <button id="goesBtn" class="on" aria-pressed="true" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
   </span></label>
   <span class="spacer"></span>
+  <span class="pill" id="loadPill" role="status" aria-live="polite" hidden>
+    <span class="loadmark"></span><span id="loadText">LOADING</span></span>
   <span class="pill"><span class="dot"></span><span id="status" role="status" aria-live="polite">LIVE</span></span>
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
     <span id="alertCount">0</span> SURGE</span>
@@ -311,6 +319,36 @@ const safeLink = value => {
     return ['http:', 'https:'].includes(u.protocol) ? u.href : '';
   } catch (_) { return ''; }
 };
+// Reference-counted because SSE snapshots and manual layer toggles can overlap.
+// The pill names actual pending data instead of displaying an ambiguous spinner.
+const activeLoads=new Map();
+function updateLoadPill(){
+  const pill=document.getElementById('loadPill'), labels=[...activeLoads.keys()];
+  pill.hidden=!labels.length;
+  document.getElementById('loadText').textContent=labels.length
+    ? `LOADING · ${labels.slice(0,3).join(' + ')}${labels.length>3?` +${labels.length-3}`:''}`
+    : 'LOADING';
+}
+function beginLoad(label){ activeLoads.set(label,(activeLoads.get(label)||0)+1); updateLoadPill(); }
+function endLoad(label){
+  const n=(activeLoads.get(label)||0)-1;
+  if(n>0) activeLoads.set(label,n); else activeLoads.delete(label);
+  updateLoadPill();
+}
+async function withLoad(label,fn){
+  beginLoad(label); try{return await fn();} finally{endLoad(label);}
+}
+function watchTiles(label,layers,timeout=15000){
+  if(!layers.length) return;
+  beginLoad(label); let left=layers.length, finished=false;
+  const done=()=>{ if(finished) return; if(--left>0) return; finished=true; endLoad(label); };
+  layers.forEach(layer=>{
+    let settled=false;
+    const one=()=>{ if(!settled){ settled=true; done(); } };
+    layer.once('load',one); layer.once('tileerror',one);
+  });
+  setTimeout(()=>{ if(!finished){ finished=true; endLoad(label); } },timeout);
+}
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
@@ -501,6 +539,7 @@ function setCityLightSignal(gl, level=0){
   gl.setPaintProperty('umbral-city-lights','raster-opacity',lightsRamp(1+.12*level));
 }
 
+beginLoad('BASEMAP');
 fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
   .then(response => {
     if(!response.ok) throw new Error(`atlas style ${response.status}`);
@@ -515,7 +554,7 @@ fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
   .catch(error => {
     console.warn('Umbral atlas unavailable; using fallback tiles.',error);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
-  });
+  }).finally(()=>endLoad('BASEMAP'));
 
 // ── celestial lighting: the map is lit by the real sky ──────────────────────
 // Not tinted films: a two-channel lighting rig. A SCREEN-blended pane ADDS light
@@ -779,20 +818,22 @@ async function load(providedData=null){
   let data=providedData;
   try{
     if(data===null){
-      const response=await fetch(url);
-      if(!response.ok) throw new Error(`incidents ${response.status}`);
-      data=await response.json();
+      data=await withLoad('INCIDENTS',async()=>{
+        const response=await fetch(url);
+        if(!response.ok) throw new Error(`incidents ${response.status}`);
+        return response.json();
+      });
     }
   }
   catch(e){ document.getElementById('status').textContent='OFFLINE'; return; }
   document.getElementById('status').textContent = label;
   currentData = data.filter(d=>d.lat!=null && d.lon!=null);
   refreshTypeOptions();
-  if(isNational()) await loadEmerging();
-  if(isNational()) loadAlerts(); else alertLayer.clearLayers();
-  if(isNational()) await loadFused(); else fusedLayer.clearLayers();
-  if(isNational()) await loadSocial(); else socialLayer.clearLayers();
-  await loadHazards();
+  const secondary=[];
+  if(isNational()) secondary.push(loadEmerging(),loadAlerts(),loadFused(),loadSocial());
+  else { alertLayer.clearLayers(); fusedLayer.clearLayers(); socialLayer.clearLayers(); }
+  if(showHazards) secondary.push(loadHazards());
+  await Promise.all(secondary);
   draw();
   pingNew(inView(applyFilters(currentData)));
   if(fitNext && currentData.length){
@@ -939,18 +980,24 @@ const EMERGING_HOURS = 6;   // emerging needs incidents to accumulate/converge �
                             // decouple its lookback from the (often short) display window
 async function loadEmerging(){
   const w = Math.max(EMERGING_HOURS, +winHours());
-  try{ emergingClusters = await (await fetch(`/live/emerging?max_age_hours=${w}`)).json(); }
-  catch(e){ emergingClusters=[]; }
+  return withLoad('EMERGING',async()=>{
+    try{ emergingClusters = await (await fetch(`/live/emerging?max_age_hours=${w}`)).json(); }
+    catch(e){ emergingClusters=[]; }
+  });
 }
 async function loadFused(){      // only multi-source events (CAD/radio + social corroboration)
   const w = Math.max(EMERGING_HOURS, +winHours());
-  try{ fusedEvents = await (await fetch(`/live/fused?max_age_hours=${w}&min_sources=2&min_score=0.1&limit_per=10&include_live=false`)).json(); }
-  catch(e){ fusedEvents=[]; }
+  return withLoad('FUSION',async()=>{
+    try{ fusedEvents = await (await fetch(`/live/fused?max_age_hours=${w}&min_sources=2&min_score=0.1&limit_per=10&include_live=false`)).json(); }
+    catch(e){ fusedEvents=[]; }
+  });
 }
 async function loadSocial(){     // social/news firehose posts (seed + live Bluesky)
   const w = Math.max(EMERGING_HOURS, +winHours());
-  try{ socialPosts = await (await fetch(`/live/social?max_age_hours=${w}`)).json(); }
-  catch(e){ socialPosts=[]; }
+  return withLoad('SOCIAL',async()=>{
+    try{ socialPosts = await (await fetch(`/live/social?max_age_hours=${w}`)).json(); }
+    catch(e){ socialPosts=[]; }
+  });
 }
 // extra-signal layer: quakes, weather, wildfire, traffic, aircraft, declarations (TFR/FEMA)
 // Each family is a `category` keyed off the row's `source`, independently filterable.
@@ -1035,13 +1082,15 @@ const hazCats = new Set(Object.keys(HAZ_STYLE));
 async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
-  try{
-    const response=await fetch(`/live/hazards/all?max_age_hours=${Math.max(w,24)}`);
-    if(!response.ok) throw new Error(`hazard aggregate ${response.status}`);
-    hazardData = (await response.json())
-      .filter(d=>d.lat!=null && d.lon!=null)
-      .map(d=>({...d, _cat:hazCat(d)}));
-  }catch(e){ hazardData=[]; }
+  return withLoad('HAZARDS',async()=>{
+    try{
+      const response=await fetch(`/live/hazards/all?max_age_hours=${Math.max(w,24)}`);
+      if(!response.ok) throw new Error(`hazard aggregate ${response.status}`);
+      hazardData = (await response.json())
+        .filter(d=>d.lat!=null && d.lon!=null)
+        .map(d=>({...d, _cat:hazCat(d)}));
+    }catch(e){ hazardData=[]; }
+  });
 }
 function drawHazards(){
   hazardLayer.clearLayers();
@@ -1093,24 +1142,26 @@ function openSocial(s, corro){
 }
 
 async function loadAlerts(){
-  let alerts=[];
-  try{ alerts = await (await fetch('/baseline/anomalies?window_hours=1&lookback_hours=72&z=2')).json(); }
-  catch(e){ return; }
-  // attach a map point + keep the strongest first so the pill jumps to the top surge
-  surgeAlerts = alerts
-    .map(a=>({...a, _c:(a.lat!=null&&a.lon!=null)?[a.lat,a.lon]:CENTERS[a.metro]}))
-    .filter(a=>a._c).sort((x,y)=>(y.zscore||0)-(x.zscore||0));
-  const pill=document.getElementById('alertPill');
-  pill.style.display = surgeAlerts.length ? 'flex' : 'none';
-  document.getElementById('alertCount').textContent = surgeAlerts.length;
-  alertLayer.clearLayers();
-  if(!showSurges) return;                       // toggled off in the ALERTS selector
-  surgeAlerts.forEach(a=>{
-    const m=L.marker(a._c,{icon:L.divIcon({className:'surge-halo',iconSize:[0,0],
-      html:'<span></span>'})});
-    m.bindTooltip(`SURGE · ${esc(surgeName(a))} · ${Number(a.current)||0} now vs ${Number(a.baseline_mean)||0} avg (${Number(a.zscore)||0}σ)`,
-      {direction:'top'});
-    m.on('click',()=>focusSurge(a)); m.addTo(alertLayer);
+  return withLoad('SURGES',async()=>{
+    let alerts=[];
+    try{ alerts = await (await fetch('/baseline/anomalies?window_hours=1&lookback_hours=72&z=2')).json(); }
+    catch(e){ return; }
+    // attach a map point + keep the strongest first so the pill jumps to the top surge
+    surgeAlerts = alerts
+      .map(a=>({...a, _c:(a.lat!=null&&a.lon!=null)?[a.lat,a.lon]:CENTERS[a.metro]}))
+      .filter(a=>a._c).sort((x,y)=>(y.zscore||0)-(x.zscore||0));
+    const pill=document.getElementById('alertPill');
+    pill.style.display = surgeAlerts.length ? 'flex' : 'none';
+    document.getElementById('alertCount').textContent = surgeAlerts.length;
+    alertLayer.clearLayers();
+    if(!showSurges) return;
+    surgeAlerts.forEach(a=>{
+      const m=L.marker(a._c,{icon:L.divIcon({className:'surge-halo',iconSize:[0,0],
+        html:'<span></span>'})});
+      m.bindTooltip(`SURGE · ${esc(surgeName(a))} · ${Number(a.current)||0} now vs ${Number(a.baseline_mean)||0} avg (${Number(a.zscore)||0}σ)`,
+        {direction:'top'});
+      m.on('click',()=>focusSurge(a)); m.addTo(alertLayer);
+    });
   });
 }
 const surgeName = a => (a.name||a.metro||'').replace(/^(ag_|pp_|p2c_|ss_)/,'');
@@ -1304,8 +1355,11 @@ function setRadar(on){
       layers:'nexrad-n0q-900913',format:'image/png',transparent:true,opacity:.58,
       pane:'radar',attribution:'NEXRAD mosaic © NOAA / Iowa Environmental Mesonet'
     }).addTo(map);
-    radarTimer=setInterval(()=>{ if(!document.hidden && radarLayer)
-      radarLayer.setParams({_refresh:Math.floor(Date.now()/300000)}); },300000);
+    watchTiles('RADAR',[radarLayer]);
+    radarTimer=setInterval(()=>{ if(!document.hidden && radarLayer){
+      watchTiles('RADAR',[radarLayer]);
+      radarLayer.setParams({_refresh:Math.floor(Date.now()/300000)});
+    } },300000);
   }else if(!on && radarLayer){
     clearInterval(radarTimer); radarTimer=null; map.removeLayer(radarLayer); radarLayer=null;
   }
@@ -1318,7 +1372,9 @@ document.getElementById('radarBtn').onclick=()=>setRadar(!radarLayer);
 let goesLayers=null, goesTimer=null;
 const GOES_SATS=['GOES-West_ABI_GeoColor','GOES-East_ABI_GeoColor'];
 const goesUrl=l=>`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${l}/default/default/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png?v=${Math.floor(Date.now()/6e5)}`;
-function goesRefresh(){ if(goesLayers) goesLayers.forEach((t,i)=>t.setUrl(goesUrl(GOES_SATS[i]))); }
+function goesRefresh(){
+  if(goesLayers){ watchTiles('SATELLITE',goesLayers); goesLayers.forEach((t,i)=>t.setUrl(goesUrl(GOES_SATS[i]))); }
+}
 // own pane: guaranteed above the GL basemap (tilePane, z auto) regardless of load
 // order — GOES starts before the async atlas style resolves — and below the sky panes
 map.createPane('goes');
@@ -1331,6 +1387,7 @@ function setGoes(on){
   if(on && !goesLayers){
     goesLayers=GOES_SATS.map(l=>L.tileLayer(goesUrl(l),
       {pane:'goes',maxNativeZoom:7,maxZoom:19,opacity:.65,attribution:'GOES © NOAA / NASA GIBS'}).addTo(map));
+    watchTiles('SATELLITE',goesLayers);
     goesTimer=setInterval(()=>{ if(!document.hidden) goesRefresh(); },600000);
   }else if(!on && goesLayers){
     clearInterval(goesTimer); goesTimer=null;
@@ -1345,8 +1402,9 @@ let moveT=null;
 map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120); });
 
 async function loadMetros(){
-  let metros=[];
-  try{ metros = await (await fetch('/live/metros')).json(); }catch(e){}
+  let metros=await withLoad('FEEDS',async()=>{
+    try{ return await (await fetch('/live/metros')).json(); }catch(e){ return []; }
+  });
   const sel=document.getElementById('metro'); sel.innerHTML='';
   const all=document.createElement('option');
   all.value='__all__'; all.textContent=`NATIONAL OVERVIEW · ${metros.length} FEEDS`;

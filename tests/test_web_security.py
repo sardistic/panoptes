@@ -32,6 +32,13 @@ def test_map_animation_budget_and_emerging_fallback():
     assert "officialCells=new Set" in HTML
 
 
+def test_loading_indicator_names_overlapping_sources():
+    assert 'id="loadPill"' in HTML
+    assert "const activeLoads=new Map()" in HTML
+    for label in ("INCIDENTS", "EMERGING", "FUSION", "SOCIAL", "HAZARDS", "RADAR", "SATELLITE"):
+        assert f"'{label}'" in HTML
+
+
 def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML
