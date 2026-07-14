@@ -47,6 +47,13 @@ def test_progressive_loading_keeps_context_off_incident_critical_path():
     assert "max_age_hours=${w}&limit=300" in HTML
 
 
+def test_signal_overlays_avoid_generic_dot_and_ring_markers():
+    assert "function fusedBeacon(e,z)" in HTML
+    assert "function socialSignal(s,z,corro)" in HTML
+    assert "color:'#d7dde5'" not in HTML
+    assert "className:'soc'" not in HTML
+
+
 def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML

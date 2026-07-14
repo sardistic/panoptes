@@ -200,10 +200,6 @@
     animation:surgepulse 2.8s ease-in-out infinite}
   @keyframes surgepulse{0%,100%{transform:scale(.65);opacity:.45}50%{transform:scale(1.15);opacity:.9}}
 
-  /* ── social firehose markers (teal diamond; glows when near official activity) ── */
-  .soc i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;background:#37c0d8;
-    transform:rotate(45deg);opacity:.5;pointer-events:auto;cursor:pointer;border-radius:1px}
-  .soc.corro i{opacity:1;width:10px;height:10px;left:-5px;top:-5px;box-shadow:0 0 8px #37c0d8}
   .haz i{display:block;width:7px;height:7px;font-size:0;background:var(--hc);border-radius:50%;
     box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
   button#hazardsBtn.on .led{background:#37c0d8}
@@ -901,6 +897,33 @@ function incidentTick(d,z){
   }).on('click',()=>openIncident(d));
 }
 
+function screenOffset(lat,lon,dx,dy,z){
+  const mpp=156543.03*Math.cos(lat*Math.PI/180)/Math.pow(2,z);
+  return [lat-dy*mpp/111320,lon+dx*mpp/(111320*Math.max(.2,Math.cos(lat*Math.PI/180)))];
+}
+
+// Corroboration is a forked intelligence beacon: convergence without another ring.
+function fusedBeacon(e,z){
+  const size=5+Math.min(6,Math.log2(1+(+e.count||0))), c=[e.lat,e.lon];
+  return L.polyline([
+    screenOffset(e.lat,e.lon,0,size,z),c,
+    screenOffset(e.lat,e.lon,-size*.72,-size*.5,z),c,
+    screenOffset(e.lat,e.lon,size*.72,-size*.5,z)
+  ],{color:'#d2a34a',weight:1.7,opacity:.9,lineCap:'square',lineJoin:'miter',interactive:true});
+}
+
+// Social evidence is a quiet diagonal stroke; corroborated posts receive a second
+// parallel stroke. Both stay on the shared Leaflet canvas—no animated DOM glyphs.
+function socialSignal(s,z,corro){
+  const size=corro?5:3.5, lines=[L.polyline([
+    screenOffset(s.lat,s.lon,-size,size,z),screenOffset(s.lat,s.lon,size,-size,z)
+  ],{color:'#4fb7bd',weight:corro?1.8:1.2,opacity:corro?.9:.48,interactive:true})];
+  if(corro) lines.push(L.polyline([
+    screenOffset(s.lat,s.lon,-size+2,size,z),screenOffset(s.lat,s.lon,size+2,-size,z)
+  ],{color:'#d2a34a',weight:1,opacity:.72,interactive:true}));
+  return L.featureGroup(lines);
+}
+
 function draw(){
   const scoped = inView(applyFilters(currentData));
   markers.clearLayers();
@@ -911,19 +934,18 @@ function draw(){
     if(z<10 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
     incidentTick(d,z).addTo(markers);
   });
-  // multi-source corroborated events: a bright open ring, distinct from red dots
+  // multi-source corroborated events: warm forked beacons, never generic rings
   fusedLayer.clearLayers();
   const fb=map.getBounds();
   fusedEvents.filter(e=>e.lat!=null && fb.contains([e.lat,e.lon])).forEach(e=>{
-    const m=L.circleMarker([e.lat,e.lon],{radius:9+Math.min(13,e.count/3),
-      color:'#d7dde5',weight:2,fill:false,opacity:.9});
+    const m=fusedBeacon(e,z);
     m.bindTooltip(`CORROBORATED · ${esc(Object.keys(e.sources||{}).join('+'))} · ${Number(e.count)||0} signals`,{direction:'top'});
     m.on('click',()=>showCorrelation(e.lat,e.lon,Object.keys(e.types||{}).slice(0,3).join(','),
       `<div class="meta">${esc(String(e.assessment||'single_source').replace(/_/g,' '))} · score ${(+e.surge_score).toFixed(2)} · `
       +`${esc(Object.entries(e.sources||{}).map(([k,v])=>k+' '+v).join(' · '))} · conf ${(+e.confidence).toFixed(2)} · severity ${(+e.mean_severity).toFixed(2)}</div>`));
     m.addTo(fusedLayer);
   });
-  // social/news firehose — teal diamonds; glow when near official CAD activity (city radius)
+  // social/news firehose — canvas slashes; a gold twin marks corroboration
   socialLayer.clearLayers();
   const officialCells=new Set(currentData.map(d=>`${Math.floor(d.lat*4)},${Math.floor(d.lon*4)}`));
   const nearOfficial=s=>{
@@ -935,8 +957,7 @@ function draw(){
   socialPosts.filter(s=>s.lat!=null && fb.contains([s.lat,s.lon]))
     .map(s=>({s,corro:nearOfficial(s)}))
     .filter(x=>z>=8||x.corro).slice(0,z>=8?500:120).forEach(({s,corro})=>{
-    const m=L.marker([s.lat,s.lon],{icon:L.divIcon({className:'soc'+(corro?' corro':''),
-      html:'<i></i>',iconSize:[0,0]})});
+    const m=socialSignal(s,z,corro);
     m.bindTooltip(`SOCIAL · ${esc(s.source||'bluesky')}${corro?' · near official activity':''}`,{direction:'top'});
     m.on('click',()=>openSocial(s,corro));
     m.addTo(socialLayer);
