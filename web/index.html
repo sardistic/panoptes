@@ -27,6 +27,7 @@
   .mono{font-family:var(--mono);font-feature-settings:"tnum" 1}
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
+  .incident-field{pointer-events:none;mix-blend-mode:screen;opacity:.88}
   /* candle-dust grain over the basemap */
   #map::after{content:"";position:absolute;inset:0;z-index:300;pointer-events:none;
     background-image:radial-gradient(circle,rgba(228,192,118,.5) 0 .4px,transparent .65px),
@@ -114,6 +115,11 @@
   #count{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1.1;
     letter-spacing:-.01em;padding:9px 16px 13px;border-bottom:1px solid var(--line)}
   #count small{font-family:var(--font);font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.04em}
+  #fieldKey{padding:7px 16px 8px;border-bottom:1px solid var(--line);display:flex;gap:5px 10px;
+    flex-wrap:wrap;font:600 7px/1 var(--font);letter-spacing:.11em;color:var(--dimmer);text-transform:uppercase}
+  #fieldKey .meaning{flex-basis:100%;color:var(--dim);letter-spacing:.14em;margin-bottom:1px}
+  #fieldKey span:not(.meaning){display:flex;align-items:center;gap:4px}
+  #fieldKey i{width:9px;height:2px;background:var(--fc);box-shadow:0 0 4px var(--fc);display:block}
   #feed{margin:0;padding:4px 16px 14px;overflow:auto;display:flex;flex-direction:column}
   #feed::-webkit-scrollbar{width:0}
   .row{padding:10px 0;border-top:1px solid var(--line);cursor:pointer;transition:background .12s}
@@ -266,7 +272,7 @@
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
-    <button id="goesBtn" class="on" aria-pressed="true" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
+    <button id="goesBtn" aria-pressed="false" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
   </span></label>
   <span class="spacer"></span>
   <span class="pill" id="loadPill" role="status" aria-live="polite" hidden>
@@ -282,6 +288,12 @@
 <div id="side" class="hud">
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
   <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
+  <div id="fieldKey" aria-label="Incident light colors">
+    <span class="meaning">Light = activity above local rate</span>
+    <span style="--fc:#b96a66"><i></i>Violence</span><span style="--fc:#c8894d"><i></i>Fire</span>
+    <span style="--fc:#a97979"><i></i>Medical</span><span style="--fc:#b3a05e"><i></i>Traffic</span>
+    <span style="--fc:#8f7f9f"><i></i>Suspicious</span><span style="--fc:#718b88"><i></i>Public</span>
+  </div>
   <div id="feed"></div>
 </div>
 
@@ -298,7 +310,6 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
 <script>
@@ -733,16 +744,72 @@ setInterval(updateCelestial, 300000);           // sky changes slowly; avoid min
 map.on('moveend', relightTerrain);               // light azimuth depends on where you look
 updateCelestial();
 
-// City lights are the ambient baseline. Incidents lift out of them as a living,
-// time-decaying activity field: broad candle-gold volume plus a tighter red core.
-// Ordinary points only resolve at street zoom; the national view reads as energy,
-// not a pinboard.
-let heat = L.heatLayer([], {radius:34, blur:29, maxZoom:15, max:1.0, minOpacity:.08,
-  gradient:{0.0:'#3e493f',0.28:'#756b42',0.58:'#d49a32',0.82:'#b4432e',1.0:'#a8202c'}})
-  .addTo(map);
-let spikeHeat = L.heatLayer([], {radius:21, blur:16, maxZoom:15, max:1.0, minOpacity:.04,
-  gradient:{0.0:'#66452d',0.48:'#df8d2c',0.78:'#c73335',1.0:'#f05a52'}})
-  .addTo(map);
+// One screen-binned canvas replaces two heat canvases and thousands of raw points.
+// NASA city lights remain the expected urban baseline; only incident energy above
+// that baseline is painted, with quiet family hues and alertness expressed as light.
+const FIELD_COLORS={
+  violence:'#b96a66', fire:'#c8894d', medical:'#a97979',
+  traffic:'#b3a05e', suspicious:'#8f7f9f', public:'#718b88', other:'#7d8173'
+};
+function incidentFamily(type){
+  const t=String(type||'').toLowerCase();
+  if(/shoot|gun|weapon|assault|robbery|stabb|violent|homicide/.test(t)) return 'violence';
+  if(/fire|smoke|explosion|hazmat/.test(t)) return 'fire';
+  if(/medical|ems|overdose|cardiac|injur|welfare/.test(t)) return 'medical';
+  if(/traffic|crash|collision|vehicle|road/.test(t)) return 'traffic';
+  if(/suspicious|disturb|alarm|burglary|theft/.test(t)) return 'suspicious';
+  if(/police|public|assist|service/.test(t)) return 'public';
+  return 'other';
+}
+function hexRgb(hex){ return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)); }
+const IncidentField=L.Layer.extend({
+  initialize(){ this._data=[]; },
+  onAdd(m){
+    this._map=m; this._canvas=L.DomUtil.create('canvas','incident-field leaflet-zoom-animated');
+    m.getPane('overlayPane').appendChild(this._canvas);
+    m.on('resize',this.redraw,this); this.redraw();
+  },
+  onRemove(m){ m.off('resize',this.redraw,this); this._canvas.remove(); },
+  setData(data){ this._data=data||[]; this.redraw(); },
+  redraw(){
+    if(!this._map||!this._canvas) return;
+    const m=this._map,size=m.getSize(),dpr=Math.min(1.5,window.devicePixelRatio||1),z=m.getZoom();
+    this._canvas.width=Math.round(size.x*dpr); this._canvas.height=Math.round(size.y*dpr);
+    this._canvas.style.width=`${size.x}px`; this._canvas.style.height=`${size.y}px`;
+    L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
+    const ctx=this._canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+    const cell=z<6?34:z<9?28:z<12?22:18,bins=new Map(),now=Date.now()/1000;
+    for(const d of this._data){
+      const p=m.latLngToContainerPoint([d.lat,d.lon]);
+      if(p.x<-cell||p.y<-cell||p.x>size.x+cell||p.y>size.y+cell) continue;
+      const key=`${Math.floor(p.x/cell)},${Math.floor(p.y/cell)}`;
+      let b=bins.get(key);
+      if(!b){ b={x:0,y:0,n:0,energy:0,peak:0,families:{}}; bins.set(key,b); }
+      const alert=alertWeight(d,now);
+      const family=incidentFamily(d.type);
+      b.x+=p.x*alert; b.y+=p.y*alert; b.energy+=alert; b.n++;
+      b.peak=Math.max(b.peak,alert); b.families[family]=(b.families[family]||0)+alert;
+    }
+    for(const b of bins.values()){
+      if(!b.energy) continue;
+      const family=Object.entries(b.families).sort((a,c)=>c[1]-a[1])[0][0];
+      const rgb=hexRgb(FIELD_COLORS[family]),x=b.x/b.energy,y=b.y/b.energy;
+      const density=Math.min(1,Math.log1p(b.energy)/Math.log(9));
+      const radius=9+(z<7?14:10)*density+7*b.peak;
+      const alpha=.035+.13*density+.12*b.peak;
+      const g=ctx.createRadialGradient(x,y,0,x,y,radius);
+      g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);
+      g.addColorStop(.42,`rgba(${rgb.join(',')},${alpha*.48})`);
+      g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
+      ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+      if(b.peak>.72){
+        ctx.strokeStyle=`rgba(${rgb.join(',')},${Math.min(.68,alpha*2.3)})`;
+        ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,y-3-b.peak*3);ctx.lineTo(x,y+3+b.peak*3);ctx.stroke();
+      }
+    }
+  }
+});
+let incidentField=new IncidentField().addTo(map);
 let markers   = L.layerGroup().addTo(map);
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
@@ -758,6 +825,7 @@ let fusedEvents = [];          // multi-source fused events (/live/fused)
 let socialPosts = [];          // placed social/news signals (/live/social)
 let seenIds = new Set(), primed = false;
 let showSpikes = true, showSurges = true, surgeAlerts = [];
+let rateSignalByMetro = new Map(); // positive rate-vs-normal signal, including sub-alert levels
 let showHazards = false, hazardData = [];   // off by default; opt-in extra-signal layer
 let fitNext = false;
 const US_BOUNDS = [[24.5,-125.0],[49.5,-66.5]];
@@ -873,15 +941,18 @@ function eventWeight(d, now){
   const recency=Math.max(.16, Math.exp(-age/(windowSeconds*.42)));
   return Math.min(1, (.2+.8*(+d.threat_score||0))*recency);
 }
+function alertWeight(d,now){
+  const threat=+d.threat_score||0,rate=Math.min(1,(rateSignalByMetro.get(d.metro)||0)/4);
+  // Routine urban volume stays close to the VIIRS baseline. Rate deviation,
+  // severity, and emerging classification are what make a cell visibly lift.
+  const gain=.28+.42*rate+.3*threat;
+  return Math.min(1,eventWeight(d,now)*gain*(d.emerging?1.22:1));
+}
 
 function drawActivityField(){
-  const now=Date.now()/1000, z=map.getZoom();
-  heat.setOptions({radius:z<6?22:z<9?30:38,blur:z<6?20:z<9?25:30});
-  spikeHeat.setOptions({radius:z<6?13:z<9?18:24,blur:z<6?12:z<9?15:18});
-  heat.setLatLngs(activityPoints.map(d=>[d.lat,d.lon,eventWeight(d,now)]));
-  spikeHeat.setLatLngs(showSpikes ? activityPoints.filter(d=>d.threat_score>=.62)
-    .map(d=>[d.lat,d.lon,eventWeight(d,now)*Math.max(0,(d.threat_score-.5)*2)]) : []);
-  const energy=activityPoints.reduce((n,d)=>n+eventWeight(d,now),0);
+  const now=Date.now()/1000;
+  incidentField.setData(showSpikes?activityPoints:activityPoints.filter(d=>d.threat_score<HIGH_THREAT));
+  const energy=activityPoints.reduce((n,d)=>n+alertWeight(d,now),0);
   setCityLightSignal(glMapRef,Math.min(1,Math.log1p(energy)/Math.log(90)));
 }
 
@@ -930,8 +1001,9 @@ function draw(){
   const z = map.getZoom();
   activityPoints=scoped;
   drawActivityField();
-  scoped.forEach(d=>{
-    if(z<10 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
+  scoped.slice().sort((a,b)=>(b.threat_score-a.threat_score)||((b.ts||0)-(a.ts||0)))
+    .slice(0,250).forEach(d=>{
+    if(z<12 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
     incidentTick(d,z).addTo(markers);
   });
   // multi-source corroborated events: warm forked beacons, never generic rings
@@ -956,7 +1028,7 @@ function draw(){
   };
   socialPosts.filter(s=>s.lat!=null && fb.contains([s.lat,s.lon]))
     .map(s=>({s,corro:nearOfficial(s)}))
-    .filter(x=>z>=8||x.corro).slice(0,z>=8?500:120).forEach(({s,corro})=>{
+    .filter(x=>z>=9||x.corro).slice(0,120).forEach(({s,corro})=>{
     const m=socialSignal(s,z,corro);
     m.bindTooltip(`SOCIAL · ${esc(s.source||'bluesky')}${corro?' · near official activity':''}`,{direction:'top'});
     m.on('click',()=>openSocial(s,corro));
@@ -1198,10 +1270,11 @@ function openSocial(s, corro){
 async function loadAlerts(){
   return withLoad('SURGES',async()=>{
     let alerts=[];
-    try{ alerts = await (await fetch('/baseline/anomalies?window_hours=1&lookback_hours=72&z=2')).json(); }
+    try{ alerts = await (await fetch('/baseline/anomalies?window_hours=1&lookback_hours=72&z=0')).json(); }
     catch(e){ return; }
+    rateSignalByMetro=new Map(alerts.map(a=>[a.metro,+a.zscore||0]));
     // attach a map point + keep the strongest first so the pill jumps to the top surge
-    surgeAlerts = alerts
+    surgeAlerts = alerts.filter(a=>(+a.zscore||0)>=2)
       .map(a=>({...a, _c:(a.lat!=null&&a.lon!=null)?[a.lat,a.lon]:CENTERS[a.metro]}))
       .filter(a=>a._c).sort((x,y)=>(y.zscore||0)-(x.zscore||0));
     const pill=document.getElementById('alertPill');
@@ -1450,7 +1523,7 @@ function setGoes(on){
   }
 }
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
-setGoes(true);
+setGoes(false);                 // expensive imagery is opt-in; alert field stays primary
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
 let moveT=null;

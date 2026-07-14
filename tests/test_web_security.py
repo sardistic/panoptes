@@ -54,6 +54,18 @@ def test_signal_overlays_avoid_generic_dot_and_ring_markers():
     assert "className:'soc'" not in HTML
 
 
+def test_single_canvas_alert_field_uses_city_light_baseline():
+    assert "const IncidentField=L.Layer.extend" in HTML
+    assert "incidentField.setData" in HTML
+    assert "L.heatLayer" not in HTML
+    assert "leaflet.heat" not in HTML
+    assert "FIELD_COLORS" in HTML
+    assert "rateSignalByMetro" in HTML
+    assert "lookback_hours=72&z=0" in HTML
+    assert "setGoes(false)" in HTML
+    assert 'Light = activity above local rate' in HTML
+
+
 def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML
