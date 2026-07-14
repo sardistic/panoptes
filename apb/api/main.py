@@ -16,6 +16,7 @@ import os
 import asyncio
 import threading
 import time as _time
+import httpx
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -541,6 +542,21 @@ def live_hazards(source: str | None = Query(None, max_length=30),
                 out.append(d)
     out.sort(key=lambda d: d.get("ts") or 0, reverse=True)
     return out
+
+
+@app.get("/live/environment")
+def live_environment():
+    """Coarse, model-derived environmental context: thermal moisture, recent rain,
+    UV, PM2.5 and US AQI. Shared ten-minute cache keeps this field inexpensive."""
+    from apb.ingest.environment import fetch_environment
+
+    def _build():
+        try:
+            return fetch_environment()
+        except (httpx.HTTPError, ValueError, KeyError, IndexError) as exc:
+            log.warning("environment field fetch failed: %s", exc)
+            return []
+    return _cached(("environment",), 600.0, _build)
 
 
 @app.get("/live/traffic")

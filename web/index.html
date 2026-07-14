@@ -28,6 +28,8 @@
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
   .incident-field{pointer-events:none;mix-blend-mode:screen;opacity:.88}
+  .environment-field{pointer-events:none;mix-blend-mode:soft-light;opacity:.58}
+  .leaflet-container,.leaflet-interactive{cursor:crosshair!important}
   /* candle-dust grain over the basemap */
   #map::after{content:"";position:absolute;inset:0;z-index:300;pointer-events:none;
     background-image:radial-gradient(circle,rgba(228,192,118,.5) 0 .4px,transparent .65px),
@@ -209,8 +211,14 @@
   .haz i{display:block;width:7px;height:7px;font-size:0;background:var(--hc);border-radius:50%;
     box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
   button#hazardsBtn.on .led{background:#37c0d8}
+  button#warningsBtn.on .led{background:#d98a2b}
+  button#envBtn.on .led{background:#718b88}
   button#goesBtn.on .led{background:#7fb8e0}
   button#radarBtn.on .led{background:#62cf72;box-shadow:0 0 7px rgba(98,207,114,.65)}
+  #envReadout{right:16px;bottom:48px;padding:8px 11px;max-width:430px;
+    font:500 9px/1.45 var(--mono);color:var(--dim);letter-spacing:.035em}
+  #envReadout b{color:var(--txt-2);font-weight:600}
+  #envReadout i{display:inline-block;width:8px;height:2px;background:var(--ec);margin-right:5px;vertical-align:middle}
 
   /* ── compact density ── */
   body.compact #side{width:300px}
@@ -227,7 +235,7 @@
       overflow:auto;align-content:flex-start}
     #top .spacer{display:none}
     #top .brand{font-size:15px}
-    #top .sub,#footer{display:none}
+    #top .sub,#footer,#envReadout{display:none}
     #top .ctl{flex:1 1 42%;min-width:130px}
     #top select{width:100%;max-width:none}
     #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
@@ -270,7 +278,9 @@
   <label class="ctl">Alerts<span class="segwrap">
     <button id="spikesBtn" class="on" aria-pressed="true" title="emphasize high-threat activity"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
+    <button id="warningsBtn" class="on" aria-pressed="true" title="active NWS warning footprints"><span class="led"></span>WARNINGS</button>
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
+    <button id="envBtn" class="on" aria-pressed="true" title="combined thermal, moisture, rain, UV and air-quality field"><span class="led"></span>ENV</button>
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
     <button id="goesBtn" aria-pressed="false" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
   </span></label>
@@ -281,6 +291,8 @@
   <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
     <span id="alertCount">0</span> SURGE</span>
 </div>
+
+<div id="envReadout" class="hud" hidden></div>
 
 <!-- Hazard family filter: its own single-row deck (shown only while HAZARDS is on) -->
 <div id="hazFilter" class="hud hazfilter" style="display:none"></div>
@@ -329,17 +341,29 @@ const safeLink = value => {
 // Reference-counted because SSE snapshots and manual layer toggles can overlap.
 // The pill names actual pending data instead of displaying an ambiguous spinner.
 const activeLoads=new Map();
+let loadTicker=null,completedLoad=null,completedTimer=null;
 function updateLoadPill(){
-  const pill=document.getElementById('loadPill'), labels=[...activeLoads.keys()];
-  pill.hidden=!labels.length;
+  const pill=document.getElementById('loadPill'),now=performance.now();
+  const labels=[...activeLoads.entries()].map(([label,r])=>`${label} ${((now-r.started)/1000).toFixed(1)}s`);
+  pill.hidden=!labels.length&&!completedLoad;
   document.getElementById('loadText').textContent=labels.length
-    ? `LOADING · ${labels.slice(0,3).join(' + ')}${labels.length>3?` +${labels.length-3}`:''}`
-    : 'LOADING';
+    ? `LOADING · ${labels.slice(0,2).join(' + ')}${labels.length>2?` +${labels.length-2}`:''}`
+    : completedLoad ? `LOADED · ${completedLoad.label} ${completedLoad.seconds.toFixed(1)}s` : 'LOADING';
 }
-function beginLoad(label){ activeLoads.set(label,(activeLoads.get(label)||0)+1); updateLoadPill(); }
+function beginLoad(label){
+  const r=activeLoads.get(label)||{count:0,started:performance.now()}; r.count++;
+  activeLoads.set(label,r); completedLoad=null; clearTimeout(completedTimer); updateLoadPill();
+  if(!loadTicker) loadTicker=setInterval(updateLoadPill,200);
+}
 function endLoad(label){
-  const n=(activeLoads.get(label)||0)-1;
-  if(n>0) activeLoads.set(label,n); else activeLoads.delete(label);
+  const r=activeLoads.get(label); if(!r) return;
+  if(--r.count>0) activeLoads.set(label,r);
+  else{
+    activeLoads.delete(label);
+    completedLoad={label,seconds:(performance.now()-r.started)/1000};
+    clearTimeout(completedTimer); completedTimer=setTimeout(()=>{completedLoad=null;updateLoadPill();},2200);
+  }
+  if(!activeLoads.size){clearInterval(loadTicker);loadTicker=null;}
   updateLoadPill();
 }
 async function withLoad(label,fn){
@@ -362,7 +386,7 @@ const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 const map = L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true})
   .setView([39.5, -98.35], 4);   // canvas renderer: thousands of incident dots stay fast
 map.attributionControl.setPrefix(false);
-map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a> · Terrain <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen/AWS</a> · Lights <a href="https://earthdata.nasa.gov/gibs">NASA</a>');
+map.attributionControl.addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a> · Terrain <a href="https://registry.opendata.aws/terrain-tiles/">Mapzen/AWS</a> · Lights <a href="https://earthdata.nasa.gov/gibs">NASA</a> · Environment <a href="https://open-meteo.com/">Open-Meteo</a> / CAMS');
 L.control.zoom({position:'topright'}).addTo(map);
 
 // Zoom ramp for the city-lights glow; f scales overall intensity so the breathing
@@ -809,6 +833,56 @@ const IncidentField=L.Layer.extend({
     }
   }
 });
+const ENV_COLORS={thermal:'#b7836b',moisture:'#668791',rain:'#527c98',uv:'#b49b64',aqi:'#82728b'};
+function environmentScores(d){
+  const apparent=+d.apparent_c||+d.temperature_c||0,dew=+d.dewpoint_c||0,rh=+d.humidity||0;
+  return {
+    thermal:Math.max(0,Math.min(1,(apparent-27)/14))*Math.max(.45,rh/100),
+    moisture:Math.max(0,Math.min(1,(dew-16)/12))*Math.max(.35,rh/100),
+    rain:Math.min(1,((+d.rain_6h_mm||0)+(+d.precipitation_mm||0)*2)/28),
+    uv:Math.min(1,(+d.uv||0)/11),
+    aqi:Math.max(0,Math.min(1,((+d.us_aqi||0)-45)/155))
+  };
+}
+const EnvironmentField=L.Layer.extend({
+  initialize(){this._data=[];},
+  onAdd(m){
+    this._map=m;this._canvas=L.DomUtil.create('canvas','environment-field leaflet-zoom-animated');
+    m.getPane('overlayPane').appendChild(this._canvas);m.on('resize',this.redraw,this);this.redraw();
+  },
+  onRemove(m){m.off('resize',this.redraw,this);this._canvas.remove();},
+  setData(data){this._data=data||[];this.redraw();},
+  redraw(){
+    if(!this._map||!this._canvas)return;
+    const m=this._map,size=m.getSize(),dpr=Math.min(1.25,window.devicePixelRatio||1),z=m.getZoom();
+    this._canvas.width=Math.round(size.x*dpr);this._canvas.height=Math.round(size.y*dpr);
+    this._canvas.style.width=`${size.x}px`;this._canvas.style.height=`${size.y}px`;
+    L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
+    const ctx=this._canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+    const radius=z<5?115:z<7?100:82,visible=[];
+    for(const d of this._data){
+      const p=m.latLngToContainerPoint([d.lat,d.lon]);
+      if(p.x>-radius&&p.y>-radius&&p.x<size.x+radius&&p.y<size.y+radius)visible.push({d,p});
+    }
+    // At street zoom the coarse model cell becomes a quiet local wash rather than
+    // disappearing just because its sample center lies outside the viewport.
+    if(!visible.length&&this._data.length){
+      const c=m.getCenter(),d=this._data.slice().sort((a,b)=>
+        Math.hypot(a.lat-c.lat,a.lon-c.lng)-Math.hypot(b.lat-c.lat,b.lon-c.lng))[0];
+      visible.push({d,p:L.point(size.x/2,size.y/2),local:true});
+    }
+    for(const {d,p,local} of visible){
+      const scores=environmentScores(d),dominant=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+      if(!dominant||dominant[1]<.06)continue;
+      const rgb=hexRgb(ENV_COLORS[dominant[0]]),strength=dominant[1],r=local?Math.max(size.x,size.y)*.72:radius;
+      const alpha=(local?.035:.018)+strength*(local?.045:.07);
+      const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+      g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
+      ctx.fillStyle=g;ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
+    }
+  }
+});
+let environmentField=new EnvironmentField().addTo(map);
 let incidentField=new IncidentField().addTo(map);
 let markers   = L.layerGroup().addTo(map);
 let emergingLayer = L.layerGroup().addTo(map);
@@ -826,7 +900,9 @@ let socialPosts = [];          // placed social/news signals (/live/social)
 let seenIds = new Set(), primed = false;
 let showSpikes = true, showSurges = true, surgeAlerts = [];
 let rateSignalByMetro = new Map(); // positive rate-vs-normal signal, including sub-alert levels
-let showHazards = false, hazardData = [];   // off by default; opt-in extra-signal layer
+let showHazards = false, hazardData = [];
+let showWarnings = true, warningData = [];
+let showEnvironment = true, environmentData = [];
 let fitNext = false;
 const US_BOUNDS = [[24.5,-125.0],[49.5,-66.5]];
 
@@ -879,7 +955,7 @@ async function refreshSecondary(force=false,skipEmerging=false){
   if(!force && Date.now()-secondaryRefreshedAt<45000) return;
   const scope=document.getElementById('metro').value;
   secondaryRefresh=(async()=>{
-    const jobs=[loadAlerts(),loadFused(),loadSocial()];
+    const jobs=[loadAlerts(),loadFused(),loadSocial(),loadWarnings(),loadEnvironment()];
     if(!skipEmerging) jobs.unshift(loadEmerging());
     if(showHazards) jobs.push(loadHazards());
     await Promise.all(jobs);
@@ -1035,6 +1111,7 @@ function draw(){
     m.addTo(socialLayer);
   });
   drawHazards();
+  drawEnvironment();
   updateCount(scoped);
   if(isNational()) renderEmergingPanel();
   else renderIncidentPanel(scoped);
@@ -1125,6 +1202,37 @@ async function loadSocial(){     // social/news firehose posts (seed + live Blue
     catch(e){ socialPosts=[]; }
   });
 }
+async function loadWarnings(){
+  if(!showWarnings){warningData=[];return;}
+  return withLoad('WARNINGS',async()=>{
+    try{
+      const r=await fetch('/live/hazards?source=nws&max_age_hours=24');
+      warningData=(await r.json()).filter(d=>d.lat!=null&&d.lon!=null)
+        .map(d=>({...d,_cat:hazCat(d)}));
+    }catch(e){warningData=[];}
+  });
+}
+async function loadEnvironment(){
+  if(!showEnvironment){environmentData=[];return;}
+  return withLoad('ENVIRONMENT',async()=>{
+    try{environmentData=await (await fetch('/live/environment')).json();}
+    catch(e){environmentData=[];}
+  });
+}
+function drawEnvironment(){
+  environmentField.setData(showEnvironment?environmentData:[]);
+  const box=document.getElementById('envReadout');
+  if(!showEnvironment||!environmentData.length){box.hidden=true;return;}
+  const c=map.getCenter(),d=environmentData.slice().sort((a,b)=>
+    Math.hypot(a.lat-c.lat,a.lon-c.lng)-Math.hypot(b.lat-c.lat,b.lon-c.lng))[0];
+  const scores=environmentScores(d),dominant=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0][0];
+  const f=v=>v==null?'—':Math.round(v*9/5+32),inch=v=>v==null?'—':(v/25.4).toFixed(2);
+  box.style.setProperty('--ec',ENV_COLORS[dominant]);box.hidden=false;
+  box.innerHTML=`<i></i><b>${esc(dominant.toUpperCase())}</b> · ${f(d.temperature_c)}°F feels ${f(d.apparent_c)}°F`
+    +` · RH ${d.humidity??'—'}% · dew ${f(d.dewpoint_c)}°F · rain 6h ${inch(d.rain_6h_mm)}in`
+    +` · UV ${d.uv==null?'—':(+d.uv).toFixed(1)} · AQI ${d.us_aqi??'—'} · PM2.5 ${d.pm2_5??'—'}`
+    +` · <span style="opacity:.55">Open-Meteo / CAMS</span>`;
+}
 // extra-signal layer: quakes, weather, wildfire, traffic, aircraft, declarations (TFR/FEMA)
 // Each family is a `category` keyed off the row's `source`, independently filterable.
 const HAZ_STYLE = {
@@ -1213,17 +1321,18 @@ async function loadHazards(){
       const response=await fetch(`/live/hazards/all?max_age_hours=${Math.max(w,24)}`);
       if(!response.ok) throw new Error(`hazard aggregate ${response.status}`);
       hazardData = (await response.json())
-        .filter(d=>d.lat!=null && d.lon!=null)
+        .filter(d=>d.lat!=null && d.lon!=null && d.source!=='nws')
         .map(d=>({...d, _cat:hazCat(d)}));
     }catch(e){ hazardData=[]; }
   });
 }
 function drawHazards(){
   hazardLayer.clearLayers();
-  if(!showHazards) return;
+  if(!showHazards&&!showWarnings) return;
   const b=map.getBounds();
-  hazardData.filter(d=>b.contains([d.lat,d.lon]) && hazCats.has(d._cat))
-    .slice(0,1200).forEach(d=>{
+  const rows=[...(showWarnings?warningData:[]),...(showHazards?hazardData:[])];
+  rows.filter(d=>b.contains([d.lat,d.lon]) && hazCats.has(d._cat))
+    .sort((a,b)=>(b.threat_score||0)-(a.threat_score||0)).slice(0,260).forEach(d=>{
     const st = HAZ_STYLE[d._cat] || HAZ_STYLE.weather;
     const tooltip=`${esc(d.event||st.label)}${d.source?' · '+esc(d.source):''}`;
     const popupHtml=()=>`<div class="pop"><div class="kick" style="color:${st.c}">${esc(st.label)}</div>`
@@ -1466,6 +1575,18 @@ document.getElementById('hazardsBtn').onclick=async e=>{
   if(!showHazards){ hazardData=[]; hazardLayer.clearLayers(); }
   else { await loadHazards(); }
   draw();                         // quakes/weather/wildfire/traffic/aircraft/declarations layer
+};
+document.getElementById('warningsBtn').onclick=async e=>{
+  showWarnings=!showWarnings;e.currentTarget.classList.toggle('on',showWarnings);
+  e.currentTarget.setAttribute('aria-pressed',String(showWarnings));
+  if(showWarnings)await loadWarnings();else warningData=[];
+  drawHazards();
+};
+document.getElementById('envBtn').onclick=async e=>{
+  showEnvironment=!showEnvironment;e.currentTarget.classList.toggle('on',showEnvironment);
+  e.currentTarget.setAttribute('aria-pressed',String(showEnvironment));
+  if(showEnvironment&&!environmentData.length)await loadEnvironment();
+  drawEnvironment();
 };
 document.getElementById('alertPill').onclick=()=>{ if(surgeAlerts.length) focusSurge(surgeAlerts[0]); };
 // Current CONUS NEXRAD base reflectivity. IEM mosaics the NWS radar network into

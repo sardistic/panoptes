@@ -35,7 +35,8 @@ def test_map_animation_budget_and_emerging_fallback():
 def test_loading_indicator_names_overlapping_sources():
     assert 'id="loadPill"' in HTML
     assert "const activeLoads=new Map()" in HTML
-    for label in ("INCIDENTS", "EMERGING", "FUSION", "SOCIAL", "HAZARDS", "RADAR", "SATELLITE"):
+    for label in ("INCIDENTS", "EMERGING", "FUSION", "SOCIAL", "HAZARDS", "WARNINGS",
+                  "ENVIRONMENT", "RADAR", "SATELLITE"):
         assert f"'{label}'" in HTML
 
 
@@ -64,6 +65,18 @@ def test_single_canvas_alert_field_uses_city_light_baseline():
     assert "lookback_hours=72&z=0" in HTML
     assert "setGoes(false)" in HTML
     assert 'Light = activity above local rate' in HTML
+
+
+def test_environment_field_warning_layer_and_load_stopwatch():
+    assert "const EnvironmentField=L.Layer.extend" in HTML
+    assert "environmentScores" in HTML
+    assert "'/live/environment'" in HTML
+    assert 'id="envReadout"' in HTML
+    assert 'id="warningsBtn"' in HTML
+    assert "source=nws" in HTML
+    assert "performance.now()-r.started" in HTML
+    assert "LOADED · ${completedLoad.label}" in HTML
+    assert "cursor:crosshair!important" in HTML
 
 
 def test_live_updates_use_sse_with_slow_fallback():
