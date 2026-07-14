@@ -805,8 +805,27 @@ function refreshTypeOptions(){
   sel.value = types.includes(keep) ? keep : '';
 }
 
-// ── data load (fetch once; draw() handles filters/viewport without refetch) ───
-async function load(providedData=null){
+// ── progressive data load ────────────────────────────────────────────────────
+// Fast cluster context paints first; incidents replace it immediately on arrival;
+// heavier correlation sources hydrate afterward and never block the primary map.
+let secondaryRefresh=null, secondaryRefreshedAt=0;
+async function refreshSecondary(force=false,skipEmerging=false){
+  if(!isNational()) return;
+  if(secondaryRefresh) return secondaryRefresh;
+  if(!force && Date.now()-secondaryRefreshedAt<45000) return;
+  const scope=document.getElementById('metro').value;
+  secondaryRefresh=(async()=>{
+    const jobs=[loadAlerts(),loadFused(),loadSocial()];
+    if(!skipEmerging) jobs.unshift(loadEmerging());
+    if(showHazards) jobs.push(loadHazards());
+    await Promise.all(jobs);
+    secondaryRefreshedAt=Date.now();
+    if(scope===document.getElementById('metro').value && isNational()) draw();
+  })().finally(()=>{ secondaryRefresh=null; });
+  return secondaryRefresh;
+}
+
+async function load(providedData=null,forceContext=false){
   if(paused) return;
   const metro = document.getElementById('metro').value;
   const w = winHours();
@@ -815,9 +834,14 @@ async function load(providedData=null){
   else if(LIVE_METROS.has(metro)){ url=`/live/incidents?metro=${metro}&max_age_hours=${w}`; label=`LIVE · ${winLabel()}`; }
   else { return; }
 
-  let data=providedData;
+  let data=providedData, previewed=false;
   try{
     if(data===null){
+      if(isNational() && !currentData.length){
+        if(emergingClusters.length) drawEmergingPreview();
+        else await loadEmerging(true);        // smallest useful payload becomes first paint
+        previewed=true;
+      }
       data=await withLoad('INCIDENTS',async()=>{
         const response=await fetch(url);
         if(!response.ok) throw new Error(`incidents ${response.status}`);
@@ -829,11 +853,8 @@ async function load(providedData=null){
   document.getElementById('status').textContent = label;
   currentData = data.filter(d=>d.lat!=null && d.lon!=null);
   refreshTypeOptions();
-  const secondary=[];
-  if(isNational()) secondary.push(loadEmerging(),loadAlerts(),loadFused(),loadSocial());
-  else { alertLayer.clearLayers(); fusedLayer.clearLayers(); socialLayer.clearLayers(); }
-  if(showHazards) secondary.push(loadHazards());
-  await Promise.all(secondary);
+  if(!isNational()){ alertLayer.clearLayers(); fusedLayer.clearLayers(); socialLayer.clearLayers(); }
+  // Primary data paints now. Context is deliberately not on this critical path.
   draw();
   pingNew(inView(applyFilters(currentData)));
   if(fitNext && currentData.length){
@@ -841,6 +862,8 @@ async function load(providedData=null){
     else map.fitBounds(currentData.map(d=>[d.lat,d.lon]),{padding:[40,40],maxZoom:14});
     fitNext=false;
   }
+  if(data===providedData && providedData!==null) return; // SSE: incidents only
+  void refreshSecondary(forceContext,previewed);
 }
 
 // ── draw: filtered + viewport-scoped render, city bubbles vs incident detail ──
@@ -978,11 +1001,21 @@ function renderEmergingPanel(){
 
 const EMERGING_HOURS = 6;   // emerging needs incidents to accumulate/converge —
                             // decouple its lookback from the (often short) display window
-async function loadEmerging(){
+function drawEmergingPreview(){
+  if(!emergingClusters.length || currentData.length) return;
+  activityPoints=emergingClusters.map(c=>({lat:c.lat,lon:c.lon,
+    threat_score:c.peak_threat,ts:c.latest_ts,call_id:`cluster:${c.metro}`}));
+  drawActivityField();
+  renderEmergingPanel();
+  document.getElementById('count').innerHTML=
+    `${emergingClusters.length}<small> cluster preview · incidents loading</small>`;
+}
+async function loadEmerging(preview=false){
   const w = Math.max(EMERGING_HOURS, +winHours());
   return withLoad('EMERGING',async()=>{
     try{ emergingClusters = await (await fetch(`/live/emerging?max_age_hours=${w}`)).json(); }
     catch(e){ emergingClusters=[]; }
+    if(isNational()){ preview ? drawEmergingPreview() : renderEmergingPanel(); }
   });
 }
 async function loadFused(){      // only multi-source events (CAD/radio + social corroboration)
@@ -995,7 +1028,7 @@ async function loadFused(){      // only multi-source events (CAD/radio + social
 async function loadSocial(){     // social/news firehose posts (seed + live Bluesky)
   const w = Math.max(EMERGING_HOURS, +winHours());
   return withLoad('SOCIAL',async()=>{
-    try{ socialPosts = await (await fetch(`/live/social?max_age_hours=${w}`)).json(); }
+    try{ socialPosts = await (await fetch(`/live/social?max_age_hours=${w}&limit=300`)).json(); }
     catch(e){ socialPosts=[]; }
   });
 }
@@ -1267,12 +1300,13 @@ async function openIncident(d){
 // ── controls ─────────────────────────────────────────────────────────────────
 document.getElementById('metro').onchange=e=>{
   const v=e.target.value; resetScope();
-  if(v==='__all__') map.fitBounds(US_BOUNDS,{padding:[20,20]});
+  currentData=[];
+  if(v==='__all__'){ map.fitBounds(US_BOUNDS,{padding:[20,20]}); drawEmergingPreview(); }
   else if(CENTERS[v]) map.flyTo(CENTERS[v],12);
   else fitNext=true;
-  load(); restartStream();
+  load(null,true); restartStream();
 };
-document.getElementById('window').onchange=()=>{ resetScope(); load(); restartStream(); };
+document.getElementById('window').onchange=()=>{ resetScope(); load(null,true); restartStream(); };
 document.getElementById('type').onchange=draw;
 document.getElementById('minThreat').onchange=draw;
 document.getElementById('spikesBtn').onclick=e=>{

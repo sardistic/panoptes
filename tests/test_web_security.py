@@ -39,6 +39,14 @@ def test_loading_indicator_names_overlapping_sources():
         assert f"'{label}'" in HTML
 
 
+def test_progressive_loading_keeps_context_off_incident_critical_path():
+    assert "await loadEmerging(true)" in HTML
+    assert "drawEmergingPreview()" in HTML
+    assert "void refreshSecondary(forceContext,previewed)" in HTML
+    assert "if(data===providedData && providedData!==null) return" in HTML
+    assert "max_age_hours=${w}&limit=300" in HTML
+
+
 def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML
