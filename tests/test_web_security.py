@@ -51,8 +51,12 @@ def test_progressive_loading_keeps_context_off_incident_critical_path():
 def test_signal_overlays_avoid_generic_dot_and_ring_markers():
     assert "function fusedBeacon(e,z)" in HTML
     assert "function socialSignal(s,z,corro)" in HTML
+    assert "function hazardBeacon(d,z,st)" in HTML
     assert "color:'#d7dde5'" not in HTML
     assert "className:'soc'" not in HTML
+    assert "className:'haz'" not in HTML
+    assert "L.circleMarker" not in HTML
+    assert "L.circle(" not in HTML
 
 
 def test_single_canvas_alert_field_uses_city_light_baseline():

@@ -27,7 +27,7 @@
   .mono{font-family:var(--mono);font-feature-settings:"tnum" 1}
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
-  .incident-field{pointer-events:none;mix-blend-mode:screen;opacity:.88}
+  .incident-field{pointer-events:none;mix-blend-mode:normal;opacity:.94}
   .environment-field{pointer-events:none;mix-blend-mode:screen;opacity:.8}
   .leaflet-container,.leaflet-interactive{cursor:crosshair!important}
   /* candle-dust grain over the basemap */
@@ -103,7 +103,7 @@
     padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;flex:0 0 auto;
     color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45;white-space:nowrap}
   .hazfilter .hchip.on{opacity:1;color:var(--txt-2);border-color:var(--line-3)}
-  .hazfilter .hchip i{width:7px;height:7px;border-radius:50%;background:var(--hcc);display:inline-block}
+  .hazfilter .hchip i{width:7px;height:2px;background:var(--hcc);display:inline-block}
   .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block;
     margin-right:6px;vertical-align:middle}
   button.on .led{background:var(--red)}
@@ -192,24 +192,22 @@
   .pop .empty{font:500 11px/1 var(--mono);color:var(--dim);margin-top:9px}
   .pop .f{font-size:11px;color:var(--dim);margin-top:4px;font-family:var(--mono)}
 
-  /* ── new-incident ping (one-shot ring, no glow) ── */
+  /* ── new-incident ping (one-shot diamond, no generic map ring) ── */
   .ping span{position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;
-    border-radius:50%;border:1.5px solid var(--accent);
+    border-radius:0;border:1.5px solid var(--accent);
     animation:ping 2s ease-out forwards;pointer-events:none}
   .ping.hi span{border-color:var(--hot)}
   .ping.mid span{border-color:var(--warn)}
-  @keyframes ping{0%{transform:scale(.3);opacity:.9}100%{transform:scale(5);opacity:0}}
+  @keyframes ping{0%{transform:rotate(45deg) scale(.3);opacity:.9}100%{transform:rotate(45deg) scale(4);opacity:0}}
   @keyframes fade{0%{opacity:0}15%{opacity:1}100%{opacity:0}}
 
-  /* ── surge: soft pulsing area glow (the one kept data pulse) ── */
-  .surge-halo span{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;
-    border-radius:50%;pointer-events:auto;cursor:pointer;
-    background:radial-gradient(circle,rgba(224,30,43,.34),rgba(224,30,43,0) 70%);
+  /* ── surge: open angular perimeter, clearly separate from incident fields ── */
+  .surge-halo span{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;
+    border:1px solid rgba(224,30,43,.72);pointer-events:auto;cursor:pointer;
+    background:rgba(224,30,43,.025);
     animation:surgepulse 2.8s ease-in-out infinite}
-  @keyframes surgepulse{0%,100%{transform:scale(.65);opacity:.45}50%{transform:scale(1.15);opacity:.9}}
+  @keyframes surgepulse{0%,100%{transform:rotate(45deg) scale(.72);opacity:.42}50%{transform:rotate(45deg) scale(1.15);opacity:.88}}
 
-  .haz i{display:block;width:7px;height:7px;font-size:0;background:var(--hc);border-radius:50%;
-    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 5px var(--hc);pointer-events:auto;cursor:pointer}
   button#hazardsBtn.on .led{background:#37c0d8}
   button#warningsBtn.on .led{background:#d98a2b}
   button#envBtn.on .led{background:#718b88}
@@ -819,17 +817,31 @@ const IncidentField=L.Layer.extend({
       const family=Object.entries(b.families).sort((a,c)=>c[1]-a[1])[0][0];
       const rgb=hexRgb(FIELD_COLORS[family]),x=b.x/b.energy,y=b.y/b.energy;
       const density=Math.min(1,Math.log1p(b.energy)/Math.log(9));
-      const radius=9+(z<7?14:10)*density+7*b.peak;
-      const alpha=.035+.13*density+.12*b.peak;
-      const g=ctx.createRadialGradient(x,y,0,x,y,radius);
-      g.addColorStop(0,`rgba(${rgb.join(',')},${alpha})`);
-      g.addColorStop(.42,`rgba(${rgb.join(',')},${alpha*.48})`);
-      g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
-      ctx.fillStyle=g; ctx.fillRect(x-radius,y-radius,radius*2,radius*2);
-      if(b.peak>.72){
-        ctx.strokeStyle=`rgba(${rgb.join(',')},${Math.min(.68,alpha*2.3)})`;
-        ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,y-3-b.peak*3);ctx.lineTo(x,y+3+b.peak*3);ctx.stroke();
+      const length=9+(z<7?23:17)*density+8*b.peak;
+      const alpha=.08+.18*density+.14*b.peak;
+      // Directional light filaments preserve the city-light vocabulary without
+      // turning dense bins into pale circular cluster badges. Orientation is stable
+      // per screen cell, so the texture does not shimmer while data refreshes.
+      const gx=Math.floor(x/cell),gy=Math.floor(y/cell);
+      const angle=((gx*37+gy*61)%157)/157*Math.PI;
+      ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.lineCap='butt';
+      for(const [offset,factor,width] of [[-2.4,.28,.65],[0,1,1.05],[2.4,.22,.55]]){
+        const g=ctx.createLinearGradient(-length*.55,0,length*.55,0);
+        g.addColorStop(0,`rgba(${rgb.join(',')},0)`);
+        g.addColorStop(.22,`rgba(${rgb.join(',')},${alpha*factor*.45})`);
+        g.addColorStop(.5,`rgba(${rgb.join(',')},${alpha*factor})`);
+        g.addColorStop(.78,`rgba(${rgb.join(',')},${alpha*factor*.38})`);
+        g.addColorStop(1,`rgba(${rgb.join(',')},0)`);
+        ctx.strokeStyle=g;ctx.lineWidth=width+density*.5;
+        ctx.beginPath();ctx.moveTo(-length*.55,offset+2*density);
+        ctx.bezierCurveTo(-length*.18,offset-2*density,length*.2,offset+2*density,length*.55,offset-1*density);
+        ctx.stroke();
       }
+      if(b.peak>.72){
+        ctx.strokeStyle=`rgba(${rgb.join(',')},${Math.min(.72,alpha*1.8)})`;
+        ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-1,-4-b.peak*3);ctx.lineTo(1,4+b.peak*3);ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 });
@@ -1369,6 +1381,28 @@ async function loadHazards(){
     }catch(e){ hazardData=[]; }
   });
 }
+// Hazards use category-shaped canvas strokes, never generic circular pins. The
+// silhouette carries meaning even when several subdued colors overlap.
+function hazardBeacon(d,z,st){
+  const s=4.5+Math.min(2,(+d.threat_score||0)*2),at=(dx,dy)=>screenOffset(d.lat,d.lon,dx,dy,z);
+  let paths;
+  if(['weather','severe','winter','cyclone','civil'].includes(d._cat)){
+    paths=[[[-s,s*.55],[0,-s],[s,s*.55]]];                    // warning chevron
+  }else if(['flood','marine','maritime','tsunami'].includes(d._cat)){
+    paths=[[[-s,-1],[-s*.35,1],[s*.35,-1],[s,1]]];           // water trace
+  }else if(['quake','disaster','volcano'].includes(d._cat)){
+    paths=[[[-s,-s],[s,s]],[[-s,s],[s,-s]]];                 // rupture
+  }else if(['traffic','rail','delay','aircraft','tfr'].includes(d._cat)){
+    paths=[[[-s,-2],[s,-2]],[[-s,2],[s,2]]];                 // transit rails
+  }else if(['fire','smoke','heat','airquality'].includes(d._cat)){
+    paths=[[[-s*.55,s],[s*.2,0],[-s*.1,-s]],[[s*.25,s],[s*.65,-s*.45]]]; // rising trace
+  }else{
+    paths=[[[-s,-s],[0,0],[s,-s]]];                          // quiet fork
+  }
+  return L.featureGroup(paths.map(path=>L.polyline(path.map(p=>at(p[0],p[1])),{
+    color:st.c,weight:1.45,opacity:.82,lineCap:'square',lineJoin:'miter',interactive:true
+  })));
+}
 function drawHazards(){
   hazardLayer.clearLayers();
   if(!showHazards&&!showWarnings) return;
@@ -1397,9 +1431,7 @@ function drawHazards(){
       area.addTo(hazardLayer);
       return;
     }
-    const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'haz',iconSize:[8,8],
-      iconAnchor:[4,4],
-      html:`<i style="--hc:${st.c}"></i>`})});
+    const m=hazardBeacon(d,map.getZoom(),st);
     m.bindTooltip(tooltip,{direction:'top'});
     m.on('click',()=>L.popup({maxWidth:340}).setLatLng([d.lat,d.lon])
       .setContent(popupHtml()).openOn(map));
