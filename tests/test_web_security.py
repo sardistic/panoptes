@@ -61,6 +61,10 @@ def test_signal_overlays_avoid_generic_dot_and_ring_markers():
 
 def test_single_canvas_alert_field_uses_city_light_baseline():
     assert "const IncidentField=L.Layer.extend" in HTML
+    incident_field = HTML.split("const IncidentField=L.Layer.extend", 1)[1].split(
+        "const ENV_COLORS", 1)[0]
+    assert "createRadialGradient" not in incident_field
+    assert "createLinearGradient" in incident_field
     assert "incidentField.setData" in HTML
     assert "L.heatLayer" not in HTML
     assert "leaflet.heat" not in HTML
