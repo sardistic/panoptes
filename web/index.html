@@ -1776,7 +1776,7 @@ function setGoes(on){
   }
 }
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
-setGoes(false);                 // expensive imagery is opt-in; alert field stays primary
+setGoes(true);                  // user decision: live GOES clouds are core to the map
 
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
 let moveT=null;
