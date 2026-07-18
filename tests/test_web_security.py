@@ -71,7 +71,7 @@ def test_single_canvas_alert_field_uses_city_light_baseline():
     assert "FIELD_COLORS" in HTML
     assert "rateSignalByMetro" in HTML
     assert "lookback_hours=72&z=0" in HTML
-    assert "setGoes(false)" in HTML
+    assert "setGoes(true)" in HTML
     assert 'Light = activity above local rate' in HTML
 
 
