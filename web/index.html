@@ -242,8 +242,18 @@
     .leaflet-control-attribution{margin:0 8px calc(34vh + 14px) 0!important;font-size:7px!important}
   }
 
+  /* ── severe incidents: angular ember sparks — desynced flicker, hard-capped ── */
+  .spark i{display:block;background:var(--sc);transform:rotate(45deg);
+    box-shadow:0 0 7px var(--sc);animation:sparkflick ease-in-out infinite}
+  @keyframes sparkflick{
+    0%,100%{opacity:.55;transform:rotate(45deg) scale(.8)}
+    22%{opacity:1;transform:rotate(45deg) scale(1.12)}
+    47%{opacity:.7;transform:rotate(45deg) scale(.9)}
+    71%{opacity:.95;transform:rotate(45deg) scale(1.05)}
+  }
+
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i{animation:none!important}
   }
 </style>
 </head>
@@ -800,6 +810,7 @@ const IncidentField=L.Layer.extend({
     this._canvas.style.width=`${size.x}px`; this._canvas.style.height=`${size.y}px`;
     L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
     const ctx=this._canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+    const T=this._t||0;   // animation clock (seconds); 0 = static frame
     const cell=z<6?34:z<9?28:z<12?22:18,bins=new Map(),now=Date.now()/1000;
     for(const d of this._data){
       const p=m.latLngToContainerPoint([d.lat,d.lon]);
@@ -818,11 +829,14 @@ const IncidentField=L.Layer.extend({
       const rgb=hexRgb(FIELD_COLORS[family]),x=b.x/b.energy,y=b.y/b.energy;
       const density=Math.min(1,Math.log1p(b.energy)/Math.log(9));
       const length=9+(z<7?23:17)*density+8*b.peak;
-      const alpha=.08+.18*density+.14*b.peak;
       // Directional light filaments preserve the city-light vocabulary without
       // turning dense bins into pale circular cluster badges. Orientation is stable
-      // per screen cell, so the texture does not shimmer while data refreshes.
+      // per screen cell; luminance breathes on a stable per-cell phase, so the
+      // field flickers like far-off windows while the geography holds still.
       const gx=Math.floor(x/cell),gy=Math.floor(y/cell);
+      const phase=((gx*53+gy*29)%97)/97*6.283;
+      const breathe=T?(.8+.2*Math.sin(T*.9+phase)):1;
+      const alpha=(.08+.18*density+.14*b.peak)*breathe;
       const angle=((gx*37+gy*61)%157)/157*Math.PI;
       ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.lineCap='butt';
       for(const [offset,factor,width] of [[-2.4,.28,.65],[0,1,1.05],[2.4,.22,.55]]){
@@ -838,7 +852,8 @@ const IncidentField=L.Layer.extend({
         ctx.stroke();
       }
       if(b.peak>.72){
-        ctx.strokeStyle=`rgba(${rgb.join(',')},${Math.min(.72,alpha*1.8)})`;
+        const flick=T?(.7+.3*Math.sin(T*3.2+phase)):1;   // hot cells flicker faster
+        ctx.strokeStyle=`rgba(${rgb.join(',')},${Math.min(.72,alpha*1.8*flick)})`;
         ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-1,-4-b.peak*3);ctx.lineTo(1,4+b.peak*3);ctx.stroke();
       }
       ctx.restore();
@@ -939,6 +954,17 @@ const EnvironmentField=L.Layer.extend({
 });
 let environmentField=new EnvironmentField().addTo(map);
 let incidentField=new IncidentField().addTo(map);
+// living field: ~12fps clock drives the per-cell breathing in IncidentField.redraw
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let fieldLast=0;
+  const fieldPulse=now=>{
+    if(!document.hidden && now-fieldLast>84){ fieldLast=now;
+      incidentField._t=now/1000; incidentField.redraw(); }
+    requestAnimationFrame(fieldPulse);
+  };
+  requestAnimationFrame(fieldPulse);
+}
+let sparkLayer = L.layerGroup().addTo(map);   // severe-incident embers (DOM, capped)
 let markers   = L.layerGroup().addTo(map);
 let emergingLayer = L.layerGroup().addTo(map);
 let pingLayer = L.layerGroup().addTo(map);
@@ -1137,6 +1163,19 @@ function draw(){
     if(z<12 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
     incidentTick(d,z).addTo(markers);
   });
+  // severe incidents keep a live ember at every zoom — the field's focal heartbeats,
+  // angular like the rest of the glyph language, desynced so they never strobe together
+  sparkLayer.clearLayers();
+  if(showSpikes) scoped.filter(d=>d.threat_score>=HIGH_THREAT)
+    .sort((a,b)=>b.threat_score-a.threat_score).slice(0,40).forEach(d=>{
+      const s=4+d.threat_score*4, col=sevColor(d.threat_score);
+      L.marker([d.lat,d.lon],{icon:L.divIcon({className:'spark',
+        iconSize:[s,s],iconAnchor:[s/2,s/2],
+        html:`<i style="--sc:${col};width:${s}px;height:${s}px;`
+          +`animation-duration:${(2.4-d.threat_score).toFixed(2)}s;`
+          +`animation-delay:${(-Math.random()*3).toFixed(2)}s"></i>`})})
+        .on('click',()=>openIncident(d)).addTo(sparkLayer);
+    });
   // multi-source corroborated events: warm forked beacons, never generic rings
   fusedLayer.clearLayers();
   const fb=map.getBounds();
@@ -1502,6 +1541,24 @@ function pingNew(pts){
   }
 }
 function resetScope(){ seenIds.clear(); primed=false; pingLayer.clearLayers(); }
+
+// ── ambient sparks: every few seconds a random fresh incident rings — the field
+// twinkles with activity even between data refreshes ──────────────────────────
+if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+  setInterval(()=>{
+    if(document.hidden || paused) return;
+    const pts = inView(applyFilters(currentData));
+    if(!pts.length) return;
+    const n = Math.min(3, Math.ceil(pts.length/120));
+    for(let i=0;i<n;i++){
+      const d = pts[(Math.random()*pts.length)|0];
+      const sev = d.threat_score>=0.7?'hi':d.threat_score>=0.45?'mid':'';
+      const m = L.marker([d.lat,d.lon],{icon:L.divIcon({className:'ping '+sev,
+        html:'<span></span>',iconSize:[0,0]}),interactive:false}).addTo(pingLayer);
+      setTimeout(()=>pingLayer.removeLayer(m),2100);
+    }
+  },3400);
+}
 
 // ── news correlation (shared by spikes, surge alerts, and incidents) ─────────
 function artRows(arts,n){
