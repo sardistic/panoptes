@@ -31,6 +31,10 @@ _EVENT_THREAT = {
     "disabledvehicle": ("traffic", 0.3), "weather": ("weather", 0.4),
     "closure": ("traffic", 0.35), "roadwork": ("traffic", 0.2),
     "construction": ("traffic", 0.2), "specialevent": ("other", 0.25),
+    # PennDOT RCRS event types (statewide, richer than 511pa)
+    "damagedroadway": ("traffic", 0.5), "debrisonroadway": ("traffic", 0.45),
+    "flooding": ("weather", 0.55), "bridgeoutage": ("traffic", 0.35),
+    "utilitywork": ("traffic", 0.2), "winterweather": ("weather", 0.5),
 }
 
 
@@ -69,6 +73,13 @@ SYSTEMS: dict[str, SystemSpec] = {
     "ne6": SystemSpec("ne6", "New England 511 Traffic",
                       "https://newengland511.org/api/getevents?key={key}&format=json",
                       state=None, env_key="T511_NE_KEY"),
+    # PennDOT RCRS_Event_Data web service — statewide live events, HTTP Basic auth
+    # with a CWOPA service account (PENNDOT_RCRS_USER / PENNDOT_RCRS_PW). Docs:
+    # pa.gov "Developer Resources Documentation/API". Richer than the keyed 511pa
+    # lane: fatality/hazmat/school-bus flags, lane status, verified timestamps.
+    "pa_rcrs": SystemSpec("pa_rcrs", "PennDOT RCRS Live Events",
+                          "https://eventsdata.dot.pa.gov/liveEvents",
+                          shape="rcrs", state="PA", env_key="PENNDOT_RCRS_USER"),
 }
 
 
@@ -95,12 +106,29 @@ def _parse_dt(s: str | None) -> float | None:
 class Traffic511:
     def __init__(self):
         self._client = httpx.Client(timeout=20.0, headers=_UA, follow_redirects=True)
+        self._rcrs_client = None   # built lazily; needs env credentials
 
     def fetch(self, key: str, include_planned: bool = False) -> list[dict]:
         import os
         spec = SYSTEMS.get(key)
         if not spec:
             return []
+        if spec.shape == "rcrs":
+            user = os.environ.get("PENNDOT_RCRS_USER", "").strip()
+            pw = os.environ.get("PENNDOT_RCRS_PW", "").strip()
+            if not user or not pw:
+                return []
+            # PennDOT terminates TLS with a Commonwealth-internal CA (self-signed
+            # root, verified 2026-07-13), so certifi can't validate this host.
+            if self._rcrs_client is None:
+                self._rcrs_client = httpx.Client(timeout=20.0, headers=_UA,
+                                                 auth=(user, pw), verify=False)
+            try:
+                data = self._rcrs_client.get(spec.url).json()
+            except (httpx.HTTPError, ValueError) as e:
+                log.warning(f"[511] {key} fetch failed: {e}")
+                return []
+            return self._rcrs(data, spec, include_planned)
         url = spec.url
         if spec.env_key:
             api_key = os.environ.get(spec.env_key, "").strip()
@@ -139,5 +167,54 @@ class Traffic511:
                 "threat_score": round(threat, 2), "emerging": threat >= 0.9,
                 "lat": float(lat), "lon": float(lon),
                 "at": r.get("Reported") or r.get("LastUpdated"), "ts": ts,
+            })
+        return out
+
+    def _rcrs(self, data, spec: SystemSpec, include_planned: bool) -> list[dict]:
+        """PennDOT RCRS liveEvents: {"values":[...]}; coords as "lat,lon" strings.
+        Timestamps are Pennsylvania local time, so they are parsed as Eastern —
+        treating them as UTC would age every event by 4-5 h and starve the
+        short live windows."""
+        from zoneinfo import ZoneInfo
+        eastern = ZoneInfo("America/New_York")
+
+        def local_ts(s):
+            if not s:
+                return None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    return datetime.strptime(s.strip(), fmt).replace(
+                        tzinfo=eastern).timestamp()
+                except ValueError:
+                    continue
+            return None
+
+        out = []
+        for r in (data.get("values") or []) if isinstance(data, dict) else []:
+            ll = r.get("incidentLocLatLong") or r.get("fromLocLatLong") or ""
+            try:
+                lat, lon = (float(x) for x in str(ll).split(","))
+            except (TypeError, ValueError):
+                continue                       # ~3/4 of records carry no point
+            etype = str(r.get("eventType") or "").lower()
+            itype, threat = _EVENT_THREAT.get(etype.replace(" ", ""), ("traffic", 0.3))
+            if not include_planned and threat <= 0.2:
+                continue                       # roadwork/utility: planned noise
+            if r.get("isHazmat") == "T":
+                threat = min(0.9, threat + 0.25)
+            if r.get("isFatality") == "T":
+                threat = max(threat, 0.85)
+            when = r.get("lastUpdate") or r.get("dateTimeNotified")
+            desc = r.get("description") or etype
+            loc = " ".join(x for x in (r.get("facility"), r.get("incidentMuniName")
+                                       or r.get("countyName")) if x) or None
+            out.append({
+                "call_id": f"{spec.key}:{r.get('eventID')}", "metro": f"t511_{spec.key}",
+                "type": itype, "summary": str(desc)[:280], "source": "511",
+                "location": loc,
+                "sentiment": _SENTIMENT[min(4, int(threat * 5))],
+                "threat_score": round(threat, 2), "emerging": threat >= 0.9,
+                "lat": lat, "lon": lon,
+                "at": when, "ts": local_ts(when),
             })
         return out
