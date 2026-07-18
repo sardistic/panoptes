@@ -67,7 +67,7 @@ def decrypt(payload: dict) -> object:
 
 class PulsePoint:
     def __init__(self):
-        self._client = httpx.Client(timeout=15.0, headers={"User-Agent": "apb/0.1"})
+        self._client = httpx.Client(timeout=15.0, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Referer": "https://web.pulsepoint.org/", "Origin": "https://web.pulsepoint.org"})
 
     def agencies(self, types=("fire", "ems", "law")) -> list[dict]:
         out, seen = [], set()
