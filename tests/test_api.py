@@ -109,3 +109,31 @@ def test_display_routes_never_fetch_upstream(client, monkeypatch):
                                                    "max_age_hours": 24}).status_code == 200
     assert client.get("/live/overview", params={"max_age_hours": 24}).status_code == 200
     assert client.get("/live/emerging", params={"max_age_hours": 24}).status_code == 200
+
+
+def test_readiness_tolerates_a_long_sweep(client, monkeypatch):
+    """A full national sweep runs ~870s, so a beat older than the old 600s bound
+    is ordinary mid-cycle progress, not a stalled poller. Only a gap wide enough
+    to mean two missed cycles should fail readiness."""
+    import time as _t
+
+    import apb.api.main as main
+
+    class _AliveThread:
+        def is_alive(self):
+            return True
+
+    monkeypatch.delenv("APB_POLLER_OFF", raising=False)
+    monkeypatch.setattr(main, "_poller_leader", True)
+    monkeypatch.setattr(main, "_poller_thread", _AliveThread())
+    monkeypatch.setattr(main, "_poller_election_error", None)
+
+    monkeypatch.setattr(main, "_poller_beat", {"n": 5, "at": _t.time() - 900})
+    mid_sweep = client.get("/health/ready")
+    assert mid_sweep.status_code == 200
+    assert "poller stale" not in mid_sweep.json()["reasons"]
+
+    monkeypatch.setattr(main, "_poller_beat", {"n": 5, "at": _t.time() - 2400})
+    wedged = client.get("/health/ready")
+    assert wedged.status_code == 503
+    assert "poller stale" in wedged.json()["reasons"]

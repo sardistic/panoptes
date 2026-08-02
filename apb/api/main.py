@@ -94,6 +94,13 @@ _poller_thread: threading.Thread | None = None
 _poller_leader = False
 _poller_election_error: str | None = None
 
+# A full national sweep is slow: measured at a steady ~870s per cycle (roughly
+# 750s of fetching across 314 metros plus the inter-cycle wait), with observed
+# outliers past 1100s. The staleness bound has to clear that comfortably, or a
+# perfectly healthy poller reports itself stale partway through every cycle.
+# Two missed cycles is a real wedge; one long sweep is not.
+_POLLER_STALE_AFTER_S = 1800.0
+
 
 def _poller(interval: float = 120.0):
     """Continuously snapshot the national stream into the DB so coverage/history grow,
@@ -105,6 +112,10 @@ def _poller(interval: float = 120.0):
         try:
             wrote = snapshots.record(_cad.overview(limit_per=80, max_age_hours=168))
             n += 1
+            # Beat on completed work, not just on entering the loop body. The
+            # sweep above is the long pole, so a start-only beat makes a healthy
+            # poller look stale for the back half of every cycle.
+            _poller_beat.update(n=n, at=_time.time())
             if n % 30 == 0:
                 snapshots.prune()
             log.info("snapshot %d: +%d rows, db=%s", n, wrote, snapshots.stats())
@@ -123,6 +134,7 @@ def _poller(interval: float = 120.0):
             if new:
                 log.info("event registry: +%d new (of %d active)", new, len(fused))
             send_pending()
+            _poller_beat.update(n=n, at=_time.time())
         except Exception as e:
             log.warning("event-registry error: %s", e)
         _poller_stop.wait(interval)
@@ -366,7 +378,7 @@ def readiness():
     if poller["election_error"]:
         reasons.append("poller election unavailable")
     if (poller["enabled"] and poller["leader"] and poller["last_beat_s"] is not None
-            and poller["last_beat_s"] > 600):
+            and poller["last_beat_s"] > _POLLER_STALE_AFTER_S):
         reasons.append("poller stale")
     body = {"status": "ready" if not reasons else "not_ready",
             "reasons": reasons, "database": db, "poller": poller}
