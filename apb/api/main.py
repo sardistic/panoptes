@@ -275,7 +275,12 @@ _SECURITY_HEADERS = {
     "Content-Security-Policy": " ".join((
         "default-src 'self';", "base-uri 'self';", "object-src 'none';",
         "frame-ancestors 'none';",
-        "script-src 'self' 'unsafe-inline' https://unpkg.com;",
+        # analytics.sardistic.com is our own Umami instance: it serves the
+        # tracker (script-src) and receives the beacon (connect-src). Naming the
+        # one origin keeps this narrower than the 'unsafe-inline' the map stack
+        # already forces.
+        "script-src 'self' 'unsafe-inline' https://unpkg.com"
+        " https://analytics.sardistic.com;",
         "worker-src 'self' blob:;", "child-src 'self' blob:;",
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
         "font-src 'self' https://fonts.gstatic.com;",
@@ -283,7 +288,8 @@ _SECURITY_HEADERS = {
         " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
         "connect-src 'self' data: https://basemaps.cartocdn.com"
         " https://*.basemaps.cartocdn.com https://s3.amazonaws.com"
-        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
+        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu"
+        " https://analytics.sardistic.com;",
     )),
 }
 
