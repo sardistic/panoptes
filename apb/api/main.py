@@ -220,6 +220,10 @@ def _startup() -> None:
 async def _lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # HTTPX logs full request URLs at INFO, including API keys carried in query
+    # parameters by some upstream providers. Keep failures visible without
+    # writing credentials into container logs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     _startup()
     try:
         yield
