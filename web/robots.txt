@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://panoptes.run/sitemap.xml

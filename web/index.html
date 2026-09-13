@@ -4,9 +4,19 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Panoptes · live event intelligence</title>
+<meta name="description" content="Panoptes maps live public-safety, weather, environmental, transportation, and open-source event intelligence across the United States." />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<link rel="canonical" href="https://panoptes.run/" />
+<meta property="og:title" content="Panoptes · Live Event Intelligence" />
+<meta property="og:description" content="Explore live public-safety, weather, environmental, transportation, and open-source event intelligence on one map." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://panoptes.run/" />
+<meta property="og:image" content="https://panoptes.run/assets/logo.png" />
+<meta name="twitter:card" content="summary" />
 <link rel="icon" type="image/png" href="/assets/logo.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" />
@@ -331,10 +341,11 @@
   </a>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
+<script defer src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
 <script>
+window.addEventListener('DOMContentLoaded', () => {
 'use strict';
 
 // Every feed is untrusted input, even when it comes from a public authority.
@@ -1844,6 +1855,7 @@ document.addEventListener('visibilitychange',()=>{
   await load();
   restartStream();
 })();
+});
 </script>
 </body>
 </html>

@@ -29,6 +29,10 @@ Thumbs.db
 .idea/
 .vscode/
 
+# local agent state
+.agent/runtime/
+docs/agent/HANDOFF.md
+
 # NOTE: the discovery catalogs (data/sources_catalog.json, arcgis_catalog.json,
 # p2c_agencies.json, pulsepoint_agencies.json, southern_agencies.json, type_map.json)
 # ARE committed on purpose — apb.ingest.cad loads them at startup.
