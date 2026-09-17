@@ -208,8 +208,13 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     body = {"contents": [{"role": "user", "parts": parts}],
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1200}}
     r = None
-    for model in candidate_models(key)[:4]:        # newest first; step down on capacity errors
-        r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body)
+    for model in candidate_models(key)[:3]:        # newest first; step down on capacity errors
+        try:
+            r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key},
+                             json=body, timeout=30.0)
+        except httpx.TimeoutException:
+            log.info("gemini %s timed out; trying the next model", model)
+            continue
         if r.status_code == 200:
             break
         if r.status_code not in (429, 503):
