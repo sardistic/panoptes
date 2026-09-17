@@ -546,6 +546,64 @@ def _ohgo(reg, src) -> list[dict]:
     return out
 
 
+# ── Carmanah / TravelIQ 511 sites: the website's own camera list (keyless) ──────
+# Their public API (`/api/v2/get/cameras`) wants a key, but every site's "Cameras
+# List" page loads the same data through a DataTables route, 100 rows a page, with
+# WKT coordinates, roadway, direction and one `/map/Cctv/{id}` still per view.
+# Found on drivenc.gov; the route is identical on every site the vendor hosts.
+TRAVELIQ: dict[str, tuple[str, str | None]] = {
+    "nc": ("www.drivenc.gov", "NC"), "ga": ("511ga.org", "GA"), "pa": ("www.511pa.com", "PA"),
+    "fl": ("fl511.com", "FL"), "la": ("511la.org", "LA"), "id": ("511.idaho.gov", "ID"),
+    "ne6": ("newengland511.org", None), "az": ("az511.gov", "AZ"), "ct": ("ctroads.org", "CT"),
+    "ut": ("www.udottraffic.utah.gov", "UT"), "nv": ("www.nvroads.com", "NV"), "wi": ("511wi.gov", "WI"),
+    "ak": ("511.alaska.gov", "AK"), "ab": ("511.alberta.ca", "AB"), "sk": ("hotline.gov.sk.ca", "SK"),
+    "ns": ("511.novascotia.ca", "NS"), "nb": ("511.gnb.ca", "NB"), "nl": ("511nl.ca", "NL"),
+    "yk": ("511yukon.ca", "YT"), "pe": ("511.gov.pe.ca", "PE"), "mb": ("www.manitoba511.ca", "MB"),
+}
+_WKT_POINT = re.compile(r"POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)")
+
+
+def _traveliq(reg, src) -> list[dict]:
+    host, state = TRAVELIQ[src.key.split("_", 1)[1]]
+    hdr = {"Referer": f"https://{host}/cctv", "X-Requested-With": "XMLHttpRequest",
+           "Accept": "application/json, text/javascript, */*; q=0.01",
+           "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"}
+
+    def page(start: int) -> dict:
+        for attempt in range(3):                           # the big sites 500 under parallel load
+            r = reg._client.post(f"https://{host}/List/GetData/Cameras", headers=hdr,
+                                 content=f"draw=1&start={start}&length=100&search%5Bvalue%5D=&search%5Bregex%5D=false")
+            if r.status_code < 500:
+                r.raise_for_status()
+                return r.json()
+            time.sleep(1.5 * (attempt + 1))
+        r.raise_for_status()
+        return {}
+    first = page(0)
+    total = int(first.get("recordsTotal") or 0)
+    rows = list(first.get("data") or [])
+    for start in range(100, min(total, 8000), 100):        # sequential on purpose (see page)
+        rows.extend(page(start).get("data") or [])
+    out = []
+    for c in rows:
+        wkt = ((c.get("latLng") or {}).get("geography") or {}).get("wellKnownText") or ""
+        m = _WKT_POINT.search(wkt)
+        if not m:
+            continue
+        lon, lat = float(m.group(1)), float(m.group(2))
+        base = " ".join(x for x in (c.get("roadway"), c.get("location")) if x) or c.get("location")
+        views = [v for v in (c.get("images") or []) if v.get("imageUrl") and not v.get("blocked")]
+        for v in views:
+            label = base + (f" · {v['description']}" if len(views) > 1 and v.get("description") else "")
+            r_ = _row(src.key, v.get("id") or f"{c.get('id')}.{v.get('sortOrder')}", label, lat, lon,
+                      state=state or c.get("state"), roadway=c.get("roadway"), direction=c.get("direction"),
+                      image_url=urljoin(f"https://{host}/", v["imageUrl"]),
+                      online=not v.get("disabled"), page_url=f"https://{host}/cctv")
+            if r_:
+                out.append(r_)
+    return out
+
+
 # ── "one-network" (Iteris/Castle Rock) 511 platform: GraphQL MapFeatures ──────
 # Found by the sniffer on 511ia.org: the public map asks /api/graphql for a bbox
 # of features per layer slug; the camera layer is keyless and returns every camera
@@ -804,6 +862,8 @@ SOURCES: dict[str, CameraSource] = {
     "ab511": CameraSource("ab511", "511 Alberta cameras", _carmanah_v2, "AB",
                           env_key="T511_AB_KEY", host="511.alberta.ca"),
 }
+SOURCES.update({f"tq_{k}": CameraSource(f"tq_{k}", f"{v[1] or 'New England'} 511 cameras (TravelIQ site list)", _traveliq, v[1])
+                for k, v in TRAVELIQ.items()})
 SOURCES.update({f"at_{k}": CameraSource(f"at_{k}", f"{v[1]} 511 cameras (Iteris ATIS)", _atis, v[1])
                 for k, v in ATIS.items()})
 SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")

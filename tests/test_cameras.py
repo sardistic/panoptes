@@ -254,3 +254,29 @@ def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper():
     ids = [r["id"] for r in rows]
     assert ids == ["at_va:1", "at_va:7.a", "at_va:7.b"]           # broken stream skipped, stills expanded
     assert rows[0]["stream_url"].endswith("x/playlist.m3u8") and rows[1]["image_url"].endswith("1/latest.jpg")
+
+
+def test_traveliq_site_list_pages_sequentially_and_parses_wkt(monkeypatch):
+    pages = {0: {"recordsTotal": 150, "data": [
+                 {"id": 1, "roadway": "I-485", "location": "CCTV10", "direction": "Inner", "state": "North Carolina",
+                  "latLng": {"geography": {"wellKnownText": "POINT (-80.77992 35.36847)"}},
+                  "images": [{"id": 1, "imageUrl": "/map/Cctv/1", "description": "a", "disabled": False, "blocked": False},
+                             {"id": 2, "imageUrl": "/map/Cctv/2", "description": "b", "disabled": False, "blocked": True}]},
+                 {"id": 3, "location": "no coords", "latLng": None, "images": [{"id": 3, "imageUrl": "/map/Cctv/3"}]}]},
+             100: {"data": [{"id": 4, "roadway": "US-1", "location": "x",
+                             "latLng": {"geography": {"wellKnownText": "POINT (-78.6 35.8)"}},
+                             "images": [{"id": 4, "imageUrl": "/map/Cctv/4", "disabled": True}]}]}}
+    calls = []
+    class _R:
+        status_code = 200
+        def __init__(self, d): self._d = d
+        def raise_for_status(self): pass
+        def json(self): return self._d
+    def post(url, headers=None, content=""):
+        start = int(content.split("start=")[1].split("&")[0]); calls.append(start); return _R(pages[start])
+    reg = CameraRegistry(); monkeypatch.setattr(reg._client, "post", post)
+    rows = cameras._traveliq(reg, SOURCES["tq_nc"])
+    assert calls == [0, 100]                                              # 150 total -> two pages, in order
+    assert [r["id"] for r in rows] == ["tq_nc:1", "tq_nc:4"]              # blocked view + coordless site dropped
+    assert rows[0]["lat"] == 35.36847 and rows[0]["lon"] == -80.77992
+    assert rows[0]["image_url"] == "https://www.drivenc.gov/map/Cctv/1" and rows[1]["online"] is False

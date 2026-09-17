@@ -65,6 +65,13 @@ local pipeline and source discovery:
 
 ## Live cameras (keyless, on by default)
 
+**Carmanah / TravelIQ sites — keyless via the site's own list route** (`POST /List/GetData/
+Cameras`, 100/page, WKT coords, `/map/Cctv/{id}` stills; found on drivenc.gov): NC, GA,
+FL, PA, UT, AZ, NV, WI, ID, LA, AK, CT, New England (CT/ME/MA/NH/RI/VT), Alberta,
+Saskatchewan, Nova Scotia, New Brunswick, Newfoundland, Yukon, PEI, Manitoba (~20k).
+The keyed `T511_*_KEY` camera entries are now redundant for cameras (still used for
+events).
+
 **One-network (Iteris) 511 states — keyless GraphQL, found by the sniffer:** IA, IN,
 MN, NE, MA, KS (`ITERIS` in cameras.py; the public map's `MapFeatures` query with the
 `normalCameras` layer, whole-state bbox at zoom 14 → every camera un-clustered).
