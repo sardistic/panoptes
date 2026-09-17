@@ -3,6 +3,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Debian point releases ship security fixes faster than the python base image is
+# rebuilt; apply them so the container scan (Trivy, HIGH/CRITICAL) stays clean.
+RUN apt-get update     && apt-get upgrade -y --no-install-recommends     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Install only the web-service deps (fast build; no torch/whisper).
 COPY requirements-web.txt .
 RUN pip install --no-cache-dir -r requirements-web.txt \
