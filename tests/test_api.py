@@ -161,3 +161,12 @@ def test_looks_endpoint_lists_persisted_scene_explanations(client, tmp_path, mon
     assert client.get("/looks?bbox=10,10,11,11").json() == [] or all(
         x["bounds"]["west"] <= 11 for x in client.get("/looks?bbox=10,10,11,11").json())
     assert client.get("/looks?bbox=abc").status_code == 400
+
+
+def test_looks_can_be_deleted(client):
+    from apb.store import looks as look_store
+    uid = look_store.record({"south": 1, "north": 2, "west": 3, "east": 4}, "overview",
+                            {"model": "m", "text": "gone soon"}, {})
+    assert client.delete(f"/looks/{uid}").json()["deleted"] is True
+    assert client.delete(f"/looks/{uid}").json()["deleted"] is False
+    assert client.delete("/looks/not-alnum!").status_code == 400

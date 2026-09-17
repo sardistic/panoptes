@@ -257,7 +257,7 @@ def _db():
 
 app = FastAPI(title="APB", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "OPTIONS"],
+    CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Content-Type"], allow_credentials=False,
 )
 
@@ -991,6 +991,15 @@ def facts_for_box(bbox: str = Query(..., max_length=80), stream: bool = False):
         return StreamingResponse(gen(), media_type="application/x-ndjson",
                                  headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
     return JSONResponse(facts_mod.facts(box), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.delete("/looks/{uid}")
+def delete_look(uid: str):
+    """Remove a saved scene explanation (its outline disappears from every map)."""
+    from apb.store import looks as look_store
+    if len(uid) > 40 or not uid.isalnum():
+        return JSONResponse({"error": "bad uid"}, status_code=400)
+    return JSONResponse({"deleted": look_store.delete(uid)}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/looks")

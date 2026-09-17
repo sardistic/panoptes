@@ -83,6 +83,14 @@ def get(uid: str) -> dict | None:
     return _row(r) if r else None
 
 
+def delete(uid: str) -> bool:
+    with _lock:
+        c = _conn()
+        n = c.execute("DELETE FROM looks WHERE uid = ?", (uid,)).rowcount
+        c.commit()
+    return n > 0
+
+
 def prior(bounds: dict, max_age_hours: float = 6.0, limit: int = 3) -> list[dict]:
     """Earlier looks overlapping this box — handed to the model as memory."""
     return query(max_age_hours, 50, (bounds["west"], bounds["south"],
