@@ -577,7 +577,9 @@ def _traveliq(reg, src) -> list[dict]:
                 r.raise_for_status()
                 return r.json()
             time.sleep(1.5 * (attempt + 1))
-        r.raise_for_status()
+        if start == 0:
+            r.raise_for_status()                          # nothing at all: let the lane report it
+        log.info("[cameras] %s page %d kept failing (%d); skipping it", host, start, r.status_code)
         return {}
     first = page(0)
     total = int(first.get("recordsTotal") or 0)
