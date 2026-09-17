@@ -221,13 +221,21 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     parts: list[dict] = [{"text": build_prompt(ctx, weather, [s[0] for s in stills])}]
     for _, data, ctype in stills:
         parts.append({"inline_data": {"mime_type": ctype, "data": base64.b64encode(data).decode()}})
+    # Thinking is disabled: on Gemini 3.x Flash the hidden thinking tokens otherwise
+    # consume the output budget (MAX_TOKENS after one sentence) and triple latency.
     body = {"contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 700}}
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048,
+                                 "thinkingConfig": {"thinkingBudget": 0}}}
     r = None
     for model in healthy_models(key)[:3]:          # newest healthy first; step down when busy
         try:
             r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key},
                              json=body, timeout=25.0)
+            if r.status_code == 400 and "thinking" in r.text.lower():   # model without the knob
+                slim = {**body, "generationConfig": {k: v for k, v in body["generationConfig"].items()
+                                                     if k != "thinkingConfig"}}
+                r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key},
+                                 json=slim, timeout=25.0)
         except httpx.TimeoutException:
             log.info("gemini %s timed out; benching it", model)
             _benched[model] = time.time() + _BENCH_SEC
