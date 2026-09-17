@@ -33,6 +33,7 @@ from apb.context.feeds import feeds_near
 from apb.ingest import cad as cad_mod
 from apb.ingest.cad import FEEDS as CAD_FEEDS
 from apb.ingest.cad import CadIngest
+from apb.ingest.cameras import STREAM_HOSTS, CameraRegistry
 from apb.store import snapshots, state
 
 log = logging.getLogger("apb.api")
@@ -51,6 +52,7 @@ def _off(flag: str) -> bool:
 
 
 _cad = CadIngest()
+_cameras = CameraRegistry()      # public DOT/traffic cameras; inventories load lazily
 
 # Every live-ready lane found by the discovery sweeps (countrywide). Keyed lanes
 # (firms, openaq, airnow, acled, ...) register 0 feeds unless their key is set.
@@ -290,10 +292,13 @@ _SECURITY_HEADERS = {
         "font-src 'self' https://fonts.gstatic.com;",
         "img-src 'self' data: blob: https://*.basemaps.cartocdn.com"
         " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
+        # camera stills go through /live/cameras/{id}/image (same-origin); only HLS
+        # playlists/segments are fetched by hls.js straight from the DOT streamers
+        "media-src 'self' blob: " + " ".join(STREAM_HOSTS) + ";",
         "connect-src 'self' data: https://basemaps.cartocdn.com"
         " https://*.basemaps.cartocdn.com https://s3.amazonaws.com"
         " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu"
-        " https://analytics.sardistic.com;",
+        " https://analytics.sardistic.com " + " ".join(STREAM_HOSTS) + ";",
     )),
 }
 
@@ -783,6 +788,54 @@ def live_hazards_all(request: Request, max_age_hours: Hours = 24.0):
     return Response(encoded, media_type="application/json", headers={"ETag": etag})
 
 
+@app.get("/live/cameras")
+def live_cameras(bbox: str | None = Query(None, max_length=80),
+                 limit: int = Query(2000, ge=1, le=5000),
+                 source: str | None = Query(None, max_length=20),
+                 include_offline: bool = False):
+    """Public live cameras (DOT/traffic first). `bbox=w,s,e,n` scopes to the map
+    view; over `limit` rows are hash-sampled so a national view shows coverage spread.
+    Stills are served by /live/cameras/{id}/image; `stream_url` is a direct HLS URL."""
+    if _off("APB_CAMERAS_OFF"):
+        return JSONResponse([], headers={"Cache-Control": "public, max-age=300"})
+    box = None
+    if bbox:
+        try:
+            w, s, e, n = (float(x) for x in bbox.split(","))
+        except ValueError:
+            return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+        if not (-180 <= w <= e <= 180 and -90 <= s <= n <= 90):
+            return JSONResponse({"error": "bbox out of range"}, status_code=400)
+        box = (w, s, e, n)
+    rows = _cameras.query(box, limit=limit, source=source, online_only=not include_offline)
+    return JSONResponse(rows, headers={"Cache-Control": "public, max-age=120"})
+
+
+@app.get("/live/cameras/sources")
+def live_camera_sources():
+    """Per-vendor inventory health (rows, age, last error) — the camera lane's /status."""
+    return _cameras.stats()
+
+
+@app.get("/live/cameras/{cam_id}/image")
+def live_camera_image(cam_id: str):
+    """Snapshot proxy. Only ids present in the registry resolve (never arbitrary
+    URLs), so this cannot be used to reach other hosts; upstream bytes are cached
+    a few seconds per camera so a busy popup does not hammer the DOT."""
+    if _off("APB_CAMERAS_OFF") or len(cam_id) > 120:
+        return Response(status_code=404)
+    try:
+        got = _cameras.snapshot(cam_id)
+    except httpx.HTTPError as e:
+        log.info("[cameras] snapshot %s failed: %s", cam_id, e)
+        return Response(status_code=502, headers={"Cache-Control": "no-store"})
+    if got is None:
+        return Response(status_code=404)
+    body, ctype = got
+    return Response(body, media_type=ctype,
+                    headers={"Cache-Control": "public, max-age=5"})
+
+
 @app.get("/events")
 def events(max_age_hours: Hours = 24.0,
            limit: int = Query(200, ge=1, le=1000)):
@@ -835,6 +888,7 @@ def status():
                    "election_error": _poller_election_error,
                    "last_beat_s": round(now - _poller_beat["at"]) if _poller_beat["at"] else None},
         "response_cache": len(_resp_cache),
+        "cameras": _cameras.stats(),
     }
 
 

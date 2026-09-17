@@ -28,6 +28,8 @@
     --red:#a8202c; --amber:#e0a030; --steel:#5d6a78;
     /* compat aliases for inline-styled JS output */
     --hot:#a8202c; --warn:#e0a030; --accent:#a8202c;
+    --deck-top:86px;   /* set from #top's real height (it wraps on narrow screens) */
+    --rainbow:linear-gradient(90deg,#ff3b6b,#ffb02e,#37e0c4,#5b8cff,#b14bff,#ff3b6b);
     --font:"Archivo",system-ui,-apple-system,sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   }
@@ -52,22 +54,22 @@
   .leaflet-container{background:#12140f;font-family:var(--font)}
   .maplibregl-map,.maplibregl-canvas{font-family:var(--font);outline:none}
 
-  /* ── classification banner ── */
-  #classbar{position:absolute;top:0;left:0;right:0;height:22px;z-index:1100;
-    background:#0b0e13;border-bottom:1px solid var(--line-2);
-    display:flex;align-items:center;justify-content:center;gap:9px}
-  #classbar b{font:600 9px/1 var(--font);letter-spacing:.34em;color:var(--steel);text-transform:uppercase}
-  #classbar i{width:5px;height:5px;background:var(--amber);display:block}
-
   /* ── floating opaque panels (no blur, hairline, square-ish) ── */
   .hud{position:absolute;z-index:1000;background:var(--panel);
     border:1px solid var(--line-2);border-radius:3px;
     box-shadow:0 1px 0 rgba(0,0,0,.5), 0 12px 34px rgba(0,0,0,.30)}
 
   /* ── command bar ── */
-  #top{top:30px;left:16px;right:16px;display:flex;align-items:center;gap:16px;
-    padding:11px 16px;flex-wrap:wrap;border-top:2px solid var(--red)}
-  #logo{height:44px;width:auto;display:block;margin:-6px 0}
+  #top{top:16px;left:16px;right:16px;display:flex;align-items:center;gap:16px;
+    padding:11px 16px;flex-wrap:wrap}
+  /* spectrum strip along the top edge — same drift as the logo */
+  #top::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
+    background:var(--rainbow);background-size:200% 100%;animation:rainbow 7s linear infinite}
+  /* the mark is a single-color PNG on alpha, so it works as a mask: the drifting
+     spectrum paints only the glyph */
+  #logo{height:44px;width:44px;flex:0 0 auto;display:block;margin:-6px 0;
+    background:var(--rainbow);background-size:200% 100%;animation:rainbow 7s linear infinite;
+    -webkit-mask:url(/assets/logo.png) center/contain no-repeat;mask:url(/assets/logo.png) center/contain no-repeat}
   #top .brand{font-weight:700;letter-spacing:.26em;font-size:15px;color:var(--txt);
     background:none;-webkit-text-fill-color:currentColor}
   #top .sub{color:var(--dim);font-size:9px;letter-spacing:.2em;line-height:1.4;
@@ -99,7 +101,7 @@
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
   /* own deck, right of the side panel; single row that scrolls instead of wrapping */
-  #hazFilter{top:100px;left:352px;right:16px;padding:8px 12px;
+  #hazFilter{top:var(--deck-top);left:352px;right:16px;padding:8px 12px;
     gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
   #hazFilter::-webkit-scrollbar{height:6px}
   #hazFilter::-webkit-scrollbar-thumb{background:var(--line-3);border-radius:3px}
@@ -120,7 +122,7 @@
   button#surgesBtn.on .led{background:var(--amber)}
 
   /* ── incident rail (LEFT) ── */
-  #side{top:100px;left:16px;width:320px;max-height:calc(100% - 196px);
+  #side{top:var(--deck-top);left:16px;width:320px;max-height:calc(100% - var(--deck-top) - 96px);
     display:flex;flex-direction:column;padding:0;overflow:hidden}
   #sideTitle{margin:0;padding:14px 16px 0;font:600 9.5px/1 var(--font);
     letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
@@ -159,13 +161,12 @@
   #footer #flogo{height:18px;width:auto;display:block}
   #footer .rainbow{position:relative}
   #footer .rainbow::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;border-radius:2px;
-    background:linear-gradient(90deg,#ff3b6b,#ffb02e,#37e0c4,#5b8cff,#b14bff,#ff3b6b);
-    background-size:200% 100%;opacity:0;transition:opacity .2s}
+    background:var(--rainbow);background-size:200% 100%;opacity:0;transition:opacity .2s}
   #footer .rainbow:hover::after{opacity:1;animation:rainbow 1.1s linear infinite}
   @keyframes rainbow{to{background-position:200% 0}}
 
   /* ── leaflet zoom (top-right, under command bar) ── */
-  .leaflet-top.leaflet-right{top:100px;right:16px}
+  .leaflet-top.leaflet-right{top:var(--deck-top);right:16px}
   .leaflet-control-zoom{border:1px solid var(--line-2)!important;border-radius:3px!important;
     overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.5)!important}
   .leaflet-control-zoom a{background:var(--panel)!important;color:var(--txt-2)!important;
@@ -223,6 +224,17 @@
   button#envBtn.on .led{background:#718b88}
   button#goesBtn.on .led{background:#7fb8e0}
   button#radarBtn.on .led{background:#62cf72;box-shadow:0 0 7px rgba(98,207,114,.65)}
+  button#camerasBtn.on .led{background:#9fc4d0}
+  /* ── camera popup: still or HLS player, edge to edge ── */
+  .campop .leaflet-popup-content{max-width:380px;min-width:300px}
+  .pop.cam .frame{margin:10px -15px 0;background:#000;min-height:150px;position:relative}
+  .pop.cam .frame img,.pop.cam .frame video{display:block;width:100%;height:auto;max-height:290px;object-fit:contain;background:#000}
+  .pop.cam .frame .off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font:600 9.5px/1 var(--mono);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+  .pop.cam .ctl{display:flex;gap:6px;margin-top:9px;align-items:center}
+  .pop.cam .ctl button{height:24px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+  .pop.cam .ctl a{font:500 10px/1 var(--mono);color:var(--dim);text-decoration:none;margin-left:auto}
+  .pop.cam .ctl a:hover{color:var(--txt)}
   #envReadout{right:16px;bottom:48px;padding:8px 11px;max-width:430px;
     font:500 9px/1.45 var(--mono);color:var(--dim);letter-spacing:.035em}
   #envReadout b{color:var(--txt-2);font-weight:600}
@@ -238,16 +250,17 @@
   body.compact .pill{height:24px}
 
   @media (max-width:760px){
-    #classbar b{letter-spacing:.16em}
-    #top{left:8px;right:8px;top:28px;gap:8px;padding:9px;max-height:31vh;
+    #top{left:8px;right:8px;top:8px;gap:8px;padding:9px;max-height:31vh;
       overflow:auto;align-content:flex-start}
     #top .spacer{display:none}
     #top .brand{font-size:15px}
     #top .sub,#footer,#envReadout{display:none}
     #top .ctl{flex:1 1 42%;min-width:130px}
+    #top .ctl:has(.segwrap){flex-basis:100%}
+    .segwrap{flex-wrap:wrap}
     #top select{width:100%;max-width:none}
     #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
-    #hazFilter{left:8px;right:8px;top:calc(31vh + 38px);max-height:18vh;overflow:auto}
+    #hazFilter{left:8px;right:8px;top:calc(31vh + 18px);max-height:18vh;overflow:auto}
     .leaflet-top.leaflet-right{top:35vh;right:8px}
     .leaflet-control-attribution{margin:0 8px calc(34vh + 14px) 0!important;font-size:7px!important}
   }
@@ -263,7 +276,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span,.spark i{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#logo,#top::before{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -272,10 +285,8 @@
 <body>
 <div id="map"></div>
 
-<div id="classbar"><i></i><b id="classText">OSINT · Public-Safety Radio · Aggregated</b><i></i></div>
-
 <div id="top" class="hud">
-  <img id="logo" src="/assets/logo.png" alt="Panoptes" />
+  <span id="logo" role="img" aria-label="Panoptes"></span>
   <span class="brand">PANOPTES</span>
   <span class="sub">All-Seeing<br/>Event Intelligence</span>
   <span class="spacer"></span>
@@ -295,7 +306,7 @@
     <option value="0.4">ELEVATED ≥0.40</option>
     <option value="0.7">HIGH ≥0.70</option>
   </select></label>
-  <label class="ctl">Alerts<span class="segwrap">
+  <label class="ctl">Layers<span class="segwrap">
     <button id="spikesBtn" class="on" aria-pressed="true" title="emphasize high-threat activity"><span class="led"></span>SPIKES</button>
     <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
     <button id="warningsBtn" class="on" aria-pressed="true" title="active NWS warning footprints"><span class="led"></span>WARNINGS</button>
@@ -303,6 +314,7 @@
     <button id="envBtn" class="on" aria-pressed="true" title="combined thermal, moisture, rain, UV and air-quality field"><span class="led"></span>ENV</button>
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
     <button id="goesBtn" aria-pressed="false" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
+    <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
   </span></label>
   <span class="spacer"></span>
   <span class="pill" id="loadPill" role="status" aria-live="polite" hidden>
@@ -401,6 +413,18 @@ function watchTiles(label,layers,timeout=15000){
   });
   setTimeout(()=>{ if(!finished){ finished=true; endLoad(label); } },timeout);
 }
+// The command bar wraps onto extra rows when the viewport is narrow; every panel
+// below it hangs off its measured height instead of a guessed constant.
+(function trackDeck(){
+  const top=document.getElementById('top');
+  const set=()=>{
+    const deck=top.offsetTop+top.offsetHeight+10;
+    document.documentElement.style.setProperty('--deck-top',`${deck}px`);
+    L.Popup.mergeOptions({autoPanPaddingTopLeft:[16,deck+8],autoPanPaddingBottomRight:[16,56]});
+  };
+  if(window.ResizeObserver) new ResizeObserver(set).observe(top); else window.addEventListener('resize',set);
+  set();
+})();
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
@@ -1791,9 +1815,126 @@ function setGoes(on){
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
 setGoes(true);                  // user decision: live GOES clouds are core to the map
 
+// ── public live cameras (DOT / traffic first) ──
+// Inventory is server-side (/live/cameras); the browser asks for the current view
+// only, so a national overview gets a hash-sampled spread and a city gets every lens.
+// Stills come through the same-origin snapshot proxy; HLS plays straight from the DOT
+// streamer (hosts are allow-listed in the API's CSP) via hls.js loaded on first use.
+const CAM_C='#9fc4d0';
+const CAM_SRC={caltrans:'Caltrans',nyctmc:'NYC DOT',ny511:'511NY',deldot:'DelDOT',chart_md:'MD CHART',
+  seattle:'Seattle DOT',on511:'Ontario 511',tfl:'TfL JamCam',nzta:'NZTA'};
+let showCameras=false, cameraRows=[], cameraFetchT=null, cameraCtl=null;
+let camPopupTimer=null, camHls=null, camPopup=null;
+const cameraLayer=L.layerGroup().addTo(map);
+function cameraLimit(z){ return z<5?400:z<8?1200:3000; }
+async function loadCameras(){
+  if(!showCameras) return;
+  if(cameraCtl) cameraCtl.abort();
+  const ctl=cameraCtl=new AbortController();
+  const b=map.getBounds().pad(.15);
+  const bbox=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(v=>v.toFixed(3)).join(',');
+  await withLoad('CAMERAS',async()=>{
+    try{
+      const r=await fetch(`/live/cameras?bbox=${bbox}&limit=${cameraLimit(map.getZoom())}`,{signal:ctl.signal});
+      if(!r.ok) throw new Error(`cameras ${r.status}`);
+      cameraRows=await r.json();
+    }catch(e){ if(e.name!=='AbortError') cameraRows=[]; }
+  });
+  if(ctl===cameraCtl) drawCameras();
+}
+// viewfinder glyph: two opposed corner brackets around a short lens tick — reads as
+// "camera" at 8px and stays angular like every other mark on the map
+function cameraGlyph(c,z){
+  const s=z>=14?4.5:z>=12?3.5:2.6,at=(dx,dy)=>screenOffset(c.lat,c.lon,dx,dy,z);
+  const paths=[[[-s,-s*.35],[-s,-s],[-s*.35,-s]],[[s*.35,s],[s,s],[s,s*.35]],[[-s*.45,s*.45],[s*.45,-s*.45]]];
+  const op=(c.stream_url&&!c.image_url?.62:.8)*(z>=12?1:.75);
+  return L.featureGroup(paths.map(path=>L.polyline(path.map(p=>at(p[0],p[1])),{
+    color:CAM_C,weight:z>=12?1.4:1.1,opacity:op,lineCap:'square',lineJoin:'miter',interactive:true
+  })));
+}
+function drawCameras(){
+  cameraLayer.clearLayers();
+  const btn=document.getElementById('camerasBtn');
+  if(!showCameras){ btn.title='public live cameras — DOT / traffic first (stills + HLS streams)'; return; }
+  const z=map.getZoom(),b=map.getBounds();
+  let n=0;
+  cameraRows.forEach(c=>{
+    if(!b.contains([c.lat,c.lon])) return;
+    n++;
+    const g=cameraGlyph(c,z);
+    g.bindTooltip(`${esc(c.name)} · ${esc(CAM_SRC[c.source]||c.source)}`,{direction:'top'});
+    g.on('click',()=>openCamera(c));
+    g.addTo(cameraLayer);
+  });
+  btn.title=`${n} live camera${n===1?'':'s'} in view · ${Object.keys(CAM_SRC).length}+ public sources`;
+}
+function stopCameraPopup(){
+  clearTimeout(camPopupTimer); camPopupTimer=null;
+  if(camHls){ try{camHls.destroy();}catch(_){} camHls=null; }
+}
+let hlsLoading=null;
+function loadHls(){
+  if(window.Hls) return Promise.resolve();
+  if(hlsLoading) return hlsLoading;
+  hlsLoading=new Promise((res,rej)=>{
+    const sc=document.createElement('script');
+    sc.src='https://unpkg.com/hls.js@1.5.15/dist/hls.min.js'; sc.onload=res; sc.onerror=()=>rej(new Error('hls.js failed'));
+    document.head.appendChild(sc);
+  });
+  return hlsLoading;
+}
+async function playStream(c,frame){
+  stopCameraPopup();
+  frame.innerHTML='<video playsinline muted autoplay controls></video>';
+  const v=frame.firstChild, url=safeLink(c.stream_url);
+  if(!url) return;
+  v.addEventListener('loadedmetadata',()=>camPopup&&camPopup.update(),{once:true}); // re-pan for the taller frame
+  if(v.canPlayType('application/vnd.apple.mpegurl')){ v.src=url; return; }
+  try{ await loadHls(); }catch(_){ frame.innerHTML='<div class="off">stream player unavailable</div>'; return; }
+  if(!window.Hls||!Hls.isSupported()){ frame.innerHTML='<div class="off">HLS unsupported here</div>'; return; }
+  camHls=new Hls({enableWorker:true,lowLatencyMode:true,maxBufferLength:12});
+  camHls.on(Hls.Events.ERROR,(_,d)=>{ if(d.fatal){ stopCameraPopup(); frame.innerHTML='<div class="off">stream offline</div>'; } });
+  camHls.loadSource(url); camHls.attachMedia(v);
+}
+function showStill(c,frame,stamp){
+  frame.innerHTML=`<img alt="${esc(c.name)}" src="/live/cameras/${encodeURIComponent(c.id)}/image?t=${Date.now()}" />`;
+  const img=frame.firstChild;
+  img.onerror=()=>{ frame.innerHTML='<div class="off">snapshot unavailable</div>'; };
+  img.onload=()=>{ if(stamp) stamp.textContent=new Date().toLocaleTimeString(); if(!stamp.dataset.sized){ stamp.dataset.sized='1'; camPopup&&camPopup.update(); } };
+  // re-pull while the popup stays open; the proxy caches ~6s so this tracks the DOT cadence
+  camPopupTimer=setTimeout(()=>showStill(c,frame,stamp),8000);
+}
+function openCamera(c){
+  stopCameraPopup();
+  const src=CAM_SRC[c.source]||String(c.source).toUpperCase();
+  const meta=[c.roadway,c.direction&&c.direction!=='Unknown'?c.direction:null,c.state].filter(Boolean).map(esc).join(' · ');
+  const el=document.createElement('div'); el.className='pop cam';
+  el.innerHTML=`<div class="kick" style="color:${CAM_C}">Live camera · ${esc(src)}</div>`
+    +`<div class="ttl">${esc(c.name||c.id)}</div>`
+    +`<div class="frame"></div>`
+    +`<div class="meta">${meta}${meta?' · ':''}<span class="stamp">—</span></div>`
+    +`<div class="ctl">${c.image_url&&c.stream_url?'<button class="still">STILL</button>':''}`
+    +`${c.stream_url?'<button class="stream">▶ STREAM</button>':''}`
+    +`${safeLink(c.page_url||c.image_url||c.stream_url)?`<a href="${esc(safeLink(c.page_url||c.image_url||c.stream_url))}" target="_blank" rel="noopener noreferrer">source ↗</a>`:''}</div>`;
+  const frame=el.querySelector('.frame'), stamp=el.querySelector('.stamp');
+  const still=()=>{ stopCameraPopup(); showStill(c,frame,stamp); };
+  if(c.image_url) still(); else { stamp.textContent='live'; playStream(c,frame); }
+  el.querySelector('.still')?.addEventListener('click',still);
+  el.querySelector('.stream')?.addEventListener('click',()=>{ stamp.textContent='live'; playStream(c,frame); });
+  camPopup=L.popup({maxWidth:380,className:'campop'}).setLatLng([c.lat,c.lon]).setContent(el).openOn(map);
+}
+map.on('popupclose',stopCameraPopup);
+document.getElementById('camerasBtn').onclick=async e=>{
+  showCameras=!showCameras; e.currentTarget.classList.toggle('on',showCameras);
+  e.currentTarget.setAttribute('aria-pressed',String(showCameras));
+  if(!showCameras){ cameraRows=[]; drawCameras(); stopCameraPopup(); map.closePopup(); return; }
+  await loadCameras();
+};
+
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
 let moveT=null;
-map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120); });
+map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120);
+  if(showCameras){ clearTimeout(cameraFetchT); cameraFetchT=setTimeout(loadCameras,260); } });
 
 async function loadMetros(){
   let metros=await withLoad('FEEDS',async()=>{

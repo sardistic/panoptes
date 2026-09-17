@@ -36,7 +36,7 @@ def test_loading_indicator_names_overlapping_sources():
     assert 'id="loadPill"' in HTML
     assert "const activeLoads=new Map()" in HTML
     for label in ("INCIDENTS", "EMERGING", "FUSION", "SOCIAL", "HAZARDS", "WARNINGS",
-                  "ENVIRONMENT", "RADAR", "SATELLITE"):
+                  "ENVIRONMENT", "RADAR", "SATELLITE", "CAMERAS"):
         assert f"'{label}'" in HTML
 
 
@@ -91,3 +91,13 @@ def test_live_updates_use_sse_with_slow_fallback():
     assert "new EventSource(`/live/stream?" in HTML
     assert "setInterval(load,60000)" in HTML
     assert "setInterval(load,15000)" not in HTML
+
+
+def test_camera_layer_uses_same_origin_proxy_and_registry_ids():
+    assert 'id="camerasBtn"' in HTML
+    assert "fetch(`/live/cameras?bbox=" in HTML
+    assert "/live/cameras/${encodeURIComponent(c.id)}/image" in HTML
+    assert "function cameraGlyph(c,z)" in HTML
+    assert "safeLink(c.stream_url)" in HTML          # HLS URL never reaches <video> unchecked
+    assert "map.on('popupclose',stopCameraPopup)" in HTML
+    assert 'id="classbar"' not in HTML               # classification banner retired
