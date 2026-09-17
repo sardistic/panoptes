@@ -75,6 +75,15 @@ events).
 **One-network (Iteris) 511 states — keyless GraphQL, found by the sniffer:** IA, IN,
 MN, NE, MA, KS (`ITERIS` in cameras.py; the public map's `MapFeatures` query with the
 `normalCameras` layer, whole-state bbox at zoom 14 → every camera un-clustered).
+**NDDOT** (ArcGIS `rcrs_dynamic/MapServer/5`, up to 6 stills per site), **MDOT Mi Drive**
+(`camera/AllForMap` + `camera/list` thumbnails). **Session-bound sites served from a
+browser snapshot** (`static_items` in `data/camera_discoveries.json`; media is public):
+511NJ (679, HLS — no CORS header, so Chrome's hls.js cannot play them; Safari/Edge
+can), GoAkamai Hawaii (336, HLS), OKtraffic (459, HLS), TDOT SmartWay (668, thumbs +
+HLS). Re-run the sniffer occasionally to refresh those inventories.
+Not viable: Arkansas (streams behind login), WV (streams loaded lazily per camera),
+Houston TranStar (image-map pixel coordinates only), Mississippi (ASP.NET postbacks).
+
 **Iteris ATIS states (SC, MT, SD, VA)** via `{st}.cdn.iteris-atis.com/geojson/icons/
 metadata/icons.cameras.geojson` (VDOT: `511.vdot.virginia.gov/services/map/array/cameras`),
 found by the sniffer's `--dump` of blob-fetched payloads. **Colorado** via the CARS "511x" GeoJSON API (`api-511x-co.carsprogram.org`).

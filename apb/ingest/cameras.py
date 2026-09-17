@@ -365,7 +365,9 @@ def _arcgis_points(reg, src, layer_url, *, build, where="1=1"):
         feats = data.get("features", [])
         for f in feats:
             r = build(f.get("attributes") or {}, f.get("geometry") or {})
-            if r:
+            if isinstance(r, dict) and "rows" in r and "id" not in r:
+                out.extend(r["rows"])
+            elif r:
                 out.append(r)
         if not feats or not data.get("exceededTransferLimit"):   # server page size varies (50..2000)
             return out
@@ -720,6 +722,53 @@ def _atis(reg, src) -> list[dict]:
     return out
 
 
+def _nddot(reg, src) -> list[dict]:
+    """NDDOT: the travel map's ArcGIS 'Cameras-Still' layer — up to six stills per site
+    on dot.nd.gov (found via the sniffer's dump of gis.dot.nd.gov requests)."""
+    def build(a, g):
+        rows = []
+        for i in ("", "2", "3", "4", "5", "6"):
+            url, desc = a.get(f"FullPath{i}") or a.get(f"Link{i}"), a.get(f"Description{i}")
+            if url and str(url).lower().endswith((".jpg", ".jpeg", ".png")):
+                rows.append(_row("nddot", f"{a.get('OBJECTID')}.{i or '1'}", desc or a.get("Description"),
+                                 g.get("y"), g.get("x"), state="ND", image_url=url,
+                                 online=str(a.get("Active", "Y")).upper() != "N"))
+        return [r for r in rows if r]
+    return _arcgis_points(reg, src, "https://gis.dot.nd.gov/arcgis/rest/services/external/rcrs_dynamic/"
+                          "MapServer/5", build=lambda a, g: {"rows": build(a, g)})
+
+
+_MI_IMG = re.compile(r'id="(\d+)Img"[^>]*src="([^"]+)"')
+
+
+def _midrive(reg, src) -> list[dict]:
+    """MDOT Mi Drive: `camera/AllForMap` has ids + coordinates; `camera/list` carries
+    each camera's thumbnail inside an HTML snippet (micamerasimages.net)."""
+    hdr = {"Referer": "https://mdotjboss.state.mi.us/MiDrive/map", "X-Requested-With": "XMLHttpRequest"}
+    r = reg._client.get("https://mdotjboss.state.mi.us/MiDrive/camera/AllForMap/", headers=hdr)
+    r.raise_for_status()
+    sites = r.json()
+    r2 = reg._client.get("https://mdotjboss.state.mi.us/MiDrive/camera/list", headers=hdr)
+    r2.raise_for_status()
+    lst = r2.json()
+    thumbs = {}
+    for row in (lst if isinstance(lst, list) else lst.get("data") or []):
+        m = _MI_IMG.search(str(row.get("image", "")))
+        if m:
+            thumbs[m.group(1)] = m.group(2)
+    out = []
+    for s in sites if isinstance(sites, list) else sites.get("data") or []:
+        img = thumbs.get(str(s.get("id")))
+        if not img:
+            continue
+        r_ = _row("midrive", s.get("id"), s.get("title"), s.get("latitude"), s.get("longitude"), state="MI",
+                  image_url=img.replace("/thumbs/", "/").replace(".flv.jpg", ".jpg"),
+                  page_url="https://mdotjboss.state.mi.us/MiDrive/map")
+        if r_:
+            out.append(r_)
+    return out
+
+
 # ── discovered feeds: specs written by apb.discover.camera_sniff ──────────────
 _DISCOVERIES = Path(__file__).resolve().parents[2] / "data" / "camera_discoveries.json"
 _PATH_PART = re.compile(r"([^\[]+)(?:\[(\d+)\])?$")
@@ -784,10 +833,12 @@ def _map_discovered(spec: dict, src, items: list) -> list[dict]:
         for j, (node, _) in enumerate(subs):
             strip = lambda p: p[len(prefix) + 4:] if prefix and p.startswith(prefix + "[0].") else p
             img = _dget(node, strip(f["image"]))
-            if not img:
+            stream = _dget(node, strip(f["stream"])) if f.get("stream") else None
+            if not img and not stream:
                 continue
-            img = urljoin(spec["endpoint"], str(img))
-            stream = img if ".m3u8" in img or "/rtplive/" in img else None
+            img = urljoin(spec["endpoint"], str(img)) if img else None
+            if img and (".m3u8" in img or "/rtplive/" in img):
+                stream, img = stream or img, None
             name = _dget(node, strip(f["name"])) if f.get("name") else None
             nid = _dget(node, strip(f["id"])) if f.get("id") else None
             nid = str(nid) if nid not in (None, "", 0, "0") else f"{i}.{j}"
@@ -796,7 +847,7 @@ def _map_discovered(spec: dict, src, items: list) -> list[dict]:
             seen.add(nid)
             row = _row(src.key, nid, name or spec.get("label") or src.key,
                        _dget(node, strip(f["lat"])), _dget(node, strip(f["lon"])), state=spec.get("state"),
-                       image_url=None if stream else img, stream_url=stream, page_url=spec.get("referer"))
+                       image_url=img, stream_url=stream, page_url=spec.get("referer"))
             if row:
                 out.append(row)
     return out
@@ -879,6 +930,8 @@ SOURCES.update({f"tq_{k}": CameraSource(f"tq_{k}", f"{v[1] or 'New England'} 511
                 for k, v in TRAVELIQ.items()})
 SOURCES.update({f"at_{k}": CameraSource(f"at_{k}", f"{v[1]} 511 cameras (Iteris ATIS)", _atis, v[1])
                 for k, v in ATIS.items()})
+SOURCES["nddot"] = CameraSource("nddot", "NDDOT travel cameras", _nddot, "ND")
+SOURCES["midrive"] = CameraSource("midrive", "MDOT Mi Drive cameras", _midrive, "MI")
 SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")
 SOURCES.update({f"it_{k}": CameraSource(f"it_{k}", f"{v[1]} 511 cameras (one-network)", _iteris, v[1])
                 for k, v in ITERIS.items()})
@@ -899,6 +952,7 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://*.skyvdn.com",             # Iteris ATIS streamers (SC, NY)
     "https://*.vdotcameras.com",        # VDOT HLS
     "https://nj-511.wink.co",           # 511NJ HLS (no CORS header: native-HLS browsers only)
+    "https://stream.oktraffic.org",     # OKtraffic HLS
 )
 
 

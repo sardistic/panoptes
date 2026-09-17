@@ -326,9 +326,9 @@ async def sniff(key: str, urls: list[str], timeout_s: float = 45.0) -> dict | No
             rr = httpx.post(best["url"], content=best.get("post_data") or "", headers=hdr, timeout=25)
         else:
             rr = httpx.get(best["url"], headers=hdr, timeout=25, follow_redirects=True)
-        replay_ok = rr.status_code == 200 and len(rr.content) > 1000 and (
-            best["fields"]["count"] and str(best["sample"].get(next(iter(best["sample"]))))[:20] in rr.text
-            or rr.text.count("{") > 8)
+        img_leaf = best["fields"]["image"].split(".")[-1].split("[")[0]
+        replay_ok = rr.status_code == 200 and len(rr.content) > 1000 and img_leaf in rr.text \
+            and rr.text.count("{") > 8            # the replay must carry the image field, not a stub
     except httpx.HTTPError:
         replay_ok = False
     static_items = None
