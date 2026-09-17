@@ -108,5 +108,5 @@ def test_clip_assistant_and_view_state_are_wired():
     assert "function clipContext(b)" in HTML and "function clipSnippet(b,ctx)" in HTML
     assert "history.replaceState(null,'',hash)" in HTML and "function readViewState()" in HTML
     assert "body.loading #top::before" in HTML            # strip animates only while loading
-    assert ".pills .slot{position:relative;width:250px" in HTML   # fixed slot, no reflow
+    assert ".pills .slot{position:relative;width:200px" in HTML   # fixed slot, no reflow
     assert "L.circle(" not in HTML
