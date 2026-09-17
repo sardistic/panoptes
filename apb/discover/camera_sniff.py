@@ -87,7 +87,8 @@ FOCUS: dict[str, tuple[float, float]] = {
 _LAT = re.compile(r"^(lat|latitude|y|lat_deg|ycoord|latdd)$", re.I)
 _LON = re.compile(r"^(lon|lng|long|longitude|x|lon_deg|xcoord|londd)$", re.I)
 _IMG = re.compile(r"\.(jpe?g|png|gif|webp)(\?|$)|/image|snapshot|cctv|camera|\.m3u8|/stream|/rtplive/", re.I)
-_ICON = re.compile(r"\.svg|/icons?/|/images/tg_|marker|sprite", re.I)
+_ICON = re.compile(r"\.svg|\.gif|/icons?/|/images/tg_|marker|sprite", re.I)
+_MEDIA = re.compile(r"\.(jpe?g|png|webp)(\?|$)|\.m3u8|/rtplive/|/Cctv/|snapshot|/image", re.I)
 _URLISH = re.compile(r"^(https?:)?//|^/", re.I)
 
 
@@ -143,6 +144,8 @@ def score_list(rows: list[dict]) -> dict | None:
         if _LON.match(leaf) and sum(1 for n in nums if n is not None and -180 <= n <= 180) > len(flat) * .7:
             lon_k = lon_k or k
         strs = [v for v in vals if isinstance(v, str)]
+        if "icon" in leaf.lower():
+            continue
         if strs and sum(1 for v in strs if _IMG.search(v) and not _ICON.search(v)) > len(flat) * .5 \
                 and (img_k is None or "url" in k.lower()):
             img_k = k
@@ -152,8 +155,9 @@ def score_list(rows: list[dict]) -> dict | None:
             id_k = id_k or k
     if not (lat_k and lon_k and img_k):
         return None
+    media = sum(1 for f in flat if isinstance(f.get(img_k), str) and _MEDIA.search(f[img_k])) / max(1, len(flat))
     return {"lat": lat_k, "lon": lon_k, "image": img_k, "name": name_k or img_k, "id": id_k or name_k or img_k,
-            "count": len(rows)}
+            "count": len(rows), "media_share": round(media, 2)}
 
 
 def _get(d, dotted):
@@ -272,6 +276,7 @@ async def sniff(key: str, urls: list[str], timeout_s: float = 45.0) -> dict | No
                 hdr = f"{cap['method']} {cap['url']}" + chr(10) + (cap["post_data"] or "") + chr(10) * 2
                 Path(f"data/sniff_captures/{key}_{i}.txt").write_bytes(hdr.encode() + cap["body"])
     best = None
+    best_items: list = []
     for cap in captured:
         text = cap["body"].decode("utf-8", "replace")
         doc = None
@@ -288,7 +293,9 @@ async def sniff(key: str, urls: list[str], timeout_s: float = 45.0) -> dict | No
             continue
         for path, rows in _walk_arrays(doc):
             sc = score_list(rows)
-            if sc and (best is None or sc["count"] > best["fields"]["count"]):
+            rank = (sc["media_share"] >= .5, sc["count"]) if sc else None
+            if sc and (best is None or rank > (best["fields"]["media_share"] >= .5, best["fields"]["count"])):
+                best_items = rows
                 best = {"url": cap["url"], "items_path": path, "fields": sc, "method": cap["method"],
                         "post_data": cap["post_data"], "referer": cap["req_headers"].get("referer"),
                         "headers": cap["req_headers"], "sample": rows[0]}
@@ -324,8 +331,14 @@ async def sniff(key: str, urls: list[str], timeout_s: float = 45.0) -> dict | No
             or rr.text.count("{") > 8)
     except httpx.HTTPError:
         replay_ok = False
+    static_items = None
+    if ok and not replay_ok:
+        # the list is session-bound but the media is public: snapshot the inventory
+        # (cameras rarely move) and let the runtime serve it as a static source
+        keep = set(v.split("[")[0].split(".")[0] for v in best["fields"].values() if isinstance(v, str))
+        static_items = [{k: v for k, v in rec.items() if k in keep} for rec in best_items if isinstance(rec, dict)]
     return {"key": key, "endpoint": best["url"], "items_path": best["items_path"], "fields": best["fields"],
-            "replay_verified": replay_ok,
+            "replay_verified": replay_ok, "static_items": static_items,
             "method": best.get("method", "GET"), "post_data": best.get("post_data"), "media": kind,
             "cookies": captured_cookies[:4000],
             "headers": {k: v for k, v in (best.get("headers") or {}).items()
@@ -355,7 +368,7 @@ async def main_async(only: list[str] | None, extra: tuple[str, str] | None):
             if res:
                 print(f"  [{k}] FOUND {res['fields']['count']} records at {res['endpoint'][:90]} "
                       f"image_verified={res['image_verified']}", file=sys.stderr)
-                existing[k] = {**res, "enabled": res["image_verified"] and res["replay_verified"],
+                existing[k] = {**res, "enabled": res["image_verified"] and (res["replay_verified"] or bool(res.get("static_items"))),
                                "label": existing.get(k, {}).get("label"), "state": existing.get(k, {}).get("state") or k.upper()}
                 print(f"      replay_verified={res['replay_verified']}", file=sys.stderr)
             else:

@@ -746,6 +746,8 @@ def _discovered(reg, src) -> list[dict]:
            **{k: v for k, v in (spec.get("headers") or {}).items() if k.lower() != "content-type"}}
     if spec.get("cookies"):
         hdr["Cookie"] = spec["cookies"]
+    if spec.get("static_items"):                 # session-bound list, public media: browser snapshot
+        return _map_discovered(spec, src, spec["static_items"])
     if spec.get("method", "GET").upper() == "POST":
         r = reg._client.post(spec["endpoint"], content=spec.get("post_data") or "", headers={
             **hdr, "Content-Type": "application/json"})
@@ -766,12 +768,17 @@ def _discovered(reg, src) -> list[dict]:
             items = items[int(m.group(2))]
     if not isinstance(items, list):
         return []
+    return _map_discovered(spec, src, items)
+
+
+def _map_discovered(spec: dict, src, items: list) -> list[dict]:
     f = spec["fields"]
     prefix = None
     m = re.match(r"^(.+?)\[0\]\.", f["lat"])
     if m and f["lon"].startswith(m.group(0)) and f["image"].startswith(m.group(0)):
         prefix = m.group(1)
     out = []
+    seen: set = set()
     for i, rec in enumerate(items):
         subs = [(rec, "")] if not prefix else [(x, "") for x in (_dget(rec, prefix) or []) if isinstance(x, dict)]
         for j, (node, _) in enumerate(subs):
@@ -783,7 +790,11 @@ def _discovered(reg, src) -> list[dict]:
             stream = img if ".m3u8" in img or "/rtplive/" in img else None
             name = _dget(node, strip(f["name"])) if f.get("name") else None
             nid = _dget(node, strip(f["id"])) if f.get("id") else None
-            row = _row(src.key, nid if nid not in (None, "") else f"{i}.{j}", name or spec.get("label") or src.key,
+            nid = str(nid) if nid not in (None, "", 0, "0") else f"{i}.{j}"
+            if nid in seen:                              # ids like cameraId=0 repeat: keep rows unique
+                nid = f"{nid}.{i}.{j}"
+            seen.add(nid)
+            row = _row(src.key, nid, name or spec.get("label") or src.key,
                        _dget(node, strip(f["lat"])), _dget(node, strip(f["lon"])), state=spec.get("state"),
                        image_url=None if stream else img, stream_url=stream, page_url=spec.get("referer"))
             if row:
@@ -887,6 +898,7 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://*.cotrip.org",             # COtrip HLS
     "https://*.skyvdn.com",             # Iteris ATIS streamers (SC, NY)
     "https://*.vdotcameras.com",        # VDOT HLS
+    "https://nj-511.wink.co",           # 511NJ HLS (no CORS header: native-HLS browsers only)
 )
 
 
