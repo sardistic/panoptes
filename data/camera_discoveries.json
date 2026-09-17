@@ -80,13 +80,16 @@
    "lat": "attributes.latitude",
    "lon": "attributes.longitude",
    "image": "attributes.name",
-   "name": "attributes.description",
-   "id": "attributes.description",
+   "name": "attributes.name",
+   "id": "attributes.name",
    "count": 254
   },
+  "replay_verified": true,
   "method": "GET",
   "post_data": null,
   "media": "still",
+  "cookies": "_ga=GA1.1.2132486263.1789654238; _ga_K7E4W83L9R=GS2.1.s1789654237$o1$g0$t1789654237$j60$l0$h0; mapcenter=390386,-845457,8",
+  "headers": {},
   "referer": "https://goky.ky.gov/",
   "sample_image": null,
   "image_verified": false,
@@ -94,8 +97,7 @@
   "found_at": "2026-09-17",
   "enabled": false,
   "label": "KYTC",
-  "state": "KY",
-  "reason": "snapshot host pws.trafficwise.org refuses connections"
+  "state": "KY"
  },
  "co": {
   "key": "co",
@@ -103,49 +105,56 @@
   "items_path": "$.features",
   "fields": {
    "lat": "properties.eventReport.location.secondaryPoint.lat",
-   "lon": "properties.eventReport.location.secondaryPoint.lon",
-   "image": "properties.eventReport.icon.image",
+   "lon": "properties.eventReport.location.primaryPoint.lon",
+   "image": "properties.representation.iconProperties.image",
    "name": "properties.title",
-   "id": "properties.id",
-   "count": 84
+   "id": "properties.eventReport.id",
+   "count": 110
   },
+  "replay_verified": true,
   "method": "GET",
   "post_data": null,
   "media": "still",
+  "cookies": "_ga=GA1.1.62445258.1789654269; _ga_G221BGV94P=GS2.1.s1789654268$o1$g1$t1789654285$j43$l0$h0",
+  "headers": {},
   "referer": "https://www.cotrip.org/",
-  "sample_image": "https://api-511x-co.carsprogram.org/tg_lane_closure_urgent.png",
+  "sample_image": "https://api-511x-co.carsprogram.org/tg_roadwork_routine.png",
   "image_verified": false,
   "token_in_url": false,
   "found_at": "2026-09-17",
   "enabled": false,
   "label": "COtrip",
-  "state": "CO",
-  "reason": "false positive: roadwork events, not cameras"
+  "state": "CO"
  },
  "nj": {
   "key": "nj",
-  "endpoint": "https://511nj.org/client/trafficMap/getCameraDataByTourId",
+  "endpoint": "https://511nj.org/client/get/event",
   "items_path": "$.data",
   "fields": {
    "lat": "latitude",
    "lon": "longitude",
-   "image": "cameraMainDetail[0].url",
-   "name": "name",
-   "id": "cameraId",
-   "count": 679
+   "image": "iconFile",
+   "name": "iconFile",
+   "id": "iconFile",
+   "count": 803
   },
+  "replay_verified": false,
   "method": "POST",
-  "post_data": "{\"encryptedData\":\"214efe855c8a80d628f35c01a44c2c3e\"}",
-  "media": "hls",
-  "referer": "https://511nj.org/camera",
-  "sample_image": "https://nj-511.wink.co/hls/public/30/WF01-6478-AAD0-D5C0-F5D7_high/index.m3u8",
-  "image_verified": true,
+  "post_data": "{\"encryptedData\":\"6bfb960f774de3325100d3d5c6005d90e5dfd0036f9e1190db396cf8a6caf38e\"}",
+  "media": "still",
+  "cookies": "_ga=GA1.1.1691073283.1789653864; googtrans=%2Fen%2Fen; _ga_2459515ZCZ=GS2.1.s1789653864$o1$g1$t1789653872$j52$l0$h0",
+  "headers": {
+   "accept": "application/json",
+   "content-type": "application/json"
+  },
+  "referer": "https://511nj.org/",
+  "sample_image": "https://511nj.org/client/get/construction.gif",
+  "image_verified": false,
   "token_in_url": false,
   "found_at": "2026-09-17",
   "enabled": false,
   "label": "511NJ",
-  "state": "NJ",
-  "reason": "POST body is a per-session encrypted token; replay returns 401"
+  "state": "NJ"
  },
  "hi": {
   "key": "hi",

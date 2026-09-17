@@ -41,3 +41,4 @@ docs/agent/HANDOFF.md
 docs/agent/HANDOFF.md
 .agent/runtime/
 data/apb.sqlite*
+data/sniff_captures/

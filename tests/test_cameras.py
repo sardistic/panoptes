@@ -189,3 +189,39 @@ def test_snapshot_sniffs_octet_stream_images(monkeypatch):
         def raise_for_status(self): pass
     monkeypatch.setattr(reg._client, "get", lambda *a, **k: _R())
     assert reg.snapshot("a:1")[1] == "image/jpeg"
+
+
+def test_iteris_graphql_lane_maps_camera_views_and_skips_other_features():
+    payload = {"data": {"mapFeaturesQuery": {"mapFeatures": [
+        {"__typename": "Camera", "uri": "camera/59618189", "title": "IA 163 @ MM 4.3", "active": True,
+         "features": [{"geometry": {"type": "Point", "coordinates": [-93.517, 41.599]}}],
+         "views": [{"url": "https://atms.iowadot.gov/a.jpg"}, {"url": "https://s.iowadot.gov/x/playlist.m3u8"}]},
+        {"__typename": "Event", "uri": "event/1", "title": "roadwork",
+         "features": [{"geometry": {"coordinates": [-93.5, 41.6]}}]}]}}}
+    class _Reg(CameraRegistry):
+        def __init__(self): super().__init__(); self.sent = None
+    reg = _Reg()
+    class _R:
+        def raise_for_status(self): pass
+        def json(self): return payload
+    def post(url, json=None, headers=None, **k):
+        reg.sent = (url, json); return _R()
+    reg._client.post = post
+    src = SOURCES["it_ia"]
+    rows = cameras._iteris(reg, src)
+    assert [r["id"] for r in rows] == ["it_ia:59618189.0", "it_ia:59618189.1"]
+    assert rows[0]["image_url"].endswith("a.jpg") and rows[1]["stream_url"].endswith("playlist.m3u8")
+    assert reg.sent[0] == "https://511ia.org/api/graphql"
+    assert reg.sent[1]["variables"]["input"]["layerSlugs"] == ["normalCameras"]
+    assert "... on Plow" in reg.sent[1]["query"]           # trimmed queries get "Server error"
+
+
+def test_cars_colorado_skips_broken_and_private_views():
+    data = {"features": [
+        {"geometry": {"coordinates": [-105.0, 40.58]}, "properties": {"id": 1, "name": "I-25", "public": True, "route": "I-25",
+         "views": [{"name": "I-25 SB", "url": "https://p.cotrip.org/rtplive/x/playlist.m3u8", "videoPreviewUrl": "https://c.carsprogram.org/x.png", "broken": False},
+                   {"name": "I-25 NB", "url": "https://p.cotrip.org/rtplive/y/playlist.m3u8", "videoPreviewUrl": "https://c.carsprogram.org/y.png", "broken": True}]}},
+        {"geometry": {"coordinates": [-105.1, 40.5]}, "properties": {"id": 2, "name": "private", "public": False,
+         "views": [{"url": "https://p/z.m3u8", "videoPreviewUrl": "https://c/z.png"}]}}]}
+    rows = cameras._cars_co(_Stub({"map-features": data}), SOURCES["cotrip"])
+    assert len(rows) == 1 and rows[0]["id"] == "cotrip:1.0" and rows[0]["stream_url"].endswith("x/playlist.m3u8")

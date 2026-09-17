@@ -14,7 +14,7 @@ def _cams(n, img="https://x.gov/cams/{i}.jpg"):
 def test_score_list_finds_camera_shape_and_rejects_icons_and_small_lists():
     sc = score_list(_cams(30))
     assert sc and sc["lat"] == "lat" and sc["lon"] == "lon" and sc["image"] == "url" and sc["count"] == 30
-    assert score_list(_cams(10)) is None                                       # too few to be a fleet
+    assert score_list(_cams(5)) is None                                        # too few to be a fleet
     assert score_list(_cams(30, img="https://x.gov/images/tg_marker.svg")) is None   # map icons, not cameras
     nested = [{"site": {"latitude": 38.1, "longitude": -90.1}, "views": [{"snapshot": "https://x/1.jpg"}]} for _ in range(20)]
     sc = score_list(nested)

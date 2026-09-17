@@ -546,6 +546,78 @@ def _ohgo(reg, src) -> list[dict]:
     return out
 
 
+# ── "one-network" (Iteris/Castle Rock) 511 platform: GraphQL MapFeatures ──────
+# Found by the sniffer on 511ia.org: the public map asks /api/graphql for a bbox
+# of features per layer slug; the camera layer is keyless and returns every camera
+# un-clustered when asked at zoom 14 for the whole state. The query must carry the
+# UI's full fragment set (a trimmed query gets "Server error").
+_ITERIS_QUERY = ("query MapFeatures($input: MapFeaturesArgs!, $plowType: String) { mapFeaturesQuery(input: $input) "
+                 "{ mapFeatures { bbox title tooltip uri features { id geometry properties type } ... on Cluster "
+                 "{ maxZoom } ... on Sign { signDisplayType } ... on Event { priority } __typename ... on Camera "
+                 "{ active views(limit: 5) { uri ... on CameraView { url } category } } ... on Plow { views(limit: 5, "
+                 "plowType: $plowType) { uri ... on PlowCameraView { url } category } } } error { message type } } }")
+# key -> (host, state, (north, south, east, west))
+ITERIS: dict[str, tuple[str, str, tuple[float, float, float, float]]] = {
+    "ia": ("511ia.org", "IA", (43.6, 40.3, -90.1, -96.7)),
+    "in": ("511in.org", "IN", (41.8, 37.7, -84.7, -88.1)),
+    "mn": ("511mn.org", "MN", (49.4, 43.4, -89.4, -97.3)),
+    "ne": ("511.nebraska.gov", "NE", (43.1, 39.9, -95.2, -104.1)),
+    "ma": ("mass511.com", "MA", (42.9, 41.2, -69.9, -73.6)),
+    "ks": ("www.kandrive.gov", "KS", (40.1, 36.9, -94.5, -102.1)),
+    # probed 2026-09-17 and NOT on this platform: CO (CARS "511x"), SD, ND, KY, VA, SC,
+    # WV, CT, NC, WA, AR, HI — see SOURCES.md for their status
+}
+
+
+def _iteris(reg, src) -> list[dict]:
+    host, state, (n, s, e, w) = ITERIS[src.key.split("_", 1)[1]]
+    body = {"query": _ITERIS_QUERY, "plowType": None,
+            "variables": {"input": {"north": n, "south": s, "east": e, "west": w, "zoom": 14,
+                                    "layerSlugs": ["normalCameras"], "nonClusterableUris": ["dashboard"]},
+                          "plowType": "plowCameras"}}
+    r = reg._client.post(f"https://{host}/api/graphql", json=body, headers={
+        "Referer": f"https://{host}/", "Origin": f"https://{host}", "Accept": "*/*"})
+    r.raise_for_status()
+    feats = ((r.json().get("data") or {}).get("mapFeaturesQuery") or {}).get("mapFeatures") or []
+    out = []
+    for c in feats:
+        if c.get("__typename") != "Camera":
+            continue
+        pt = ((c.get("features") or [{}])[0].get("geometry") or {}).get("coordinates") or [None, None]
+        views = [v for v in (c.get("views") or []) if v.get("url")]
+        for i, v in enumerate(views):
+            url = v["url"]
+            r_ = _row(src.key, f"{c.get('uri', '').split('/')[-1]}.{i}",
+                      c.get("title") + (f" · view {i + 1}" if len(views) > 1 else ""), pt[1], pt[0],
+                      state=state, image_url=None if ".m3u8" in url else url,
+                      stream_url=url if ".m3u8" in url else None, online=bool(c.get("active", True)),
+                      page_url=f"https://{host}/")
+            if r_:
+                out.append(r_)
+    return out
+
+
+def _cars_co(reg, src) -> list[dict]:
+    """Colorado COtrip: Castle Rock CARS "511x" API (keyless GeoJSON) — every camera
+    view carries an HLS playlist and a snapshot PNG."""
+    data = reg.get_json("https://api-511x-co.carsprogram.org/cameras/map-features")
+    out = []
+    for f in data.get("features", []):
+        p, c = f.get("properties") or {}, (f.get("geometry") or {}).get("coordinates") or [None, None]
+        if not p.get("public", True):
+            continue
+        for i, v in enumerate(p.get("views") or []):
+            if v.get("broken"):
+                continue
+            r = _row("cotrip", f"{p.get('id')}.{i}", v.get("name") or p.get("name"), c[1], c[0], state="CO",
+                     roadway=p.get("route"), image_url=v.get("videoPreviewUrl"),
+                     stream_url=v.get("url") if ".m3u8" in str(v.get("url", "")) else None,
+                     page_url="https://www.cotrip.org/")
+            if r:
+                out.append(r)
+    return out
+
+
 # ── discovered feeds: specs written by apb.discover.camera_sniff ──────────────
 _DISCOVERIES = Path(__file__).resolve().parents[2] / "data" / "camera_discoveries.json"
 _PATH_PART = re.compile(r"([^\[]+)(?:\[(\d+)\])?$")
@@ -568,7 +640,10 @@ def _discovered(reg, src) -> list[dict]:
     records through the discovered field paths. A `X[0].` prefix shared by the
     lat/lon/image paths means X is a per-site list of cameras: expand it."""
     spec = src.spec
-    hdr = {"Referer": spec.get("referer") or "", "Accept": "application/json, text/plain, */*"}
+    hdr = {"Referer": spec.get("referer") or "", "Accept": "application/json, text/plain, */*",
+           **{k: v for k, v in (spec.get("headers") or {}).items() if k.lower() != "content-type"}}
+    if spec.get("cookies"):
+        hdr["Cookie"] = spec["cookies"]
     if spec.get("method", "GET").upper() == "POST":
         r = reg._client.post(spec["endpoint"], content=spec.get("post_data") or "", headers={
             **hdr, "Content-Type": "application/json"})
@@ -687,6 +762,9 @@ SOURCES: dict[str, CameraSource] = {
     "ab511": CameraSource("ab511", "511 Alberta cameras", _carmanah_v2, "AB",
                           env_key="T511_AB_KEY", host="511.alberta.ca"),
 }
+SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")
+SOURCES.update({f"it_{k}": CameraSource(f"it_{k}", f"{v[1]} 511 cameras (one-network)", _iteris, v[1])
+                for k, v in ITERIS.items()})
 SOURCES.update(_load_discoveries())      # sniffed feeds (data/camera_discoveries.json)
 
 # Hosts the browser may pull HLS playlists/segments from directly (hls.js fetch +
@@ -700,6 +778,7 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://s3-eu-west-1.amazonaws.com",   # TfL mp4 clips
     "https://*.wowza.com",              # ALGO Alabama HLS CDN
     "https://*.modot.mo.gov",           # MoDOT (discovered) HLS
+    "https://*.cotrip.org",             # COtrip HLS
 )
 
 

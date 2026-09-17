@@ -65,6 +65,11 @@ local pipeline and source discovery:
 
 ## Live cameras (keyless, on by default)
 
+**One-network (Iteris) 511 states — keyless GraphQL, found by the sniffer:** IA, IN,
+MN, NE, MA, KS (`ITERIS` in cameras.py; the public map's `MapFeatures` query with the
+`normalCameras` layer, whole-state bbox at zoom 14 → every camera un-clustered).
+**Colorado** via the CARS "511x" GeoJSON API (`api-511x-co.carsprogram.org`).
+
 **Finding new feeds is automated:** `python -m apb.discover.camera_sniff` (needs
 Playwright + Chromium, build-time only) opens each DOT/511 map in `SEEDS`, captures
 the JSON the page loads, recognises camera lists by shape, validates a still or HLS
