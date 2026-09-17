@@ -56,3 +56,22 @@ Consequences: the existing `GOOGLE_API_KEY` in prod is Custom-Search-restricted 
 returns 403 for the Generative Language API — a separate `GEMINI_API_KEY` must be
 added to `/srv/panoptes/.env` before the clip answers in production. Shareable view
 state now lives in the URL hash (`v`, `m`, `w`, `t`, `s`, `l`).
+
+### 2026-09-17 — Facts aggregator streams fastest-first; Overpass is best-effort
+
+Context: the user wants every public metric for a drawn box (population, income,
+elevation, flood zone, tides, sky, air, wildlife, POIs…). Sources vary from 200 ms
+(Open-Meteo) to 30 s+ (Overpass mirrors, WorldPop tasks).
+
+Decision: `apb/context/facts.py` runs every source in parallel and `facts_stream`
+yields each result the moment it lands (NDJSON via `/facts?stream=1`); the bubble's
+table fills in arrival order but displays in canonical section order. A 15 s deadline
+ends the stream; stragglers keep running and land in the 10-min cache, so the next
+ask is complete. Census ACS needs a key (the API refuses keyless now) — gated on
+`CENSUS_API_KEY`; WorldPop covers headcount keylessly. Overpass's main server 406s
+our client; a mirror (`APB_OVERPASS_URL`) is used and treated as best-effort.
+Google Places / reviews are not wired: Places is a billed API with no keyless tier;
+OSM POI counts stand in for "business activity".
+
+Consequences: `/facts` is cheap to add to (one function + one tuple in `_tasks`).
+Windy webcams are looked up per view, not preloaded (100k+ cams).

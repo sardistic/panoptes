@@ -157,6 +157,14 @@ FOCUS_BRIEFS = {
         "environment readout, visibility, wind, precipitation, air quality, day/night, and "
         "what the camera stills show about actual conditions. Explain how the weather bears "
         "on the incidents/hazards present. 100-180 words."),
+    "facts": (
+        "The user asked for the FACTS of this rectangle. You are given a structured facts "
+        "digest (place, population, economy, terrain, water, sky, air, nature, activity — "
+        "each labelled with its source). Write a tight briefing, 150-260 words, organised "
+        "as short labelled lines (Place:, People:, Economy:, Terrain & water:, Sky:, Air:, "
+        "Nature:, Activity:). Quote the numbers with units; say which are estimates "
+        "(WorldPop, tract-level ACS, model-derived weather). Note anything notable or "
+        "contradictory. Do not invent metrics that are not in the digest."),
     "place": (
         "Focus on the place itself: what area/city/roads/landmarks the rectangle covers "
         "(infer from coordinates, incident locations, roadway names, camera names and news), "
@@ -252,6 +260,8 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
         val = ctx.get(key)
         if val:
             lines.append(f"{label}: {json.dumps(val, ensure_ascii=False)[:6000]}")
+    if ctx.get("facts"):
+        lines.append("Facts digest for the box (JSON, by section): " + ctx["facts"])
     if ctx.get("prior"):
         lines.append("Earlier looks at this same area (your own previous answers; note what "
                      "changed since): " + json.dumps(ctx["prior"], ensure_ascii=False)[:2500])

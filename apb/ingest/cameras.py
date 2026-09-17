@@ -476,6 +476,73 @@ def _hongkong(reg, src) -> list[dict]:
     return out
 
 
+def _toronto(reg, src) -> list[dict]:
+    """City of Toronto RESCU cameras (open data GeoJSON; still per site)."""
+    out = []
+    data = reg.get_json("https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/a3309088-5fd4-4d34-8297-"
+                        "77c8301840ac/resource/4a568300-c7f8-496d-b150-dff6f5dc6d4f/download/traffic-camera-list-4326.geojson")
+    for f in data.get("features", []):
+        p, c = f.get("properties") or {}, (f.get("geometry") or {}).get("coordinates") or [None, None]
+        if c and isinstance(c[0], list):          # MultiPoint
+            c = c[0]
+        if len(c) < 2:
+            continue
+        r = _row("toronto", p.get("REC_ID"), f"{p.get('MAINROAD')} @ {p.get('CROSSROAD')}", c[1], c[0],
+                 state="ON", roadway=p.get("MAINROAD"), image_url=p.get("IMAGEURL"))
+        if r:
+            out.append(r)
+    return out
+
+
+def _buoycams(reg, src) -> list[dict]:
+    """NOAA NDBC BuoyCAMs: ocean-buoy panoramas (kind=marine), hourly stills."""
+    out = []
+    for c in reg.get_json("https://www.ndbc.noaa.gov/buoycams.php"):
+        r = _row("buoycam", c.get("id"), c.get("name"), c.get("lat"), c.get("lng"), state="sea",
+                 image_url=f"https://www.ndbc.noaa.gov/buoycam.php?station={c.get('id')}", kind="marine")
+        if r:
+            out.append(r)
+    return out
+
+
+def _wsdot(reg, src) -> list[dict]:
+    """WSDOT statewide cameras — free AccessCode (WSDOT_ACCESS_CODE). Shape per WSDOT
+    Traveler API docs; unverified until a code is set."""
+    key = os.environ.get("WSDOT_ACCESS_CODE", "").strip()
+    if not key:
+        return []
+    out = []
+    for c in reg.get_json("https://wsdot.wa.gov/Traffic/api/HighwayCameras/HighwayCamerasREST.svc/"
+                          f"GetCamerasAsJson?AccessCode={key}"):
+        loc = c.get("CameraLocation") or {}
+        r = _row("wsdot", c.get("CameraID"), c.get("Title"), loc.get("Latitude"), loc.get("Longitude"),
+                 state="WA", roadway=loc.get("RoadName"), image_url=c.get("ImageURL"),
+                 online=bool(c.get("IsActive", True)))
+        if r:
+            out.append(r)
+    return out
+
+
+def _ohgo(reg, src) -> list[dict]:
+    """OHGO (Ohio DOT) cameras — free key (OHGO_API_KEY, `Authorization: APIKEY <key>`).
+    Shape per publicapi.ohgo.com docs; unverified until a key is set."""
+    key = os.environ.get("OHGO_API_KEY", "").strip()
+    if not key:
+        return []
+    out = []
+    r0 = reg._client.get("https://publicapi.ohgo.com/api/v1/cameras?page-all=true",
+                         headers={"Authorization": f"APIKEY {key}"})
+    r0.raise_for_status()
+    for c in r0.json().get("results", []):
+        for i, v in enumerate(c.get("cameraViews") or []):
+            r = _row("ohgo", f"{c.get('id')}.{i}", f"{c.get('location')} · {v.get('direction') or ''}".strip(" ·"),
+                     c.get("latitude"), c.get("longitude"), state="OH", direction=v.get("direction"),
+                     image_url=v.get("largeUrl") or v.get("smallUrl"))
+            if r:
+                out.append(r)
+    return out
+
+
 SOURCES: dict[str, CameraSource] = {
     "caltrans": CameraSource("caltrans", "Caltrans CCTV (12 districts)", _caltrans, "CA"),
     "nyctmc": CameraSource("nyctmc", "NYC DOT traffic cameras", _nyctmc, "NY"),
@@ -500,6 +567,10 @@ SOURCES: dict[str, CameraSource] = {
     "sg": CameraSource("sg", "Singapore LTA traffic images", _singapore, "SG"),
     "hk": CameraSource("hk", "Hong Kong TD traffic snapshots", _hongkong, "HK"),
     "tfnsw": CameraSource("tfnsw", "Transport for NSW cameras", _tfnsw, "NSW"),
+    "toronto": CameraSource("toronto", "City of Toronto RESCU cameras", _toronto, "ON"),
+    "buoycam": CameraSource("buoycam", "NOAA NDBC BuoyCAMs", _buoycams, None),
+    "wsdot": CameraSource("wsdot", "WSDOT cameras", _wsdot, "WA", env_key="WSDOT_ACCESS_CODE"),
+    "ohgo": CameraSource("ohgo", "OHGO Ohio cameras", _ohgo, "OH", env_key="OHGO_API_KEY"),
     # Carmanah v2 hosts that answered "Invalid Key" (2026-09-17): same free key as
     # the 511 events lane where one exists. Shape unverified until a key is set.
     "ga511": CameraSource("ga511", "511 Georgia cameras", _carmanah_v2, "GA",
@@ -575,6 +646,7 @@ class CameraRegistry:
         self._loading: set[str] = set()
         self._snap: dict[str, tuple[float, bytes, str]] = {}
         self._snap_lock = threading.Lock()
+        self._windy_cache: dict[tuple, tuple[float, list[dict]]] = {}
 
     # -- upstream helpers used by parsers
     def get_json(self, url: str):
@@ -621,6 +693,45 @@ class CameraRegistry:
                 threading.Thread(target=self._refresh, args=(key,), daemon=True,
                                  name=f"cameras-{key}").start()
 
+    def windy(self, bbox: tuple[float, float, float, float]) -> list[dict]:
+        """Windy Webcams (WINDY_WEBCAMS_KEY): the world's largest public webcam index,
+        looked up per box (v3 `nearby`) and cached 10 min. Adds beaches, mountains,
+        cities, harbours — anything not run by a DOT."""
+        key = os.environ.get("WINDY_WEBCAMS_KEY", "").strip()
+        if not key:
+            return []
+        w, s, e, n = bbox
+        lat, lon = (s + n) / 2, (w + e) / 2
+        radius = max(3, min(250, int(max(n - s, (e - w) * 0.7) * 111 / 2 + 2)))
+        ck = (round(lat, 2), round(lon, 2), radius)
+        now = time.time()
+        with self._snap_lock:
+            hit = self._windy_cache.get(ck)
+            if hit and now - hit[0] < 600:
+                return hit[1]
+        rows: list[dict] = []
+        try:
+            r = self._client.get("https://api.windy.com/webcams/api/v3/webcams",
+                                 params={"nearby": f"{lat},{lon},{radius}", "limit": 50,
+                                         "include": "location,images,player,urls"},
+                                 headers={"x-windy-api-key": key})
+            r.raise_for_status()
+            for c in r.json().get("webcams", []):
+                loc, imgs = c.get("location") or {}, ((c.get("images") or {}).get("current") or {})
+                row = _row("windy", c.get("webcamId"), c.get("title"), loc.get("latitude"), loc.get("longitude"),
+                           state=loc.get("country"), roadway=loc.get("city"), image_url=imgs.get("preview"),
+                           page_url=((c.get("urls") or {}).get("detail")), online=c.get("status") == "active",
+                           kind="webcam")
+                if row:
+                    rows.append(row)
+        except (httpx.HTTPError, ValueError) as ex:
+            log.info("[cameras] windy lookup failed: %s", ex)
+        with self._snap_lock:
+            self._windy_cache[ck] = (now, rows)
+            for r_ in rows:
+                self._index[r_["id"]] = r_          # so the snapshot proxy can resolve them
+        return rows
+
     def query(self, bbox: tuple[float, float, float, float] | None = None,
               limit: int = 2000, source: str | None = None,
               online_only: bool = True) -> list[dict]:
@@ -630,6 +741,8 @@ class CameraRegistry:
         with self._lock:
             rows = [r for k, rs in self._rows.items() if not source or k == source
                     for r in rs]
+        if bbox and (not source or source == "windy") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 6:
+            rows = rows + self.windy(bbox)
         if online_only:
             rows = [r for r in rows if r["online"]]
         if bbox:

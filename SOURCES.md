@@ -16,6 +16,11 @@ and surge-score source-diversity.
 | OpenAQ | `OPENAQ_KEY` | PM2.5 air-quality spikes (v3 API) | https://openaq.org/ → account → API key (https://docs.openaq.org/) |
 | aisstream.io | `AISSTREAM_KEY` | Live maritime AIS vessel positions (websocket) | https://aisstream.io/ → free signup → API key |
 | Gemini (scene explainer) | `GEMINI_API_KEY` (or an unrestricted `GOOGLE_API_KEY`) | "What am I looking at?" — the clip's box summaries, camera image analysis, drill-downs. `GEMINI_MODEL` pins a model; otherwise the newest Flash is auto-picked | https://aistudio.google.com/apikey — the key must allow the Generative Language API (the Custom-Search-restricted key returns 403) |
+| Census ACS (facts) | `CENSUS_API_KEY` | Tract/county population, median income, income bands, age, home value, poverty, education, renters | https://api.census.gov/data/key_signup.html — instant |
+| eBird (facts) | `EBIRD_API_KEY` | Notable bird sightings near the box (7 days) | https://ebird.org/api/keygen — instant |
+| Windy Webcams (cameras) | `WINDY_WEBCAMS_KEY` | World's largest public webcam index, looked up per map view | https://api.windy.com/keys — free tier |
+| WSDOT (cameras) | `WSDOT_ACCESS_CODE` | Washington statewide cameras | https://wsdot.wa.gov/traffic/api/ — free |
+| OHGO (cameras) | `OHGO_API_KEY` | Ohio statewide cameras | https://publicapi.ohgo.com — free |
 | ACLED | `ACLED_EMAIL` + `ACLED_PASSWORD` | Protests, riots, political-violence events | https://acleddata.com/user/register → myACLED account (OAuth login; the old key+email API is retired) |
 | 511 Georgia | `T511_GA_KEY` | Statewide GA DOT traffic incidents | https://511ga.org → developer resources (free key) |
 | 511 Louisiana | `T511_LA_KEY` | Statewide LA DOT traffic incidents | https://511la.org → developer resources |

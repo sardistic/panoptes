@@ -315,6 +315,12 @@
     background:#0b0d10;border:1px solid var(--line-2);border-radius:2px;color:#9fc4d0;font-size:14px;cursor:pointer}
   #clipBubble .thumbs .livetile small{font:600 7px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
   #clipBubble .thumbs .livetile:hover{border-color:#ffd23f}
+  #clipBubble .facts{margin-top:10px;white-space:normal}
+  #clipBubble .facts details{border-top:1px solid var(--line);padding:5px 0}
+  #clipBubble .facts summary{font:600 9px/1.6 var(--font);letter-spacing:.16em;text-transform:uppercase;color:#ffd23f;cursor:pointer}
+  #clipBubble .facts table{width:100%;border-collapse:collapse;font:500 10px/1.35 var(--mono)}
+  #clipBubble .facts th{text-align:left;color:var(--dim);font-weight:500;padding:2px 6px 2px 0;vertical-align:top;width:44%}
+  #clipBubble .facts td{color:var(--txt-2);padding:2px 0;vertical-align:top;word-break:break-word}
   #clipBubble .thumbs img.live{background:#0b0d10 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='%239fc4d0'/%3E%3C/svg%3E") center/40% no-repeat}
   #map.drawing .leaflet-container,#map.drawing{cursor:crosshair!important}
   @media (max-width:760px){ #clip{bottom:calc(34vh + 12px);width:72px;height:72px} #clip svg{width:64px;height:64px} #clipBubble{bottom:calc(34vh + 90px)} }
@@ -1924,8 +1930,10 @@ const CAM_SRC={caltrans:'Caltrans',nyctmc:'NYC DOT',ny511:'511NY',deldot:'DelDOT
   seattle:'Seattle DOT',on511:'Ontario 511',tfl:'TfL JamCam',nzta:'NZTA',tripcheck:'ODOT TripCheck',
   algo:'ALGO Alabama',travelmidwest:'TravelMidwest',austin:'Austin TX',brla:'Baton Rouge',
   alertca:'ALERTCalifornia',calgary:'Calgary',ottawa:'Ottawa',vancouver:'Vancouver',
-  digitraffic:'Fintraffic',sg:'Singapore LTA',hk:'Hong Kong TD',tfnsw:'Transport NSW'};
-const CAM_KIND_C={traffic:CAM_C,wildfire:'#e0873a',weather:'#8fb0d8'};
+  digitraffic:'Fintraffic',sg:'Singapore LTA',hk:'Hong Kong TD',tfnsw:'Transport NSW',toronto:'Toronto RESCU',buoycam:'NOAA BuoyCAM',
+  wsdot:'WSDOT',ohgo:'OHGO Ohio',windy:'Windy webcam'};
+const CAM_KIND_LABEL={wildfire:'Wildfire camera',weather:'Weather camera',marine:'Buoy camera',webcam:'Public webcam'};
+const CAM_KIND_C={traffic:CAM_C,wildfire:'#e0873a',weather:'#8fb0d8',marine:'#5fb3c9',webcam:'#c9b27a'};
 let showCameras=false, cameraRows=[], cameraFetchT=null, cameraCtl=null;
 let camPopupTimer=null, camHls=null, camPopup=null;
 const cameraLayer=L.layerGroup().addTo(map);
@@ -2013,7 +2021,7 @@ function openCamera(c){
   const src=CAM_SRC[c.source]||String(c.source).toUpperCase();
   const meta=[c.roadway,c.direction&&c.direction!=='Unknown'?c.direction:null,c.state].filter(Boolean).map(esc).join(' · ');
   const el=document.createElement('div'); el.className='pop cam';
-  const kindLabel={wildfire:'Wildfire camera',weather:'Weather camera'}[c.kind]||'Live camera';
+  const kindLabel=CAM_KIND_LABEL[c.kind]||'Live camera';
   el.innerHTML=`<div class="kick" style="color:${CAM_KIND_C[c.kind]||CAM_C}">${kindLabel} · ${esc(src)}</div>`
     +`<div class="ttl">${esc(c.name||c.id)}</div>`
     +`<div class="frame"></div>`
@@ -2151,10 +2159,10 @@ function clipContext(b){
 }
 // Drill-down chips: only facets that actually have data in the box, plus the two
 // that always make sense (weather, place). Re-asks the same rectangle with a focus.
-const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place']];
+const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place'],['facts','Facts']];
 function clipFacetsHtml(ctx,current){
   const has={overview:true,cameras:(ctx.cameras||[]).length>0||(ctx.stream_cameras||[]).length>0,incidents:ctx.counts.incidents_in_box>0,hazards:ctx.counts.hazards_in_box>0,
-    social:ctx.counts.social_in_box>0,weather:true,place:true};
+    social:ctx.counts.social_in_box>0,weather:true,place:true,facts:true};
   const chips=CLIP_FACETS.filter(([k])=>has[k]).map(([k,l])=>`<button data-focus="${k}" class="${k===current?'cur':''}">${l}${k==='cameras'?` · ${ctx.cameras.length+(ctx.stream_cameras||[]).length}`:k==='incidents'?` · ${ctx.counts.incidents_in_box}`:k==='hazards'?` · ${ctx.counts.hazards_in_box}`:k==='social'?` · ${ctx.counts.social_in_box}`:''}</button>`).join('');
   return `<div class="dive"><span class="lab">Dive into</span>${chips}</div>`;
 }
@@ -2206,6 +2214,52 @@ function clipSnippet(b,ctx){
   } else overlays();
   return wrap;
 }
+// Facts table: every metric for the box, grouped by section, straight from /facts
+// (the same digest the model was given), so the numbers are inspectable, not just prose.
+const FACT_LABEL={worldpop_2020_in_box:'population in box (WorldPop 2020)',median_household_income_usd:'median household income $',
+  median_home_value_usd:'median home value $',household_income_bands_pct:'income bands %',county_unemployment_rate_pct:'county unemployment %',
+  epa_tri_facilities_in_county:'EPA TRI facilities (county)',elevation_m:'elevation m (min/mean/max)',fema_flood_zone_at_center:'FEMA flood zone',
+  nearest_tide_station:'tide station',water_level_ft_mllw:'water level ft (MLLW)',river_discharge_m3s:'river discharge m³/s',
+  solar_irradiance_kwh_m2_day_recent_mean:'solar kWh/m²/day (recent)',aircraft_within_nm:'aircraft radius nm',us_aqi:'US AQI',pm2_5:'PM2.5',pm10:'PM10',
+  inaturalist_obs_30d:'iNaturalist obs (30d)',gbif_occurrences_this_year:'GBIF occurrences (year)',daylight_hours:'daylight h'};
+function factVal(v){
+  if(v==null) return '—';
+  if(Array.isArray(v)) return v.map(x=>typeof x==='object'?Object.values(x).filter(y=>y!=null).join(' '):x).slice(0,8).join(', ');
+  if(typeof v==='object') return Object.entries(v).map(([k,x])=>`${k.replace(/_/g,' ')} ${factVal(x)}`).join(' · ');
+  return String(v);
+}
+async function loadFactsTable(b){
+  const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(x=>x.toFixed(4)).join(',');
+  const body=clipBubble.querySelector('.body'); if(!body) return;
+  const holder=document.createElement('div'); holder.className='facts';
+  holder.innerHTML='<div class="prog"><i></i></div><div class="steps note">metrics arrive as each source answers…</div>';
+  body.appendChild(holder);
+  const order=['place','population','economy','terrain','water','sky','air','nature','activity'];
+  const secEl={};
+  const section=k=>{ if(secEl[k]) return secEl[k];
+    const d=document.createElement('details'); d.open=true; d.innerHTML=`<summary>${esc(k)}</summary><table></table>`;
+    const later=order.slice(order.indexOf(k)+1).map(x=>secEl[x]).find(Boolean);   // canonical order, any arrival order
+    (later||holder.querySelector('.note')).before(d); return secEl[k]=d; };
+  const addRows=(k,data)=>{ const t=section(k).querySelector('table');
+    Object.entries(data).filter(([kk])=>!['time','interval'].includes(kk)).forEach(([kk,v])=>{
+      const tr=document.createElement('tr'); tr.innerHTML=`<th>${esc(FACT_LABEL[kk]||kk.replace(/_/g,' '))}</th><td>${esc(factVal(v)).slice(0,220)}</td>`; t.appendChild(tr); }); };
+  try{
+    const res=await fetch(`/facts?bbox=${bb}&stream=1`); if(!res.ok||!res.body) throw new Error('facts '+res.status);
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true}); let nl;
+      while((nl=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,nl); buf=buf.slice(nl+1); if(!line.trim()) continue;
+        let ev; try{ ev=JSON.parse(line); }catch(_){ continue; }
+        if(ev.data) addRows(ev.section,ev.data);
+        else if(ev.done){ holder.querySelector('.prog')?.remove();
+          const note=holder.querySelector('.note');
+          note.textContent=(ev.failed&&ev.failed.length?`still waiting on: ${ev.failed.map(x=>x.split(':')[0]).join(', ')} (ask again in a minute). `:'')+'every metric shown is public, keyless data.'; }
+      }
+    }
+  }catch(_){ holder.innerHTML='<div class="steps">facts unavailable</div>'; }
+}
 // Grab one frame from an HLS camera: play muted for ~1.5s, draw to canvas, JPEG it.
 // CORS-clean streams (ACAO *) stay untainted; anything else fails quietly -> null.
 function grabFrame(c,timeoutMs=8000){
@@ -2241,6 +2295,7 @@ function renderLook(look,b,foot){
   foot=foot||[look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ');
   clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
   clipBox=b; clipState='result';
+  if(focus==='facts') loadFactsTable(b);   // streams every metric under the briefing
   if(!clipCams.length){                   // re-opened look: mark its cameras on the snippet
     const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(',');
     fetch(`/live/cameras?bbox=${bb}&limit=400`).then(r=>r.json()).then(rows=>{ clipCams=rows.filter(c=>c.image_url||c.stream_url);
@@ -2263,6 +2318,8 @@ function addLook(look,fresh){
   if(!look||!look.bounds||look.bounds.south==null) return;
   if(looksById.has(look.uid)) looksLayer.removeLayer(looksById.get(look.uid));
   const b=L.latLngBounds([look.bounds.south,look.bounds.west],[look.bounds.north,look.bounds.east]);
+  // repeated looks at the same box (drill-downs) share one outline instead of stacking fills
+  for(const [uid,r0] of looksById){ if(r0.getBounds().equals(b,1e-4)){ looksLayer.removeLayer(r0); looksById.delete(uid); } }
   const c=LOOK_C[look.focus]||LOOK_C.overview;
   const r=L.rectangle(b,{color:c,weight:fresh?1.6:1.1,dashArray:'6 4',fillColor:c,fillOpacity:fresh?.07:.035,interactive:true});
   r.bindTooltip(`${esc((look.focus||'overview').toUpperCase())} · ${esc(ago(look.ts))} — ${esc((look.text||'').slice(0,90))}…`,{sticky:true,className:'look-label',direction:'top'});
@@ -2273,7 +2330,7 @@ function addLook(look,fresh){
 async function loadLooks(){
   try{ (await (await fetch('/looks?max_age_hours=24&limit=200')).json()).reverse().forEach(l=>addLook(l,false)); }catch(_){}
 }
-const CLIP_TITLES={overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
+const CLIP_TITLES={facts:'The facts',overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
 async function clipExplain(b,focus='overview'){
   clipState='thinking'; clipEl.classList.add('thinking'); clipBox=b;
   clipThinking(b,focus);

@@ -864,7 +864,7 @@ class ExplainRequest(BaseModel):
     stream_cameras: list[str] = Field(default_factory=list, max_length=20)   # names, HLS-only
     frames: list[dict] = Field(default_factory=list, max_length=4)   # {id, data} browser frame grabs
     focus: Literal["overview", "cameras", "incidents", "hazards", "social", "weather",
-                   "place"] = "overview"
+                   "place", "facts"] = "overview"
 
 
 _explain_hits: dict[str, deque] = defaultdict(deque)
@@ -908,6 +908,12 @@ def explain_scene(req: ExplainRequest, request: Request):
         except Exception as e:                  # never let context enrichment sink the answer
             log.info("explain news context failed: %s", e)
     max_stills = 10 if req.focus == "cameras" else 3      # fewer bytes = faster first answer
+    if req.focus in ("facts", "place"):                   # every public metric for the box
+        from apb.context import facts as facts_mod
+        try:
+            ctx["facts"] = facts_mod.digest(facts_mod.facts(b))
+        except Exception as e:
+            log.info("facts unavailable: %s", e)
     ctx["stream_cameras"] = [str(n)[:120] for n in req.stream_cameras]
     from apb.store import looks as look_store
     try:                                        # memory: earlier answers over this box
@@ -962,6 +968,28 @@ def explain_scene(req: ExplainRequest, request: Request):
     except Exception as e:                      # persistence must never sink the answer
         log.warning("look not saved: %s", e)
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/facts")
+def facts_for_box(bbox: str = Query(..., max_length=80), stream: bool = False):
+    """Every public metric we can retrieve for a rectangle (`bbox=w,s,e,n`): place,
+    population, economy, terrain, water, sky, air, nature, activity. Keyless sources
+    only unless CENSUS_API_KEY / EBIRD_API_KEY are set. ~15s cold, cached 10 min."""
+    from apb.context import facts as facts_mod
+    try:
+        w, s, e, n = (float(x) for x in bbox.split(","))
+    except ValueError:
+        return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+    if not (-180 <= w < e <= 180 and -90 <= s < n <= 90) or (n - s) * (e - w) > 25:
+        return JSONResponse({"error": "bbox out of range or larger than 25 deg^2"}, status_code=400)
+    box = {"south": s, "north": n, "west": w, "east": e}
+    if stream:                                   # NDJSON: fastest sources first, appended live
+        def gen():
+            for ev in facts_mod.facts_stream(box):
+                yield json.dumps(ev, ensure_ascii=False, default=str) + "\n"
+        return StreamingResponse(gen(), media_type="application/x-ndjson",
+                                 headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    return JSONResponse(facts_mod.facts(box), headers={"Cache-Control": "public, max-age=300"})
 
 
 @app.get("/looks")

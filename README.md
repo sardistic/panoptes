@@ -33,11 +33,14 @@ register to unlock the keyed lanes.
 - **Traffic & transport** — 511 traffic (NY keyless; GA/LA/PA/ID/VA/New England
   unlock with free `T511_*_KEY`s), FAA TFRs, FAA airport delays, Amtrak trains
   running 1h+ late (rail-corridor anomaly signal).
-- **Live cameras** — 22 keyless public camera sources (~22k lenses): Caltrans, NYC DOT,
+- **Live cameras** — 24 keyless public camera sources (~23k lenses): Toronto RESCU,
+  NOAA BuoyCAMs, Caltrans, NYC DOT,
   511NY, DelDOT, Maryland CHART, Seattle, ODOT TripCheck, ALGO Alabama, TravelMidwest
   (IL/IN/WI/KY), Austin, Baton Rouge, ALERTCalifornia wildfire cams, Ontario 511,
   Ottawa, Calgary, Vancouver, TfL, Transport NSW, NZTA, Fintraffic weather cams,
-  Singapore, Hong Kong; more Carmanah 511 states unlock with `T511_*_KEY`s. Stills
+  Singapore, Hong Kong; more unlock with keys: Carmanah 511 states (`T511_*_KEY`),
+  WSDOT (`WSDOT_ACCESS_CODE`), OHGO (`OHGO_API_KEY`), and the worldwide Windy webcam
+  index looked up per view (`WINDY_WEBCAMS_KEY`). Stills
   are proxied same-origin, HLS streams play in the popup. `APB_CAMERAS_OFF=1` disables.
 - **Scene explainer ("the clip")** — draw a box on the map and Gemini Flash summarises
   the layers, weather and live camera stills inside it, with drill-downs per facet
@@ -66,6 +69,14 @@ register to unlock the keyed lanes.
 - `/live/cameras?bbox=w,s,e,n&limit=` — public cameras in view (hash-sampled over
   `limit`); `/live/cameras/{id}/image` is the snapshot proxy (registry ids only, never
   arbitrary URLs); `/live/cameras/sources` is the lane's per-vendor health.
+- `/facts?bbox=w,s,e,n[&stream=1]` — every public metric for a box: place (reverse
+  geocode, Wikipedia landmarks, NWS office/zone/radar, Census geography), population
+  (WorldPop; ACS with `CENSUS_API_KEY`), economy (BLS unemployment, EPA TRI), terrain
+  (elevation, FEMA flood zone), water (NOAA tides, USGS gauges, river discharge,
+  marine), sky (cloud layers, visibility, CAPE, UV, sun/moon, aircraft overhead, solar
+  irradiance), air (CAMS AQI/PM/O3/NO2/SO2/CO/dust), nature (iNaturalist, GBIF, OSM
+  trees), activity (OSM POIs, major roads; eBird with `EBIRD_API_KEY`). `stream=1`
+  emits NDJSON as each source answers.
 - `POST /explain` — scene explainer for a drawn rectangle (abstracted layers + filters
   from the client, weather + camera stills added server-side, Gemini Flash answer;
   `focus` selects a drill-down). Throttled 6/min/IP; 503 until `GEMINI_API_KEY` is set.
