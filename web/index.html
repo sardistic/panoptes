@@ -66,8 +66,9 @@
     padding:11px 16px;flex-wrap:wrap}
   /* spectrum strip along the top edge — same drift as the logo */
   #top::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
-    background:var(--rainbow);background-size:200% 100%;background-position:50% 0;opacity:.7;transition:opacity .3s}
-  body.loading #top::before{opacity:1;animation:rainbow 1.4s linear infinite}
+    background:var(--rainbow);background-size:400% 100%;background-position:50% 0;opacity:.7;transition:opacity .3s}
+  body.loading #top::before{opacity:1;animation:rainbowWide 6s linear infinite}
+  @keyframes rainbowWide{to{background-position:400% 0}}
   /* the mark is a single-color PNG on alpha, so it works as a mask: the drifting
      spectrum paints only the glyph */
   /* the logo's gradient is steered by the cursor: it points at the pointer, flows
@@ -287,6 +288,15 @@
   #clipBubble .snip .key{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;display:flex;gap:8px;flex-wrap:wrap;
     font:600 7.5px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);background:rgba(9,11,15,.72)}
   #clipBubble .snip .key i{display:inline-block;width:7px;height:7px;margin-right:4px;vertical-align:-1px;transform:rotate(45deg);background:var(--kc)}
+  #clipBubble .prog{height:3px;margin:10px 0 6px;background:var(--line);overflow:hidden;border-radius:2px}
+  #clipBubble .prog i{display:block;height:100%;width:40%;background:var(--rainbow);background-size:250% 100%;
+    animation:progslide 1.1s ease-in-out infinite alternate,rainbow 3s linear infinite}
+  @keyframes progslide{from{transform:translateX(-30%)}to{transform:translateX(230%)}}
+  #clipBubble .steps{font:500 9.5px/1.6 var(--mono);color:var(--dim)}
+  #clipBubble .steps b{color:var(--txt-2);font-weight:600}
+  .look-label{background:rgba(13,16,21,.9);border:1px solid #7a1a8c;color:#f0c46a;font:600 8px/1 var(--mono);
+    letter-spacing:.1em;text-transform:uppercase;padding:3px 5px;border-radius:2px;white-space:nowrap}
+  .look-label::before{display:none}
   #clipBubble .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:4px;margin-top:9px}
   #clipBubble .thumbs img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000;border:1px solid var(--line-2);border-radius:2px;cursor:pointer}
   #clipBubble .thumbs img:hover{border-color:#ffd23f}
@@ -2044,7 +2054,19 @@ document.addEventListener('mousemove',e=>{         // the eyes follow the cursor
     if(!clipEl.classList.contains('thinking')) p.style.transform=`translate(${(dx/d*k).toFixed(2)}px,${(dy/d*k).toFixed(2)}px)`;
   });
 },{passive:true});
+let clipTick=null;
+function clipThinking(b,focus){
+  const steps=['reading the layers in the box','fetching cameras in the box','pulling weather at the center',
+    focus==='cameras'?'sending up to 10 stills to the model':'sending up to 3 stills to the model','waiting for Gemini Flash'];
+  clipSay(focus==='overview'?'Looking…':`Looking closer · ${esc(focus)}`,
+    `<div class="prog"><i></i></div><div class="steps">${steps.map((t,i)=>`<div data-step="${i}">${i===0?'<b>▸</b> ':'&nbsp;&nbsp;'}${esc(t)}</div>`).join('')}<div class="elapsed">0.0s</div></div>`,null,null,clipSnippet(b));
+  const started=performance.now(); clearInterval(clipTick);
+  clipTick=setInterval(()=>{ const el=clipBubble.querySelector('.elapsed'); if(!el){ clearInterval(clipTick); return; }
+    const t=(performance.now()-started)/1000; el.textContent=`${t.toFixed(1)}s${t>12?' · the newest model is busy, stepping down':''}`; },100);
+}
+function clipStep(i){ clipBubble.querySelectorAll('.steps [data-step]').forEach(d=>{ const k=+d.dataset.step; d.innerHTML=(k<i?'<b>✓</b> ':k===i?'<b>▸</b> ':'&nbsp;&nbsp;')+esc(d.textContent.replace(/^[✓▸]\s*/,'').trim()); }); }
 function clipSay(kick,html,foot,actions,snippet){
+  clearInterval(clipTick);
   clipBubble.hidden=false;
   clipBubble.innerHTML=`<div class="kick"><span>${kick}</span><button class="x" aria-label="close">✕</button></div>`
     +`<div class="body">${html}</div>${foot?`<div class="foot">${foot}</div>`:''}`
@@ -2053,8 +2075,9 @@ function clipSay(kick,html,foot,actions,snippet){
   clipBubble.querySelector('.x').onclick=clipReset;
 }
 function clipReset(){
+  clearInterval(clipTick);
   clipBubble.hidden=true; clipState='idle'; clipEl.classList.remove('armed','thinking'); clipCams=[]; clipBox=null;
-  if(clipRect){ map.removeLayer(clipRect); clipRect=null; }
+  if(clipRect){ map.removeLayer(clipRect); clipRect=null; }        // saved looks stay on the map (looksLayer)
   if(clipCtl){ clipCtl.abort(); clipCtl=null; }
   clipStopDraw();
 }
@@ -2164,20 +2187,59 @@ function clipSnippet(b,ctx){
   if(!pending) overlays();
   return wrap;
 }
+// A look = one saved answer. Rendered the same whether it just arrived or was re-opened
+// from the map; the facet chips re-ask the same rectangle.
+function renderLook(look,b,foot){
+  const focus=look.focus||'overview', ids=look.camera_ids||[];
+  const ctx={cameras:ids,counts:look.counts||{}};
+  const names=(look.cameras||[]);
+  const thumbs=ids.length?`<div class="thumbs">${ids.map((id,i)=>`<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(names[i]||id)}" title="[${i+1}] ${esc(names[i]||id)}" data-id="${esc(id)}"/>`).join('')}</div>`:'';
+  const w=look.weather||{};
+  foot=foot||[look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ');
+  clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
+  clipBox=b; clipState='result';
+  if(!clipCams.length){                   // re-opened look: mark its cameras on the snippet
+    const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(',');
+    fetch(`/live/cameras?bbox=${bb}&limit=400`).then(r=>r.json()).then(rows=>{ clipCams=rows.filter(c=>c.image_url);
+      const old=clipBubble.querySelector('.snip'); if(old&&clipBox===b) old.replaceWith(clipSnippet(b)); }).catch(()=>{});
+  }
+  clipBubble.querySelectorAll('.dive button').forEach(btn=>{ btn.onclick=()=>{ if(btn.dataset.focus!==focus) clipExplain(clipBox,btn.dataset.focus); }; });
+  clipBubble.querySelectorAll('.thumbs img').forEach(img=>{ img.onclick=async()=>{ let c=clipCams.find(x=>x.id===img.dataset.id);
+    if(!c){ try{ const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(','); c=(await (await fetch(`/live/cameras?bbox=${bb}&limit=400`)).json()).find(x=>x.id===img.dataset.id); }catch(_){} }
+    if(c) openCamera(c); }; });
+  clipBubble.querySelector('.go').onclick=()=>{ if(clipRect){ map.removeLayer(clipRect); clipRect=null; } clipCams=[]; clipArm(); };
+}
+// ── persisted looks drawn on the map: dashed thermal outlines, click to re-open ──
+const looksLayer=L.layerGroup().addTo(map); const looksById=new Map();
+const LOOK_C={overview:'#f0c46a',cameras:'#9fc4d0',incidents:'#ff6b57',hazards:'#d98a2b',social:'#b48cff',weather:'#8fb0d8',place:'#c9a0dc'};
+function addLook(look,fresh){
+  if(!look||!look.bounds||look.bounds.south==null) return;
+  if(looksById.has(look.uid)) looksLayer.removeLayer(looksById.get(look.uid));
+  const b=L.latLngBounds([look.bounds.south,look.bounds.west],[look.bounds.north,look.bounds.east]);
+  const c=LOOK_C[look.focus]||LOOK_C.overview;
+  const r=L.rectangle(b,{color:c,weight:fresh?1.6:1.1,dashArray:'6 4',fillColor:c,fillOpacity:fresh?.07:.035,interactive:true});
+  r.bindTooltip(`${esc((look.focus||'overview').toUpperCase())} · ${esc(ago(look.ts))} — ${esc((look.text||'').slice(0,90))}…`,{sticky:true,className:'look-label',direction:'top'});
+  r.on('click',()=>{ if(clipState==='drawing'||clipState==='thinking') return; if(clipRect){ map.removeLayer(clipRect); clipRect=null; } clipCams=[]; renderLook(look,b); });
+  r.addTo(looksLayer); looksById.set(look.uid,r);
+  if(fresh&&clipRect){ map.removeLayer(clipRect); clipRect=null; }     // the saved outline replaces the drawing
+}
+async function loadLooks(){
+  try{ (await (await fetch('/looks?max_age_hours=24&limit=200')).json()).reverse().forEach(l=>addLook(l,false)); }catch(_){}
+}
 const CLIP_TITLES={overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
 async function clipExplain(b,focus='overview'){
   clipState='thinking'; clipEl.classList.add('thinking'); clipBox=b;
-  clipSay(focus==='overview'?'Looking…':`Looking closer · ${esc(focus)}`,
-    focus==='cameras'?'Pulling every camera still in the box and reading each frame.':'Reading the layers, pulling weather and the nearest camera stills, thinking.',null,null,clipSnippet(b));
+  clipThinking(b,focus);
   clipCtl=new AbortController(); const ctl=clipCtl;
   try{
-    const ctx=clipContext(b); ctx.focus=focus;
+    const ctx=clipContext(b); ctx.focus=focus; clipStep(1);
     const bbox=[ctx.bounds.west,ctx.bounds.south,ctx.bounds.east,ctx.bounds.north].join(',');
     if(focus==='overview'||!clipCams.length){
       try{ const r=await fetch(`/live/cameras?bbox=${bbox}&limit=400`,{signal:ctl.signal}); if(r.ok) clipCams=(await r.json()).filter(c=>c.image_url); }catch(_){ clipCams=[]; }
       if(ctl===clipCtl){ const old=clipBubble.querySelector('.snip'); if(old) old.replaceWith(clipSnippet(b)); }   // now with the cameras marked
     }
     ctx.cameras=clipCams.slice(0,12).map(c=>c.id);       // the snippet marks them all; the model sees up to 12
+    clipStep(2); setTimeout(()=>clipStep(3),700); setTimeout(()=>clipStep(4),1600);
     const res=await withLoad('LOOK',()=>fetch('/explain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ctx),signal:ctl.signal}));
     const data=await res.json().catch(()=>({}));
     if(ctl!==clipCtl) return;
@@ -2187,11 +2249,10 @@ async function clipExplain(b,focus='overview'){
       const w=data.weather||{};
       const foot=[data.model&&`model ${esc(data.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C · wind ${esc(w.wind_speed_10m)} km/h`,
         (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box'].filter(Boolean).join(' · ');
-      const ids=data.camera_ids||[]; ctx.cameras=ids.length?ctx.cameras:[];
-      const thumbs=focus==='cameras'&&ids.length?`<div class="thumbs">${ids.map((id,i)=>{const c=clipCams.find(x=>x.id===id);return `<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(c?c.name:id)}" title="[${i+1}] ${esc(c?c.name:id)}" data-id="${esc(id)}"/>`;}).join('')}</div>`:'';
-      clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(data.text||'(no answer)')+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
-      clipBubble.querySelectorAll('.dive button').forEach(btn=>{ btn.onclick=()=>{ if(btn.dataset.focus!==focus) clipExplain(clipBox,btn.dataset.focus); }; });
-      clipBubble.querySelectorAll('.thumbs img').forEach(img=>{ img.onclick=()=>{ const c=clipCams.find(x=>x.id===img.dataset.id); if(c) openCamera(c); }; });
+      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,
+        cameras:data.cameras||[],camera_ids:data.camera_ids||[],counts:ctx.counts};
+      addLook(look,true);
+      renderLook(look,b,foot);
     }
     clipBubble.querySelector('.go').onclick=()=>{ if(clipRect){ map.removeLayer(clipRect); clipRect=null; } clipCams=[]; clipArm(); };
   }catch(e){
@@ -2326,6 +2387,7 @@ document.addEventListener('visibilitychange',()=>{
   if(st.type){ const sel=document.getElementById('type'); if([...sel.options].some(o=>o.value===st.type)){ sel.value=st.type; draw(); } }
   restartStream();
   urlReady=true; writeViewState();
+  loadLooks(); setInterval(()=>{ if(!document.hidden) loadLooks(); },300000);
 })();
 });
 </script>

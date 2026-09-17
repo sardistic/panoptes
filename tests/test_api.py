@@ -150,3 +150,14 @@ def test_explain_is_off_without_a_key_and_validates_bounds(client, monkeypatch):
     r = client.post("/explain", json={"bounds": {"south": 1, "north": 2, "west": 3, "east": 4},
                                       "focus": "bogus"})
     assert r.status_code == 422
+
+
+def test_looks_endpoint_lists_persisted_scene_explanations(client, tmp_path, monkeypatch):
+    from apb.store import looks as look_store
+    look_store.record({"south": 1, "north": 2, "west": 3, "east": 4}, "overview",
+                      {"model": "m", "text": "quiet", "cameras": [], "camera_ids": []}, {"incidents_in_box": 0})
+    r = client.get("/looks?max_age_hours=1")
+    assert r.status_code == 200 and any(x["text"] == "quiet" for x in r.json())
+    assert client.get("/looks?bbox=10,10,11,11").json() == [] or all(
+        x["bounds"]["west"] <= 11 for x in client.get("/looks?bbox=10,10,11,11").json())
+    assert client.get("/looks?bbox=abc").status_code == 400

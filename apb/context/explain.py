@@ -31,6 +31,8 @@ _WEATHER = "https://api.open-meteo.com/v1/forecast"
 _UA = {"User-Agent": "panoptes/0.1 (panoptes.run; scene explainer)"}
 _client = httpx.Client(timeout=60.0, headers=_UA, follow_redirects=True)
 _model_cache: dict = {"names": None, "at": 0.0}
+_benched: dict[str, float] = {}          # model -> until (unix); set on 429/503/timeouts
+_BENCH_SEC = 15 * 60.0
 _FALLBACK_MODEL = "gemini-2.5-flash"
 
 # WMO weather interpretation codes -> plain words (Open-Meteo `weather_code`).
@@ -80,6 +82,15 @@ def candidate_models(key: str) -> list[str]:
     return chosen
 
 
+def healthy_models(key: str) -> list[str]:
+    """candidate_models with recently-failing models moved to the back, so a busy
+    newest model costs one slow call every 15 minutes instead of every request."""
+    now = time.time()
+    names = candidate_models(key)
+    return ([n for n in names if _benched.get(n, 0) <= now]
+            + [n for n in names if _benched.get(n, 0) > now])
+
+
 def pick_model(key: str) -> str:
     """Newest general-purpose Flash chat model available to this key."""
     return candidate_models(key)[0]
@@ -111,12 +122,14 @@ def weather_at(lat: float, lon: float) -> dict:
 FOCUS_BRIEFS = {
     "overview": (
         "A user drew a rectangle on the map and asked: what am I looking at? Answer in "
-        "plain English, 120-220 words, no markdown headers. Lead with the single most "
+        "plain English, 90-160 words, no markdown headers. Lead with the single most "
         "important thing in the box, then the rest by importance. Be concrete (names, "
         "roads, counts, ages). Separate what the data shows from what you infer. If the "
         "camera images show anything relevant (traffic state, weather, smoke, flooding, "
         "emergency vehicles, signage or on-image text such as timestamps), say so and cite "
-        "which camera. If the box is quiet, say that plainly and describe the ambient picture."),
+        "which camera. If the box is quiet, say that plainly and describe the ambient picture. "
+        "ALWAYS finish with one line starting 'Cameras:' that says in a sentence what the "
+        "attached stills show (or 'Cameras: none in the box')."),
     "cameras": (
         "The user wants to inspect the live cameras inside the rectangle. For EACH attached "
         "still, one short line prefixed by its number: what the camera shows right now — "
@@ -187,6 +200,9 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
         val = ctx.get(key)
         if val:
             lines.append(f"{label}: {json.dumps(val, ensure_ascii=False)[:6000]}")
+    if ctx.get("prior"):
+        lines.append("Earlier looks at this same area (your own previous answers; note what "
+                     "changed since): " + json.dumps(ctx["prior"], ensure_ascii=False)[:2500])
     if camera_names:
         lines.append("Attached images are live stills from these cameras, in order: "
                      + "; ".join(f"[{i + 1}] {n}" for i, n in enumerate(camera_names)))
@@ -206,20 +222,22 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     for _, data, ctype in stills:
         parts.append({"inline_data": {"mime_type": ctype, "data": base64.b64encode(data).decode()}})
     body = {"contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1200}}
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 700}}
     r = None
-    for model in candidate_models(key)[:3]:        # newest first; step down on capacity errors
+    for model in healthy_models(key)[:3]:          # newest healthy first; step down when busy
         try:
             r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key},
-                             json=body, timeout=30.0)
+                             json=body, timeout=25.0)
         except httpx.TimeoutException:
-            log.info("gemini %s timed out; trying the next model", model)
+            log.info("gemini %s timed out; benching it", model)
+            _benched[model] = time.time() + _BENCH_SEC
             continue
         if r.status_code == 200:
             break
         if r.status_code not in (429, 503):
             break
-        log.info("gemini %s busy (%d); trying the next model", model, r.status_code)
+        log.info("gemini %s busy (%d); benching it", model, r.status_code)
+        _benched[model] = time.time() + _BENCH_SEC
     if r is None or r.status_code != 200:
         msg = ""
         try:

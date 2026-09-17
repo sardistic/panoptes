@@ -905,7 +905,13 @@ def explain_scene(req: ExplainRequest, request: Request):
                                                 radius_km=40.0, limit=8)]
         except Exception as e:                  # never let context enrichment sink the answer
             log.info("explain news context failed: %s", e)
-    max_stills = 10 if req.focus == "cameras" else 5
+    max_stills = 10 if req.focus == "cameras" else 3      # fewer bytes = faster first answer
+    from apb.store import looks as look_store
+    try:                                        # memory: earlier answers over this box
+        ctx["prior"] = [{"ago_min": round((_time.time() - p["ts"]) / 60), "focus": p["focus"],
+                         "text": (p["text"] or "")[:500]} for p in look_store.prior(b)]
+    except Exception as e:
+        log.info("prior looks unavailable: %s", e)
     stills: list[tuple[str, bytes, str]] = []
     used_ids: list[str] = []
     for cam_id in req.cameras[:12]:
@@ -932,7 +938,28 @@ def explain_scene(req: ExplainRequest, request: Request):
         log.warning("explain upstream error: %s", e)
         return JSONResponse({"error": "model upstream unreachable"}, status_code=424)
     out["camera_ids"] = used_ids
+    try:
+        out["uid"] = look_store.record(b, req.focus, out, req.counts)
+    except Exception as e:                      # persistence must never sink the answer
+        log.warning("look not saved: %s", e)
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/looks")
+def looks(max_age_hours: Hours = 24.0, limit: int = Query(200, ge=1, le=500),
+          bbox: str | None = Query(None, max_length=80)):
+    """Persisted scene explanations (the clip's answers): rectangle, focus, text,
+    cameras used, weather. The map draws them as outlines you can re-open."""
+    from apb.store import looks as look_store
+    box = None
+    if bbox:
+        try:
+            w, s, e, n = (float(x) for x in bbox.split(","))
+            box = (w, s, e, n)
+        except ValueError:
+            return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+    return JSONResponse(look_store.query(max_age_hours, limit, box),
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/events")
