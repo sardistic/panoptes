@@ -58,6 +58,7 @@ def test_explain_requires_key_and_surfaces_upstream_errors(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-test")
     monkeypatch.setattr(explain, "weather_at", lambda lat, lon: {"conditions": "clear"})
+    monkeypatch.setattr(explain, "sky_images", lambda b: [])
 
     class _Bad:
         status_code = 429
@@ -86,6 +87,7 @@ def test_explain_steps_down_when_newest_model_is_busy(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     monkeypatch.setattr(explain, "candidate_models", lambda key: ["gemini-9-flash", "gemini-8-flash"])
     monkeypatch.setattr(explain, "weather_at", lambda lat, lon: {})
+    monkeypatch.setattr(explain, "sky_images", lambda b: [])
     tried = []
     class _R:
         def __init__(self, code, text=""): self.status_code = code; self._t = text
@@ -98,3 +100,13 @@ def test_explain_steps_down_when_newest_model_is_busy(monkeypatch):
     monkeypatch.setattr(explain._client, "post", post)
     out = explain.explain({"bounds": {}, "view": {"lat": 1, "lon": 2}}, [])
     assert out["model"] == "gemini-8-flash" and tried == ["gemini-9-flash", "gemini-8-flash"]
+
+
+def test_sky_urls_pick_satellite_by_longitude_and_radar_only_over_conus():
+    md = explain.sky_urls({"south": 38.3, "north": 38.4, "west": -77.0, "east": -76.9})
+    assert "GOES-East" in md["goes"] and "nexrad-n0q" in md["radar"]
+    assert "BBOX=37.550,-77.990,39.150,-75.910" in md["goes"]        # padded to a regional view
+    ca = explain.sky_urls({"south": 34.0, "north": 34.1, "west": -118.3, "east": -118.2})
+    assert "GOES-West" in ca["goes"] and "radar" in ca
+    assert explain.sky_urls({"south": 51.4, "north": 51.6, "west": -0.2, "east": 0.0}) == {}   # London: no GOES/NEXRAD
+    assert explain.sky_urls({}) == {}

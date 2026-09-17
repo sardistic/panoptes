@@ -29,10 +29,13 @@ def _conn() -> sqlite3.Connection:
             ts REAL NOT NULL,
             south REAL, north REAL, west REAL, east REAL,
             focus TEXT, model TEXT, text TEXT,
-            weather TEXT, cameras TEXT, camera_ids TEXT, counts TEXT
+            weather TEXT, cameras TEXT, camera_ids TEXT, counts TEXT, sky TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_looks_ts ON looks(ts);
         """)
+        cols = [r[1] for r in c.execute("PRAGMA table_info(looks)")]
+        if "sky" not in cols:                       # pre-sky rows keep working
+            c.execute("ALTER TABLE looks ADD COLUMN sky TEXT")
         c.commit()
         _ready = True
     return c
@@ -42,11 +45,12 @@ def record(bounds: dict, focus: str, out: dict, counts: dict | None = None) -> s
     uid = uuid.uuid4().hex[:12]
     with _lock:
         c = _conn()
-        c.execute("INSERT INTO looks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+        c.execute("INSERT INTO looks VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
             uid, time.time(), bounds.get("south"), bounds.get("north"), bounds.get("west"),
             bounds.get("east"), focus, out.get("model"), out.get("text"),
             json.dumps(out.get("weather") or {}), json.dumps(out.get("cameras") or []),
-            json.dumps(out.get("camera_ids") or []), json.dumps(counts or {})))
+            json.dumps(out.get("camera_ids") or []), json.dumps(counts or {}),
+            json.dumps(out.get("sky") or {})))
         c.commit()
     return uid
 
@@ -55,7 +59,7 @@ def _row(r) -> dict:
     return {"uid": r[0], "ts": r[1], "bounds": {"south": r[2], "north": r[3], "west": r[4], "east": r[5]},
             "focus": r[6], "model": r[7], "text": r[8], "weather": json.loads(r[9] or "{}"),
             "cameras": json.loads(r[10] or "[]"), "camera_ids": json.loads(r[11] or "[]"),
-            "counts": json.loads(r[12] or "{}")}
+            "counts": json.loads(r[12] or "{}"), "sky": json.loads((r[13] if len(r) > 13 else None) or "{}")}
 
 
 def query(max_age_hours: float = 24.0, limit: int = 200,

@@ -861,6 +861,8 @@ class ExplainRequest(BaseModel):
     counts: dict[str, int] = Field(default_factory=dict)
     cameras: list[str] = Field(default_factory=list, max_length=12)
     social: list[dict] = Field(default_factory=list, max_length=30)
+    stream_cameras: list[str] = Field(default_factory=list, max_length=20)   # names, HLS-only
+    frames: list[dict] = Field(default_factory=list, max_length=4)   # {id, data} browser frame grabs
     focus: Literal["overview", "cameras", "incidents", "hazards", "social", "weather",
                    "place"] = "overview"
 
@@ -906,6 +908,7 @@ def explain_scene(req: ExplainRequest, request: Request):
         except Exception as e:                  # never let context enrichment sink the answer
             log.info("explain news context failed: %s", e)
     max_stills = 10 if req.focus == "cameras" else 3      # fewer bytes = faster first answer
+    ctx["stream_cameras"] = [str(n)[:120] for n in req.stream_cameras]
     from apb.store import looks as look_store
     try:                                        # memory: earlier answers over this box
         ctx["prior"] = [{"ago_min": round((_time.time() - p["ts"]) / 60), "focus": p["focus"],
@@ -927,6 +930,22 @@ def explain_scene(req: ExplainRequest, request: Request):
             used_ids.append(cam_id)
         if len(stills) >= max_stills:
             break
+    # Frames the browser grabbed from HLS-only cameras (canvas capture). Only ids that
+    # are registered stream cameras are accepted, and the bytes must be a real image.
+    import base64
+    from apb.ingest.cameras import _sniff_image
+    for fr in req.frames[:4]:
+        cam = _cameras.get(str(fr.get("id", "")))
+        if not cam or not cam.get("stream_url") or len(stills) >= max_stills + 3:
+            continue
+        try:
+            raw = base64.b64decode(str(fr.get("data", ""))[:900_000], validate=True)
+        except (ValueError, TypeError):
+            continue
+        mime = _sniff_image(raw)
+        if mime and len(raw) <= 650_000:
+            stills.append((f"{cam['name']} ({cam['source']}, live stream frame)", raw, mime))
+            used_ids.append(cam["id"])
     try:
         out = explainer.explain(ctx, stills)
     # 424 (not 502/503): Cloudflare swaps origin 5xx bodies for its own error page,

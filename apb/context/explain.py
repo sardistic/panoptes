@@ -166,6 +166,58 @@ FOCUS_BRIEFS = {
 }
 
 
+_GIBS_WMS = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi"
+_IEM_WMS = "https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi"
+
+
+def sky_urls(bounds: dict) -> dict[str, str]:
+    """WMS crops of the sky over the box: GOES GeoColor (the map's satellite layer)
+    padded to a regional view so clouds/smoke/lights read, and CONUS NEXRAD base
+    reflectivity (the map's radar layer). Same public services the map itself uses."""
+    try:
+        s, n = float(bounds["south"]), float(bounds["north"])
+        w, e = float(bounds["west"]), float(bounds["east"])
+    except (KeyError, TypeError, ValueError):
+        return {}
+    clat, clon = (s + n) / 2, (w + e) / 2
+    out: dict[str, str] = {}
+
+    def pad(min_span: float) -> tuple[float, float, float, float]:
+        hs = max(min_span, (n - s)) / 2
+        hw = max(min_span * 1.3, (e - w)) / 2
+        return (max(-85, clat - hs), clon - hw, min(85, clat + hs), clon + hw)
+
+    if -170 <= clon <= -20 and -60 <= clat <= 70:          # GOES East/West footprint
+        layer = "GOES-West_ABI_GeoColor" if clon < -105 else "GOES-East_ABI_GeoColor"
+        ps, pw, pn, pe = pad(1.6)
+        out["goes"] = (f"{_GIBS_WMS}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS={layer}"
+                       f"&CRS=EPSG:4326&BBOX={ps:.3f},{pw:.3f},{pn:.3f},{pe:.3f}&WIDTH=640"
+                       f"&HEIGHT=640&FORMAT=image/png&TIME=default")
+    if -130 <= clon <= -60 and 22 <= clat <= 52:           # NEXRAD CONUS mosaic
+        ps, pw, pn, pe = pad(1.0)
+        out["radar"] = (f"{_IEM_WMS}?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=nexrad-n0q"
+                        f"&SRS=EPSG:4326&BBOX={pw:.3f},{ps:.3f},{pe:.3f},{pn:.3f}&WIDTH=640"
+                        f"&HEIGHT=640&FORMAT=image/png&TRANSPARENT=true")
+    return out
+
+
+def sky_images(bounds: dict) -> list[tuple[str, bytes, str]]:
+    """Fetch the sky crops as image parts (label, bytes, mime); failures are skipped."""
+    labels = {"goes": "GOES GeoColor satellite crop of the region around the box (latest ~10-min "
+                      "frame; at night city lights are orange, clouds blue-white)",
+              "radar": "NEXRAD base-reflectivity radar crop around the box (transparent = no echoes; "
+                       "greens light rain, yellows/reds heavy, purples hail-capable)"}
+    out = []
+    for key, url in sky_urls(bounds).items():
+        try:
+            r = _client.get(url, timeout=20.0)
+            if r.status_code == 200 and r.content[:4] == bytes.fromhex("89504e47") and len(r.content) < 1_500_000:
+                out.append((labels[key], r.content, "image/png"))
+        except httpx.HTTPError as e:
+            log.info("sky crop %s failed: %s", key, e)
+    return out
+
+
 def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
     b = ctx.get("bounds") or {}
     view = ctx.get("view") or {}
@@ -203,11 +255,19 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
     if ctx.get("prior"):
         lines.append("Earlier looks at this same area (your own previous answers; note what "
                      "changed since): " + json.dumps(ctx["prior"], ensure_ascii=False)[:2500])
+    if ctx.get("stream_cameras"):
+        lines.append("Live-stream-only cameras inside the box (no frame attached unless listed "
+                     "below): " + "; ".join(ctx["stream_cameras"]))
+    if ctx.get("sky_labels"):
+        lines.append("The FIRST attached images are sky/weather crops, in order: "
+                     + "; ".join(f"[S{i + 1}] {n}" for i, n in enumerate(ctx["sky_labels"]))
+                     + ". Use them for cloud cover, storms, smoke and lights; say what they show.")
     if camera_names:
-        lines.append("Attached images are live stills from these cameras, in order: "
+        lines.append("Then live camera stills, in order: "
                      + "; ".join(f"[{i + 1}] {n}" for i, n in enumerate(camera_names)))
     else:
-        lines.append("No camera stills were available inside the box.")
+        lines.append("No camera stills were available inside the box"
+                     + (" (only the stream-only cameras above)." if ctx.get("stream_cameras") else "."))
     return "\n".join(lines)
 
 
@@ -218,8 +278,11 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
         raise RuntimeError("GEMINI_API_KEY is not configured")
     view = ctx.get("view") or {}
     weather = weather_at(float(view.get("lat", 0)), float(view.get("lon", 0))) if view else {}
+    sky = sky_images(ctx.get("bounds") or {}) if ctx.get("focus", "overview") in (
+        "overview", "weather", "hazards", "place") else []
+    ctx["sky_labels"] = [s[0].split(" (")[0] for s in sky]
     parts: list[dict] = [{"text": build_prompt(ctx, weather, [s[0] for s in stills])}]
-    for _, data, ctype in stills:
+    for _, data, ctype in sky + stills:
         parts.append({"inline_data": {"mime_type": ctype, "data": base64.b64encode(data).decode()}})
     # Thinking is disabled: on Gemini 3.x Flash the hidden thinking tokens otherwise
     # consume the output budget (MAX_TOKENS after one sentence) and triple latency.
@@ -257,4 +320,5 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     text = "".join(p.get("text", "") for c in data.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
     return {"model": model, "text": text.strip(), "weather": weather,
-            "focus": ctx.get("focus") or "overview", "cameras": [s[0] for s in stills]}
+            "focus": ctx.get("focus") or "overview", "cameras": [s[0] for s in stills],
+            "sky": sky_urls(ctx.get("bounds") or {}) if sky else {}}

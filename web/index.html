@@ -257,9 +257,15 @@
   /* ── the clip: a paperclip with eyes that explains the map ── */
   #clip{right:14px;bottom:8px;width:92px;height:92px;padding:0;display:flex;align-items:center;justify-content:center;
     cursor:pointer;background:none;border:0;box-shadow:none;transition:transform .15s;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
-  #clip:hover{transform:translateY(-3px) rotate(-4deg)}
+  #clip{animation:clipbob 3.2s ease-in-out infinite;transform-origin:50% 90%}
+  #clip:hover{animation:clipboing .55s cubic-bezier(.34,1.56,.64,1)}
+  #clip.tap{animation:cliptap .9s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes clipbob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)}}
+  @keyframes clipboing{0%{transform:scale(1,1)}30%{transform:scale(1.18,.84) translateY(4px)}60%{transform:scale(.92,1.12) translateY(-10px)}100%{transform:scale(1,1)}}
+  @keyframes cliptap{0%{transform:rotate(-2deg)}25%{transform:rotate(-14deg) translateY(-8px)}45%{transform:rotate(9deg) translateY(6px) scale(1.05,.95)}60%{transform:rotate(-6deg) translateY(2px)}100%{transform:rotate(-2deg)}}
   #clip.armed{filter:drop-shadow(0 0 10px rgba(255,210,63,.55)) drop-shadow(0 6px 14px rgba(0,0,0,.55))}
   #clip svg{width:84px;height:84px;overflow:visible}
+  #clip{width:76px}
   #clip .wire{fill:none;stroke:url(#clipGrad);stroke-width:4.6;stroke-linecap:round;stroke-linejoin:round;
     filter:drop-shadow(0 1px 0 rgba(0,0,0,.6))}
   #clip .eye{fill:#f4f1e8}
@@ -301,6 +307,15 @@
   #clipBubble .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:4px;margin-top:9px}
   #clipBubble .thumbs img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000;border:1px solid var(--line-2);border-radius:2px;cursor:pointer}
   #clipBubble .thumbs img:hover{border-color:#ffd23f}
+  #clipBubble .sky{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:9px}
+  #clipBubble .sky figure{margin:0;position:relative}
+  #clipBubble .sky img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000;border:1px solid var(--line-2);border-radius:2px}
+  #clipBubble .sky figcaption{position:absolute;left:0;right:0;bottom:0;padding:3px 5px;font:600 7.5px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--txt-2);background:rgba(9,11,15,.7)}
+  #clipBubble .thumbs .livetile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;aspect-ratio:4/3;
+    background:#0b0d10;border:1px solid var(--line-2);border-radius:2px;color:#9fc4d0;font-size:14px;cursor:pointer}
+  #clipBubble .thumbs .livetile small{font:600 7px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  #clipBubble .thumbs .livetile:hover{border-color:#ffd23f}
+  #clipBubble .thumbs img.live{background:#0b0d10 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='%239fc4d0'/%3E%3C/svg%3E") center/40% no-repeat}
   #map.drawing .leaflet-container,#map.drawing{cursor:crosshair!important}
   @media (max-width:760px){ #clip{bottom:calc(34vh + 12px);width:72px;height:72px} #clip svg{width:64px;height:64px} #clipBubble{bottom:calc(34vh + 90px)} }
 
@@ -341,7 +356,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip .lid,#clip .pupil{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -414,9 +429,9 @@
   <svg viewBox="0 0 64 64" aria-hidden="true">
     <defs><linearGradient id="clipGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#7a1a8c"/><stop offset=".45" stop-color="#f07a1a"/><stop offset="1" stop-color="#fff6d0"/></linearGradient></defs>
-    <path class="wire" d="M22 46 V16 a10 10 0 0 1 20 0 V48 a6 6 0 0 1 -12 0 V22 a2 2 0 0 1 4 0 V44"/>
-    <g class="eyeL"><circle class="eye" cx="24" cy="27" r="6.5"/><circle class="pupil" cx="24" cy="27" r="2.8"/><ellipse class="lid" cx="24" cy="27" rx="6.6" ry="6.6"/></g>
-    <g class="eyeR"><circle class="eye" cx="41" cy="27" r="6.5"/><circle class="pupil" cx="41" cy="27" r="2.8"/><ellipse class="lid" cx="41" cy="27" rx="6.6" ry="6.6"/></g>
+    <path class="wire" d="M25 48 V14 a7 7 0 0 1 14 0 V50 a4.5 4.5 0 0 1 -9 0 V20 a1.5 1.5 0 0 1 3 0 V46"/>
+    <g class="eyeL"><circle class="eye" cx="27" cy="26" r="5.6"/><circle class="pupil" cx="27" cy="26" r="2.5"/><ellipse class="lid" cx="27" cy="26" rx="5.7" ry="5.7"/></g>
+    <g class="eyeR"><circle class="eye" cx="40" cy="26" r="5.6"/><circle class="pupil" cx="40" cy="26" r="2.5"/><ellipse class="lid" cx="40" cy="26" rx="5.7" ry="5.7"/></g>
   </svg>
 </button>
 <div id="clipBubble" class="hud" role="dialog" aria-live="polite" hidden></div>
@@ -506,6 +521,7 @@ function watchTiles(label,layers,timeout=15000){
   if(window.ResizeObserver) new ResizeObserver(set).observe(top); else window.addEventListener('resize',set);
   set();
 })();
+let atlasStyleJson = null;     // the Umbral Atlas style, reused by the clip's snippet renderer
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
@@ -704,7 +720,8 @@ fetch('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json')
     return response.json();
   })
   .then(sourceStyle => {
-    const atlas = L.maplibreGL({style:atlasStyle(sourceStyle),interactive:false}).addTo(map);
+    atlasStyleJson = atlasStyle(sourceStyle);
+    const atlas = L.maplibreGL({style:atlasStyleJson,interactive:false}).addTo(map);
     const gl = atlas.getMaplibreMap();
     gl.once('load',() => { installAtlasTextures(gl); glMapRef = gl;
       cityLightLevel=-1; setCityLightSignal(gl,0); updateCelestial(); });
@@ -2059,7 +2076,7 @@ document.addEventListener('mousemove',e=>{         // the eyes follow the cursor
 let clipTick=null;
 function clipThinking(b,focus){
   const steps=['reading the layers in the box','fetching cameras in the box','pulling weather at the center',
-    focus==='cameras'?'sending up to 10 stills to the model':'sending up to 3 stills to the model','waiting for Gemini Flash'];
+    'grabbing frames from stream-only cameras','cropping GOES satellite + radar over the box',focus==='cameras'?'sending up to 10 stills to the model':'sending up to 3 stills to the model','waiting for Gemini Flash'];
   clipSay(focus==='overview'?'Looking…':`Looking closer · ${esc(focus)}`,
     `<div class="prog"><i></i></div><div class="steps">${steps.map((t,i)=>`<div data-step="${i}">${i===0?'<b>▸</b> ':'&nbsp;&nbsp;'}${esc(t)}</div>`).join('')}<div class="elapsed">0.0s</div></div>`,null,null,clipSnippet(b));
   const started=performance.now(); clearInterval(clipTick);
@@ -2136,15 +2153,15 @@ function clipContext(b){
 // that always make sense (weather, place). Re-asks the same rectangle with a focus.
 const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place']];
 function clipFacetsHtml(ctx,current){
-  const has={overview:true,cameras:(ctx.cameras||[]).length>0,incidents:ctx.counts.incidents_in_box>0,hazards:ctx.counts.hazards_in_box>0,
+  const has={overview:true,cameras:(ctx.cameras||[]).length>0||(ctx.stream_cameras||[]).length>0,incidents:ctx.counts.incidents_in_box>0,hazards:ctx.counts.hazards_in_box>0,
     social:ctx.counts.social_in_box>0,weather:true,place:true};
-  const chips=CLIP_FACETS.filter(([k])=>has[k]).map(([k,l])=>`<button data-focus="${k}" class="${k===current?'cur':''}">${l}${k==='cameras'?` · ${ctx.cameras.length}`:k==='incidents'?` · ${ctx.counts.incidents_in_box}`:k==='hazards'?` · ${ctx.counts.hazards_in_box}`:k==='social'?` · ${ctx.counts.social_in_box}`:''}</button>`).join('');
+  const chips=CLIP_FACETS.filter(([k])=>has[k]).map(([k,l])=>`<button data-focus="${k}" class="${k===current?'cur':''}">${l}${k==='cameras'?` · ${ctx.cameras.length+(ctx.stream_cameras||[]).length}`:k==='incidents'?` · ${ctx.counts.incidents_in_box}`:k==='hazards'?` · ${ctx.counts.hazards_in_box}`:k==='social'?` · ${ctx.counts.social_in_box}`:''}</button>`).join('');
   return `<div class="dive"><span class="lab">Dive into</span>${chips}</div>`;
 }
 // Snippet: the drawn box as a small basemap crop (Carto dark tiles, already CSP-allowed)
 // with everything the answer is grounded on overlaid — cameras, incidents, hazards,
 // surges, clusters — so the user sees exactly what the model was given.
-const SNIP_C={camera:'#9fc4d0',wildfire:'#e0873a',weather:'#8fb0d8',incident:'#ff6b57',hazard:'#d98a2b',surge:'#a8202c',cluster:'#ffd23f',social:'#b48cff'};
+const SNIP_C={camera:'#9fc4d0',stream:'#7fa3b3',wildfire:'#e0873a',weather:'#8fb0d8',incident:'#ff6b57',hazard:'#d98a2b',surge:'#a8202c',cluster:'#ffd23f',social:'#b48cff'};
 function clipSnippet(b,ctx){
   const W=328,H=190,wrap=document.createElement('div'); wrap.className='snip';
   const cv=document.createElement('canvas'); cv.width=W*2; cv.height=H*2; cv.style.width=W+'px'; wrap.appendChild(cv);
@@ -2153,8 +2170,6 @@ function clipSnippet(b,ctx){
   let z=17; for(;z>2;z--){ const [x1,y1]=proj(b.getNorth(),b.getWest(),z),[x2,y2]=proj(b.getSouth(),b.getEast(),z); if(x2-x1<=W-16&&y2-y1<=H-16) break; }
   const [cx,cy]=proj(b.getCenter().lat,b.getCenter().lng,z), ox=cx-W/2, oy=cy-H/2;
   const toPx=(lat,lon)=>{const [x,y]=proj(lat,lon,z);return [x-ox,y-oy];};
-  const tx0=Math.floor(ox/256),tx1=Math.floor((ox+W)/256),ty0=Math.floor(oy/256),ty1=Math.floor((oy+H)/256);
-  let pending=0;
   const overlays=()=>{
     const [ax,ay]=toPx(b.getNorth(),b.getWest()),[bx,by]=toPx(b.getSouth(),b.getEast());
     g.save(); g.fillStyle='rgba(0,0,0,.42)'; g.fillRect(0,0,W,H); g.clearRect(ax,ay,bx-ax,by-ay); g.restore();
@@ -2172,22 +2187,47 @@ function clipSnippet(b,ctx){
     (typeof socialPosts!=='undefined'?socialPosts:[]).forEach(p=>{ if(p.lat!=null&&b.contains([p.lat,p.lon])){ mark(p.lat,p.lon,SNIP_C.social,'incident'); add('social'); } });
     emergingClusters.forEach(c=>{ if(b.contains([c.lat,c.lon])){ mark(c.lat,c.lon,SNIP_C.cluster,'cluster'); add('cluster'); } });
     surgeAlerts.forEach(a=>{ if(a.lat!=null&&b.contains([a.lat,a.lon])){ mark(a.lat,a.lon,SNIP_C.surge,'surge'); add('surge'); } });
-    clipCams.forEach(c=>{ mark(c.lat,c.lon,SNIP_C[c.kind]||SNIP_C.camera,'camera'); add(c.kind==='traffic'?'camera':c.kind); });
+    clipCams.forEach(c=>{ mark(c.lat,c.lon,SNIP_C[c.kind]||SNIP_C.camera,'camera'); add(c.kind!=='traffic'?c.kind:c.image_url?'camera':'stream'); });
     g.strokeStyle='#ffd23f'; g.lineWidth=1; g.setLineDash([4,3]); g.strokeRect(ax+.5,ay+.5,bx-ax-1,by-ay-1); g.setLineDash([]);
     const key=document.createElement('div'); key.className='key';
-    const labels={camera:'cameras',wildfire:'fire cams',weather:'weather cams',incident:'incidents',hazard:'hazards',surge:'surges',cluster:'clusters',social:'social'};
+    const labels={camera:'cameras',stream:'stream-only cams',wildfire:'fire cams',weather:'weather cams',incident:'incidents',hazard:'hazards',surge:'surges',cluster:'clusters',social:'social'};
     key.innerHTML=Object.entries(counts).map(([k,n])=>`<span style="--kc:${SNIP_C[k]||SNIP_C.camera}"><i></i>${n} ${labels[k]||k}</span>`).join('')||`<span>nothing placed inside the box · z${z}</span>`;
     wrap.appendChild(key);
   };
-  for(let tx=tx0;tx<=tx1;tx++) for(let ty=ty0;ty<=ty1;ty++){
-    const n=2**z; if(ty<0||ty>=n) continue; const wx=((tx%n)+n)%n;
-    const img=new Image(); img.crossOrigin='anonymous'; pending++;
-    img.onload=()=>{ g.drawImage(img,tx*256-ox,ty*256-oy,256,256); if(--pending===0) overlays(); };
-    img.onerror=()=>{ if(--pending===0) overlays(); };
-    img.src=`https://${'abcd'[(wx+ty)%4]}.basemaps.cartocdn.com/dark_all/${z}/${wx}/${ty}@2x.png`;
-  }
-  if(!pending) overlays();
+  // Basemap: a hidden MapLibre map in the atlas style, sized exactly like the canvas,
+  // exported once idle. No raster tiles (Carto's are watermarked without a key).
+  if(atlasStyleJson&&window.maplibregl){
+    const host=document.createElement('div'); host.style.cssText=`position:fixed;left:-9999px;top:0;width:${W}px;height:${H}px`; document.body.appendChild(host);
+    let done=false;
+    const finish=()=>{ if(done) return; done=true; try{ g.drawImage(gm.getCanvas(),0,0,W,H); }catch(_){} try{ gm.remove(); }catch(_){} host.remove(); overlays(); };
+    const gm=new maplibregl.Map({container:host,style:atlasStyleJson,interactive:false,attributionControl:false,preserveDrawingBuffer:true,
+      center:[b.getCenter().lng,b.getCenter().lat],zoom:z-1,fadeDuration:0});
+    gm.once('idle',finish); setTimeout(finish,6000);
+  } else overlays();
   return wrap;
+}
+// Grab one frame from an HLS camera: play muted for ~1.5s, draw to canvas, JPEG it.
+// CORS-clean streams (ACAO *) stay untainted; anything else fails quietly -> null.
+function grabFrame(c,timeoutMs=8000){
+  return new Promise(async resolve=>{
+    const url=safeLink(c.stream_url); if(!url) return resolve(null);
+    const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.crossOrigin='anonymous';
+    v.style.cssText='position:fixed;left:-9999px;top:0;width:320px;height:180px;opacity:0'; document.body.appendChild(v);
+    let hls=null, done=false;
+    const finish=val=>{ if(done) return; done=true; clearTimeout(t); try{ if(hls) hls.destroy(); }catch(_){} v.pause(); v.removeAttribute('src'); v.remove(); resolve(val); };
+    const t=setTimeout(()=>finish(null),timeoutMs);
+    const snap=()=>{ try{ if(!v.videoWidth) return finish(null); const cv=document.createElement('canvas'); const w=Math.min(640,v.videoWidth), h=Math.round(v.videoHeight*w/v.videoWidth);
+        cv.width=w; cv.height=h; cv.getContext('2d').drawImage(v,0,0,w,h);
+        const data=cv.toDataURL('image/jpeg',.72).split(',')[1]; finish(data?{id:c.id,data}:null); }catch(_){ finish(null); } };
+    v.addEventListener('playing',()=>setTimeout(snap,1500),{once:true});
+    v.addEventListener('error',()=>finish(null),{once:true});
+    try{
+      if(v.canPlayType('application/vnd.apple.mpegurl')){ v.src=url; }
+      else{ await loadHls(); if(!window.Hls||!Hls.isSupported()) return finish(null);
+        hls=new Hls({enableWorker:true,maxBufferLength:6}); hls.on(Hls.Events.ERROR,(_,d)=>{ if(d.fatal) finish(null); }); hls.loadSource(url); hls.attachMedia(v); }
+      await v.play().catch(()=>{});
+    }catch(_){ finish(null); }
+  });
 }
 // A look = one saved answer. Rendered the same whether it just arrived or was re-opened
 // from the map; the facet chips re-ask the same rectangle.
@@ -2195,17 +2235,22 @@ function renderLook(look,b,foot){
   const focus=look.focus||'overview', ids=look.camera_ids||[];
   const ctx={cameras:ids,counts:look.counts||{}};
   const names=(look.cameras||[]);
-  const thumbs=ids.length?`<div class="thumbs">${ids.map((id,i)=>`<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(names[i]||id)}" title="[${i+1}] ${esc(names[i]||id)}" data-id="${esc(id)}"/>`).join('')}</div>`:'';
+  const thumbs=ids.length?`<div class="thumbs">${ids.map((id,i)=>`<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(names[i]||id)}" title="[${i+1}] ${esc(names[i]||id)}" data-id="${esc(id)}" onerror="this.outerHTML='<span class=&quot;livetile&quot; data-id=&quot;'+this.dataset.id+'&quot; title=&quot;'+this.title+'&quot;>▶<small>live</small></span>'"/>`).join('')}</div>`:'';
   const w=look.weather||{};
+  const sky=look.sky&&Object.keys(look.sky).length?`<div class="sky">${Object.entries(look.sky).map(([k,u])=>`<figure><img src="${esc(safeLink(u))}" alt="${k}"/><figcaption>${k==='goes'?'GOES GeoColor · region':'NEXRAD radar · region'}</figcaption></figure>`).join('')}</div>`:'';
   foot=foot||[look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ');
-  clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
+  clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
   clipBox=b; clipState='result';
   if(!clipCams.length){                   // re-opened look: mark its cameras on the snippet
     const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(',');
-    fetch(`/live/cameras?bbox=${bb}&limit=400`).then(r=>r.json()).then(rows=>{ clipCams=rows.filter(c=>c.image_url);
+    fetch(`/live/cameras?bbox=${bb}&limit=400`).then(r=>r.json()).then(rows=>{ clipCams=rows.filter(c=>c.image_url||c.stream_url);
       const old=clipBubble.querySelector('.snip'); if(old&&clipBox===b) old.replaceWith(clipSnippet(b)); }).catch(()=>{});
   }
   clipBubble.querySelectorAll('.dive button').forEach(btn=>{ btn.onclick=()=>{ if(btn.dataset.focus!==focus) clipExplain(clipBox,btn.dataset.focus); }; });
+  clipBubble.querySelector('.thumbs')?.addEventListener('click',async e=>{ const t=e.target.closest('.livetile'); if(!t) return;
+    let c=clipCams.find(x=>x.id===t.dataset.id);
+    if(!c){ try{ const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(','); c=(await (await fetch(`/live/cameras?bbox=${bb}&limit=400`)).json()).find(x=>x.id===t.dataset.id); }catch(_){} }
+    if(c) openCamera(c); });
   clipBubble.querySelectorAll('.thumbs img').forEach(img=>{ img.onclick=async()=>{ let c=clipCams.find(x=>x.id===img.dataset.id);
     if(!c){ try{ const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(','); c=(await (await fetch(`/live/cameras?bbox=${bb}&limit=400`)).json()).find(x=>x.id===img.dataset.id); }catch(_){} }
     if(c) openCamera(c); }; });
@@ -2237,11 +2282,19 @@ async function clipExplain(b,focus='overview'){
     const ctx=clipContext(b); ctx.focus=focus; clipStep(1);
     const bbox=[ctx.bounds.west,ctx.bounds.south,ctx.bounds.east,ctx.bounds.north].join(',');
     if(focus==='overview'||!clipCams.length){
-      try{ const r=await fetch(`/live/cameras?bbox=${bbox}&limit=400`,{signal:ctl.signal}); if(r.ok) clipCams=(await r.json()).filter(c=>c.image_url); }catch(_){ clipCams=[]; }
+      try{ const r=await fetch(`/live/cameras?bbox=${bbox}&limit=400`,{signal:ctl.signal}); if(r.ok) clipCams=(await r.json()).filter(c=>c.image_url||c.stream_url); }catch(_){ clipCams=[]; }
       if(ctl===clipCtl){ const old=clipBubble.querySelector('.snip'); if(old) old.replaceWith(clipSnippet(b)); }   // now with the cameras marked
     }
-    ctx.cameras=clipCams.slice(0,12).map(c=>c.id);       // the snippet marks them all; the model sees up to 12
-    clipStep(2); setTimeout(()=>clipStep(3),700); setTimeout(()=>clipStep(4),1600);
+    const withStill=clipCams.filter(c=>c.image_url), streamOnly=clipCams.filter(c=>!c.image_url&&c.stream_url);
+    ctx.cameras=withStill.slice(0,12).map(c=>c.id);       // the snippet marks them all; the model sees up to 12
+    ctx.stream_cameras=streamOnly.slice(0,20).map(c=>`${c.name} (${CAM_SRC[c.source]||c.source})`);
+    clipStep(2);
+    // HLS-only cameras (MD CHART, DelDOT, most of 511NY): the server cannot decode video,
+    // so the browser plays the stream for a moment and hands the model a frame.
+    const want=focus==='cameras'?4:Math.max(0,3-withStill.length);
+    if(want&&streamOnly.length){ clipStep(3); ctx.frames=(await Promise.all(streamOnly.slice(0,want).map(c=>grabFrame(c)))).filter(Boolean); }
+    if(ctl!==clipCtl) return;
+    setTimeout(()=>clipStep(4),200); setTimeout(()=>clipStep(5),1200); setTimeout(()=>clipStep(6),2200);
     const res=await withLoad('LOOK',()=>fetch('/explain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ctx),signal:ctl.signal}));
     const data=await res.json().catch(()=>({}));
     if(ctl!==clipCtl) return;
@@ -2251,7 +2304,7 @@ async function clipExplain(b,focus='overview'){
       const w=data.weather||{};
       const foot=[data.model&&`model ${esc(data.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C · wind ${esc(w.wind_speed_10m)} km/h`,
         (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box'].filter(Boolean).join(' · ');
-      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,
+      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,sky:data.sky||{},
         cameras:data.cameras||[],camera_ids:data.camera_ids||[],counts:ctx.counts};
       addLook(look,true);
       renderLook(look,b,foot);
@@ -2274,6 +2327,14 @@ clipEl.onclick=()=>{
   else if(clipState==='thinking'){ /* wait */ }
 };
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&clipState!=='idle') clipReset(); });
+// idle mischief: every so often the clip taps the screen to remind you it's there
+(function clipFidget(){
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduced) return;
+  const tap=()=>{ if(clipState==='idle'&&!document.hidden){ clipEl.classList.add('tap'); setTimeout(()=>clipEl.classList.remove('tap'),950); }
+    setTimeout(tap,9000+Math.random()*14000); };
+  setTimeout(tap,6000);
+})();
 
 // ── shareable view state ──
 // The hash mirrors what is on screen (center/zoom, area, window, type, severity,
