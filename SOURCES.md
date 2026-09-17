@@ -84,6 +84,14 @@ HLS). Re-run the sniffer occasionally to refresh those inventories.
 Not viable: Arkansas (streams behind login), WV (streams loaded lazily per camera),
 Houston TranStar (image-map pixel coordinates only), Mississippi (ASP.NET postbacks).
 
+**Beyond DOT:** Alaska RWIS road-weather cams (340), WeatherSTEM skycams (885, sniffed,
+kind `weather`), Iceland Vegagerðin road cams (165, sniffed GraphQL), Taiwan TDX freeway/
+highway CCTV (1.3k, keyless quota), NOAA BuoyCAMs, ALERTCalifornia wildfire cams, Fintraffic.
+**Local broadcast** (TV tower/weather cams): `YOUTUBE_API_KEY` enables a per-view YouTube
+Live search (geotagged live streams; played via the privacy-enhanced embed) — free key at
+console.cloud.google.com → YouTube Data API v3. Windy (`WINDY_WEBCAMS_KEY`) covers the
+rest of the world's public webcams.
+
 **Iteris ATIS states (SC, MT, SD, VA)** via `{st}.cdn.iteris-atis.com/geojson/icons/
 metadata/icons.cameras.geojson` (VDOT: `511.vdot.virginia.gov/services/map/array/cameras`),
 found by the sniffer's `--dump` of blob-fetched payloads. **Colorado** via the CARS "511x" GeoJSON API (`api-511x-co.carsprogram.org`).

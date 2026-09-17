@@ -1931,9 +1931,10 @@ const CAM_SRC={caltrans:'Caltrans',nyctmc:'NYC DOT',ny511:'511NY',deldot:'DelDOT
   algo:'ALGO Alabama',travelmidwest:'TravelMidwest',austin:'Austin TX',brla:'Baton Rouge',
   alertca:'ALERTCalifornia',calgary:'Calgary',ottawa:'Ottawa',vancouver:'Vancouver',
   digitraffic:'Fintraffic',sg:'Singapore LTA',hk:'Hong Kong TD',tfnsw:'Transport NSW',toronto:'Toronto RESCU',buoycam:'NOAA BuoyCAM',
-  wsdot:'WSDOT',ohgo:'OHGO Ohio',windy:'Windy webcam'};
-const CAM_KIND_LABEL={wildfire:'Wildfire camera',weather:'Weather camera',marine:'Buoy camera',webcam:'Public webcam'};
-const CAM_KIND_C={traffic:CAM_C,wildfire:'#e0873a',weather:'#8fb0d8',marine:'#5fb3c9',webcam:'#c9b27a'};
+  wsdot:'WSDOT',ohgo:'OHGO Ohio',windy:'Windy webcam',youtube:'YouTube Live',ak_rwis:'Alaska RWIS',tw_tdx:'Taiwan TDX',
+  nddot:'NDDOT',midrive:'Mi Drive',cotrip:'COtrip'};
+const CAM_KIND_LABEL={wildfire:'Wildfire camera',weather:'Weather camera',marine:'Buoy camera',webcam:'Public webcam',broadcast:'Live broadcast'};
+const CAM_KIND_C={traffic:CAM_C,wildfire:'#e0873a',weather:'#8fb0d8',marine:'#5fb3c9',webcam:'#c9b27a',broadcast:'#e06aa8'};
 let showCameras=false, cameraRows=[], cameraFetchT=null, cameraCtl=null;
 let camPopupTimer=null, camHls=null, camPopup=null;
 const cameraLayer=L.layerGroup().addTo(map);
@@ -2031,7 +2032,8 @@ function openCamera(c){
     +`${safeLink(c.page_url||c.image_url||c.stream_url)?`<a href="${esc(safeLink(c.page_url||c.image_url||c.stream_url))}" target="_blank" rel="noopener noreferrer">source ↗</a>`:''}</div>`;
   const frame=el.querySelector('.frame'), stamp=el.querySelector('.stamp');
   const still=()=>{ stopCameraPopup(); showStill(c,frame,stamp); };
-  if(c.image_url) still(); else { stamp.textContent='live'; playStream(c,frame); }
+  if(c.embed_url&&safeLink(c.embed_url)){ stamp.textContent='live'; frame.innerHTML=`<iframe src="${esc(safeLink(c.embed_url))}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" style="width:100%;aspect-ratio:16/9;border:0;display:block;background:#000"></iframe>`; }
+  else if(c.image_url) still(); else { stamp.textContent='live'; playStream(c,frame); }
   el.querySelector('.still')?.addEventListener('click',still);
   el.querySelector('.stream')?.addEventListener('click',()=>{ stamp.textContent='live'; playStream(c,frame); });
   camPopup=L.popup({maxWidth:380,className:'campop'}).setLatLng([c.lat,c.lon]).setContent(el).openOn(map);

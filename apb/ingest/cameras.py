@@ -76,11 +76,11 @@ def _f(v) -> float | None:
 
 def _row(source: str, native_id, name, lat, lon, *, state=None, roadway=None,
          direction=None, image_url=None, stream_url=None, online=True,
-         page_url=None, kind: str = "traffic") -> dict | None:
+         page_url=None, kind: str = "traffic", embed_url=None) -> dict | None:
     lat, lon = _f(lat), _f(lon)
     if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
         return None
-    if not (lat or lon) or not (image_url or stream_url):
+    if not (lat or lon) or not (image_url or stream_url or embed_url):
         return None
     return {
         "id": f"{source}:{native_id}", "source": source, "kind": kind,
@@ -89,6 +89,7 @@ def _row(source: str, native_id, name, lat, lon, *, state=None, roadway=None,
         "direction": (direction or None) and str(direction)[:40],
         "image_url": image_url or None, "stream_url": stream_url or None,
         "online": bool(online), "page_url": page_url or None,
+        **({"embed_url": embed_url} if embed_url else {}),
     }
 
 
@@ -769,6 +770,51 @@ def _midrive(reg, src) -> list[dict]:
     return out
 
 
+def _ak_rwis(reg, src) -> list[dict]:
+    """Alaska DOT&PF road-weather (RWIS) cameras: every site with its latest still per
+    view, on Azure blob storage (served as octet-stream; the proxy sniffs JPEG)."""
+    coords = {s_["siteId"]: (s_.get("latitude"), s_.get("longitude"))
+              for s_ in reg.get_json("https://roadweather.alaska.gov/api/sites") if "siteId" in s_}
+    out = []
+    for site in reg.get_json("https://roadweather.alaska.gov/api/cameras"):
+        lat, lon = coords.get(site.get("siteId"), (None, None))
+        for v in (site.get("latestImages") or {}).values():
+            img = (v.get("latestImage") or {}).get("downloadUrl")
+            if not img:
+                continue
+            r = _row("ak_rwis", f"{site.get('siteId')}.{v.get('viewNumber')}",
+                     f"{site.get('description')} · {v.get('viewName') or ''}".strip(" ·"),
+                     lat, lon, state="AK", image_url=img, kind="weather")
+            if r:
+                out.append(r)
+    return out
+
+
+def _tw_tdx(reg, src) -> list[dict]:
+    """Taiwan MOTC TDX open data: freeway + provincial-highway CCTV (keyless within the
+    anonymous quota). `VideoStreamURL` is an MJPEG stream; the same host serves a
+    single JPEG at `/abs2mjpg/jpg?camera=N`."""
+    out = []
+    for road in ("Freeway", "Highway"):
+        try:
+            data = reg.get_json(f"https://tdx.transportdata.tw/api/basic/v2/Road/Traffic/CCTV/{road}?$format=JSON")
+        except (httpx.HTTPError, ValueError) as e:
+            log.info("[cameras] tdx %s: %s", road, e)
+            continue
+        for c in data.get("CCTVs", []):
+            url = c.get("VideoStreamURL") or ""
+            still = url.replace("/bmjpg?", "/jpg?") if "/bmjpg?" in url else (url if url.lower().endswith((".jpg", ".jpeg")) else None)
+            name = f"{c.get('RoadName', '')} {c.get('LocationMile', '')} {c.get('RoadDirection', '')}".strip()
+            sec = c.get("RoadSection") or {}
+            if sec.get("Start"):
+                name += f" · {sec.get('Start')}→{sec.get('End', '')}"
+            r = _row("tw_tdx", c.get("CCTVID"), name, c.get("PositionLat"), c.get("PositionLon"), state="TW",
+                     roadway=c.get("RoadName"), direction=c.get("RoadDirection"), image_url=still)
+            if r:
+                out.append(r)
+    return out
+
+
 # ── discovered feeds: specs written by apb.discover.camera_sniff ──────────────
 _DISCOVERIES = Path(__file__).resolve().parents[2] / "data" / "camera_discoveries.json"
 _PATH_PART = re.compile(r"([^\[]+)(?:\[(\d+)\])?$")
@@ -847,7 +893,8 @@ def _map_discovered(spec: dict, src, items: list) -> list[dict]:
             seen.add(nid)
             row = _row(src.key, nid, name or spec.get("label") or src.key,
                        _dget(node, strip(f["lat"])), _dget(node, strip(f["lon"])), state=spec.get("state"),
-                       image_url=img, stream_url=stream, page_url=spec.get("referer"))
+                       image_url=img, stream_url=stream, page_url=spec.get("referer"),
+                       kind=spec.get("kind") or "traffic")
             if row:
                 out.append(row)
     return out
@@ -930,6 +977,8 @@ SOURCES.update({f"tq_{k}": CameraSource(f"tq_{k}", f"{v[1] or 'New England'} 511
                 for k, v in TRAVELIQ.items()})
 SOURCES.update({f"at_{k}": CameraSource(f"at_{k}", f"{v[1]} 511 cameras (Iteris ATIS)", _atis, v[1])
                 for k, v in ATIS.items()})
+SOURCES["ak_rwis"] = CameraSource("ak_rwis", "Alaska RWIS road-weather cameras", _ak_rwis, "AK")
+SOURCES["tw_tdx"] = CameraSource("tw_tdx", "Taiwan freeway/highway CCTV (TDX)", _tw_tdx, "TW")
 SOURCES["nddot"] = CameraSource("nddot", "NDDOT travel cameras", _nddot, "ND")
 SOURCES["midrive"] = CameraSource("midrive", "MDOT Mi Drive cameras", _midrive, "MI")
 SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")
@@ -1074,6 +1123,53 @@ class CameraRegistry:
                 self._index[r_["id"]] = r_          # so the snapshot proxy can resolve them
         return rows
 
+    def youtube_live(self, bbox: tuple[float, float, float, float]) -> list[dict]:
+        """Local broadcast cams (YOUTUBE_API_KEY): live streams geotagged inside the
+        view — TV-station tower cams, weather cams, harbour/beach cams. One Search
+        call (100 quota units) per rounded view, cached an hour; played via the
+        privacy-enhanced embed in the popup."""
+        key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+        if not key:
+            return []
+        w, s, e, n = bbox
+        lat, lon = (s + n) / 2, (w + e) / 2
+        radius_km = max(5, min(500, int(max(n - s, (e - w) * 0.7) * 111 / 2 + 3)))
+        ck = ("yt", round(lat, 1), round(lon, 1), radius_km)
+        now = time.time()
+        with self._snap_lock:
+            hit = self._windy_cache.get(ck)
+            if hit and now - hit[0] < 3600:
+                return hit[1]
+        rows: list[dict] = []
+        try:
+            r = self._client.get("https://www.googleapis.com/youtube/v3/search", params={
+                "part": "snippet", "eventType": "live", "type": "video", "maxResults": 50,
+                "q": "live cam|tower cam|weather cam|traffic cam|harbor cam|beach cam|webcam",
+                "location": f"{lat:.4f},{lon:.4f}", "locationRadius": f"{radius_km}km", "key": key})
+            r.raise_for_status()
+            ids = [it["id"]["videoId"] for it in r.json().get("items", []) if it.get("id", {}).get("videoId")]
+            if ids:                                          # a second call for exact coordinates
+                v = self._client.get("https://www.googleapis.com/youtube/v3/videos", params={
+                    "part": "snippet,recordingDetails", "id": ",".join(ids), "key": key})
+                v.raise_for_status()
+                for it in v.json().get("items", []):
+                    loc = (it.get("recordingDetails") or {}).get("location") or {}
+                    sn = it.get("snippet") or {}
+                    thumb = ((sn.get("thumbnails") or {}).get("medium") or {}).get("url")
+                    row = _row("youtube", it["id"], sn.get("title"), loc.get("latitude"), loc.get("longitude"),
+                               state=None, roadway=sn.get("channelTitle"), image_url=thumb,
+                               embed_url=f"https://www.youtube-nocookie.com/embed/{it['id']}?autoplay=1&mute=1",
+                               page_url=f"https://www.youtube.com/watch?v={it['id']}", kind="broadcast")
+                    if row:
+                        rows.append(row)
+        except (httpx.HTTPError, ValueError, KeyError) as ex:
+            log.info("[cameras] youtube lookup failed: %s", ex)
+        with self._snap_lock:
+            self._windy_cache[ck] = (now, rows)
+            for r_ in rows:
+                self._index[r_["id"]] = r_
+        return rows
+
     def query(self, bbox: tuple[float, float, float, float] | None = None,
               limit: int = 2000, source: str | None = None,
               online_only: bool = True) -> list[dict]:
@@ -1085,6 +1181,8 @@ class CameraRegistry:
                     for r in rs]
         if bbox and (not source or source == "windy") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 6:
             rows = rows + self.windy(bbox)
+        if bbox and (not source or source == "youtube") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 25:
+            rows = rows + self.youtube_live(bbox)
         if online_only:
             rows = [r for r in rows if r["online"]]
         if bbox:

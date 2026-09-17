@@ -287,6 +287,7 @@ _SECURITY_HEADERS = {
     "Content-Security-Policy": " ".join((
         "default-src 'self';", "base-uri 'self';", "object-src 'none';",
         "frame-ancestors 'none';",
+        "frame-src https://www.youtube-nocookie.com;",     # broadcast cams (YouTube Live embeds)
         # analytics.sardistic.com is our own Umami instance: it serves the
         # tracker (script-src) and receives the beacon (connect-src). Naming the
         # one origin keeps this narrower than the 'unsafe-inline' the map stack

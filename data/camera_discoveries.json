@@ -25252,5 +25252,69 @@
   "label": "TDOT SmartWay",
   "state": "TN",
   "reason": "TDOT open-data API returns 401 to non-browser clients; thumbs (tnsnapshots.com) and HLS (skyvdn) are public"
+ },
+ "is": {
+  "key": "is",
+  "endpoint": "https://umferdin.is/graphql?operationName=Cameras&variables=%7B%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%226038173b1125c05ef86c19672916bea5b2b70f590521471f1adb046023489421%22%7D%7D",
+  "items_path": "$.data.Cameras.results",
+  "fields": {
+   "lat": "coordinates.lat",
+   "lon": "coordinates.lon",
+   "image": "images[0].url",
+   "name": "name",
+   "id": "images[0].id",
+   "count": 165,
+   "media_share": 1.0
+  },
+  "replay_verified": true,
+  "static_items": null,
+  "method": "GET",
+  "post_data": null,
+  "media": "still",
+  "cookies": "",
+  "headers": {
+   "accept": "*/*",
+   "content-type": "application/json"
+  },
+  "referer": "https://umferdin.is/en",
+  "sample_image": "https://www.vegagerdin.is/vgdata/vefmyndavelar/hellisheidi_1.jpg",
+  "image_verified": true,
+  "token_in_url": false,
+  "found_at": "2026-09-17",
+  "enabled": true,
+  "label": "Vegager\u00f0in Iceland",
+  "state": "IS"
+ },
+ "weatherstem": {
+  "key": "weatherstem",
+  "endpoint": "https://cdn.weatherstem.com/dashboard/data/dynamic/dashboard.json",
+  "items_path": "$",
+  "fields": {
+   "lat": "geo.lat",
+   "lon": "geo.lng",
+   "image": "photos[0].url",
+   "name": "photos[0].name",
+   "id": "uid",
+   "count": 885,
+   "media_share": 0.97
+  },
+  "replay_verified": true,
+  "static_items": null,
+  "method": "GET",
+  "post_data": null,
+  "media": "still",
+  "cookies": "__cf_bm=nqRbLrVgAbyO4Ogh6A6pcSWBXrDmLXHHMJ9eOv9SKkk-1789674095.7001936-1.0.1.1-u11Eshvh0nYTUHVv0PyHicvnEpBnXvF45CR_XeUuJkXX7qv5Eky3kFIWoPHMyAda3pUI2uilL4Ll3qTjOUpUPAlqc5rGO.6eVKHkYGn1tzI6KpGriGCKW_0IdrCeMuA8; _gcl_au=1.1.1687647427.1789674096; IDE=AHWqTUnzKsgUW5rdGrf91cLHJen-uPIDfPzTnDtKmu6F54oR5fqYmFMwvRSfgA7a; __cf_bm=pMiMawlXOqYKbIyet3vFqGIYfzf7Is2ZJJ6oAzXIz1s-1789674096.1438088-1.0.1.1-WUw4Emx6zvEKT1oNuwk5sH1jtiWBdS1Q_hrFBWCjXQHBXaRRPqyLnkhSCtVsqzGC5Qi0fn.XISJw20rwxIqUuHPYmaN3w5ARyYDQ8UomGiR3GIhUWxaOOAM.iXoFhPSF; __cf_bm=xuFdZg_cHGajLdgoR8Bxo4SF46OAv_KwTi0zwKPIMaI-1789674096.1488223-1.0.1.1-vAatU8KenBvU3ezAwQcLCdYY1QYYBhiSz2UkTLxfIYqQVj.jw4JSQUUvjWN64JsR6XxX57urQiEadkD24Fw6eWOquwTd6_ruMsFWBTWRPG1At.wHNzOmKV_mg3rxH1qS; _gid=GA1.2.696583829.1789674096; _gat_gtag_UA_48391646_1=1; _ga=GA1.1.1470922177.1789674096; __hstc=18669030.9dd15fc507ed7af0049ffb240a7bf458.1789674096392.1789674096392.1789674096392.1; hubspotutk=9dd15fc507ed7af0049ffb240a7bf458; __hssrc=1; __hssc=18669030.1.1789674096392; __cf_bm=bbWSHggS2711tN3ero5j30A13yVEvIXZ5qdYyZZNcz8-1789674096.5054407-1.0.1.1-m43_NO5fwCDVfYcMFsGHd8004I4ZGruiMcJ04A7XILPkwaCsnyCHIzenyFi_ausU7DZXFHzfhBxxQyutMt6aUQGK1to2vIt27R_OvpA4dvFTZZJpVqqmf5sNOdVhQAgs; __cf_bm=ZhyD9fi.Fre1o4zvZOVrMiQ6YodVywkMX8cbdCygxYY-1789674096.5528708-1.0.1.1-SM6a7GJh4jmSQUE_yx5BumyZDgzmBfyHl5wB.332MgWCkTFjQe4E1S.YoWci92jazPvfn1UlCsoVCKmggBBzNQvUC8VLy6id2g_XrltnEMTv849htLUEnI3TfpyLlEDS; _ga_HFQWJKD1Q6=GS2.1.s1789674096$o1$g0$t1789674106$j50$l0$h0; _hcp=v2.NwsjJ6N19Q1UZNMTbMfmBQIvcbkzknnnc74XQc8oUaS4XYKkeWd4E5O6s641Luy9tPDsj64f/rouD+yKm9fy6CmdtAuT1XL8TwXQG6JzLLz9wwhs9XvX8+2rCZGhcKVs347a8b/xrySf+9TCnrT+4swcVnalfmfBZMvPJJXhJP2absvBfif2Wqwbxcw5WCqIkYzzLurCNzEY; __cf_bm=M8huYz.4W2GsOh5H5nLGYYuZJ6t0RCRwhzvBspoLnFs-1789674107.7502356-1.0.1.1-qbe.qoXnPCQunh3UMYZVCMqP.T9Be12aH79Xvm8t96IiaraB.rKNVWvz1mCwIAsi1qZ0.h5OjbflYtN7tH7Q8aaqmcKwCRVJFSxYVY4.pQUJmG8_IEieFQlkD8T_eaLA; _cfuvid=Iq9JuxX9wz8mmaW.yrVzp3gJprnrXxptnEc67hi8oRw-1789674107.7502356-1.0.1.1-hxbPw6aFGNjTAzl1v4uNqu7zpr8aeQyRKb3Hm3OpwaE; __hstc=58392949.2f7481d5750b6277533b4157e57ef2da.1789674108019.1789674108019.1789674108019.1; hubspotutk=2f7481d5750b6277533b4157e57ef2da; __hssrc=1; __hssc=58392949.1.1789674108019; _ga_DHL9NJGPFR=GS2.1.s1789674107$o1$g0$t1789674107$j60$l0$h0; _ga=GA1.1.366812881.1789674108",
+  "headers": {
+   "accept": "application/json, text/javascript, */*; q=0.01"
+  },
+  "referer": "https://www.weatherstem.com/",
+  "sample_image": "https://cdn.weatherstem.com/skycamera/leon/apalacheepark/cumulus/snapshot.jpg",
+  "image_verified": true,
+  "token_in_url": false,
+  "found_at": "2026-09-17",
+  "enabled": true,
+  "label": "WeatherSTEM skycams",
+  "state": null,
+  "kind": "weather"
  }
 }

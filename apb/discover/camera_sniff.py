@@ -68,6 +68,18 @@ SEEDS: dict[str, list[str]] = {
     "uk": ["https://www.trafficengland.com/", "https://trafficscotland.org/", "https://traffic.wales/"],
     "au": ["https://www.livetraffic.com/", "https://qldtraffic.qld.gov.au/", "https://traffic.vicroads.vic.gov.au/"],
     "no": ["https://www.vegvesen.no/trafikkinformasjon/reiseinformasjon/webkamera/"],
+    "alertwest": ["https://alertwest.live/"],
+    "hvo": ["https://www.usgs.gov/volcanoes/kilauea/webcams"],
+    "dk": ["https://www.trafikinfo.dk/kort"],
+    "is": ["https://www.road.is/travel-info/web-cams/"],
+    "pl": ["https://www.gddkia.gov.pl/kamery"],
+    "es": ["https://infocar.dgt.es/etraffic/"],
+    "ie": ["https://www.tiitraffic.ie/"],
+    "be": ["https://www.verkeerscentrum.be/verkeersinfo/kaart"],
+    "ch": ["https://www.tcs.ch/de/verkehrsinfo/webcams/"],
+    "nl": ["https://www.rijkswaterstaat.nl/verkeersinformatie"],
+    "wa_fire": ["https://www.dnr.wa.gov/wildfire-cameras"],
+    "weatherstem": ["https://www.weatherstem.com/skycams"],
 }
 
 # Where to zoom for each seed (a busy metro): tile-loaded maps only fetch cameras
@@ -81,7 +93,9 @@ FOCUS: dict[str, tuple[float, float]] = {
     "sc": (34.00, -81.03), "wv": (38.35, -81.63), "co": (39.74, -104.99), "nj": (40.73, -74.17),
     "ma": (42.36, -71.06), "hi": (21.31, -157.86), "bc": (49.28, -123.12), "qc": (45.50, -73.57),
     "mb": (49.90, -97.14), "ab": (51.05, -114.07), "uk": (51.51, -0.13), "au": (-33.87, 151.21),
-    "no": (59.91, 10.75),
+    "no": (59.91, 10.75), "alertwest": (44.05, -121.3), "dk": (55.68, 12.57), "is": (64.13, -21.9),
+    "pl": (52.23, 21.01), "es": (40.42, -3.70), "ie": (53.35, -6.26), "be": (50.85, 4.35), "ch": (46.95, 7.45),
+    "nl": (52.37, 4.90),
 }
 
 _LAT = re.compile(r"^(lat|latitude|y|lat_deg|ycoord|latdd)$", re.I)
