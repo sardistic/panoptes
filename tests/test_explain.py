@@ -8,7 +8,7 @@ from apb.context import explain
 
 def test_pick_model_prefers_highest_stable_flash(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
-    explain._model_cache.update(name=None, at=0.0)
+    explain._model_cache.update(names=None, at=0.0)
     names = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.1-flash-preview-09-01",
              "gemini-3.1-flash", "gemini-3.1-flash-lite", "gemini-3.1-flash-image",
              "gemini-3.2-flash-preview-11-01"]
@@ -22,7 +22,7 @@ def test_pick_model_prefers_highest_stable_flash(monkeypatch):
     monkeypatch.setattr(explain._client, "get", lambda *a, **k: _R())
     assert explain.pick_model("k") == "gemini-3.2-flash-preview-11-01"   # newest wins, preview or not
     names.remove("gemini-3.2-flash-preview-11-01")
-    explain._model_cache.update(name=None, at=0.0)
+    explain._model_cache.update(names=None, at=0.0)
     assert explain.pick_model("k") == "gemini-3.1-flash"                  # stable beats preview at equal version
     monkeypatch.setenv("GEMINI_MODEL", "gemini-9-flash")
     assert explain.pick_model("k") == "gemini-9-flash"
@@ -30,11 +30,11 @@ def test_pick_model_prefers_highest_stable_flash(monkeypatch):
 
 def test_pick_model_falls_back_without_caching_failure(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
-    explain._model_cache.update(name=None, at=0.0)
+    explain._model_cache.update(names=None, at=0.0)
     def boom(*a, **k): raise httpx.ConnectError("down")
     monkeypatch.setattr(explain._client, "get", boom)
     assert explain.pick_model("k") == explain._FALLBACK_MODEL
-    assert explain._model_cache["name"] is None
+    assert explain._model_cache["names"] is None
 
 
 def test_prompt_carries_focus_layers_weather_and_camera_order():
@@ -79,3 +79,22 @@ def test_explain_requires_key_and_surfaces_upstream_errors(monkeypatch):
     assert sent["url"].endswith("/models/gemini-test:generateContent")
     parts = sent["body"]["contents"][0]["parts"]
     assert parts[1]["inline_data"]["mime_type"] == "image/jpeg"
+
+
+def test_explain_steps_down_when_newest_model_is_busy(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.setattr(explain, "candidate_models", lambda key: ["gemini-9-flash", "gemini-8-flash"])
+    monkeypatch.setattr(explain, "weather_at", lambda lat, lon: {})
+    tried = []
+    class _R:
+        def __init__(self, code, text=""): self.status_code = code; self._t = text
+        def json(self):
+            return ({"candidates": [{"content": {"parts": [{"text": self._t}]}}]} if self.status_code == 200
+                    else {"error": {"message": "high demand"}})
+    def post(url, **k):
+        tried.append(url.split("/models/")[1].split(":")[0])
+        return _R(503) if "9-flash" in url else _R(200, "ok")
+    monkeypatch.setattr(explain._client, "post", post)
+    out = explain.explain({"bounds": {}, "view": {"lat": 1, "lon": 2}}, [])
+    assert out["model"] == "gemini-8-flash" and tried == ["gemini-9-flash", "gemini-8-flash"]

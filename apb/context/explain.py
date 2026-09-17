@@ -30,7 +30,7 @@ _GEN = os.environ.get("GEMINI_API_BASE", "https://generativelanguage.googleapis.
 _WEATHER = "https://api.open-meteo.com/v1/forecast"
 _UA = {"User-Agent": "panoptes/0.1 (panoptes.run; scene explainer)"}
 _client = httpx.Client(timeout=60.0, headers=_UA, follow_redirects=True)
-_model_cache: dict = {"name": None, "at": 0.0}
+_model_cache: dict = {"names": None, "at": 0.0}
 _FALLBACK_MODEL = "gemini-2.5-flash"
 
 # WMO weather interpretation codes -> plain words (Open-Meteo `weather_code`).
@@ -52,15 +52,16 @@ def _version(name: str) -> tuple:
     return (int(m.group(1)), int(m.group(2) or 0)) if m else (0, 0)
 
 
-def pick_model(key: str) -> str:
-    """Newest general-purpose Flash chat model available to this key."""
+def candidate_models(key: str) -> list[str]:
+    """General-purpose Flash chat models for this key, newest first. The newest one
+    is sometimes capacity-limited (503 "high demand"), so callers walk the list."""
     pinned = os.environ.get("GEMINI_MODEL", "").strip()
     if pinned:
-        return pinned
+        return [pinned]
     now = time.time()
-    if _model_cache["name"] and now - _model_cache["at"] < 3600:
-        return _model_cache["name"]
-    chosen = _FALLBACK_MODEL
+    if _model_cache["names"] and now - _model_cache["at"] < 3600:
+        return _model_cache["names"]
+    chosen = [_FALLBACK_MODEL]
     try:
         r = _client.get(f"{_GEN}/models", params={"key": key, "pageSize": 200}, timeout=20.0)
         r.raise_for_status()
@@ -72,11 +73,16 @@ def pick_model(key: str) -> str:
             # highest version first; among equals prefer a stable name over preview/dated
             flash.sort(key=lambda n: (_version(n), 0 if re.search(r"preview|\d{2}-\d{2}", n) else 1),
                        reverse=True)
-            chosen = flash[0]
-        _model_cache.update(name=chosen, at=now)      # cache only a real discovery
+            chosen = flash
+        _model_cache.update(names=chosen, at=now)     # cache only a real discovery
     except (httpx.HTTPError, ValueError, KeyError) as e:
         log.warning("gemini model discovery failed (%s); using %s", e, chosen)
     return chosen
+
+
+def pick_model(key: str) -> str:
+    """Newest general-purpose Flash chat model available to this key."""
+    return candidate_models(key)[0]
 
 
 def weather_at(lat: float, lon: float) -> dict:
@@ -194,7 +200,6 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     key = api_key()
     if not key:
         raise RuntimeError("GEMINI_API_KEY is not configured")
-    model = pick_model(key)
     view = ctx.get("view") or {}
     weather = weather_at(float(view.get("lat", 0)), float(view.get("lon", 0))) if view else {}
     parts: list[dict] = [{"text": build_prompt(ctx, weather, [s[0] for s in stills])}]
@@ -202,14 +207,21 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
         parts.append({"inline_data": {"mime_type": ctype, "data": base64.b64encode(data).decode()}})
     body = {"contents": [{"role": "user", "parts": parts}],
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1200}}
-    r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body)
-    if r.status_code != 200:
+    r = None
+    for model in candidate_models(key)[:4]:        # newest first; step down on capacity errors
+        r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body)
+        if r.status_code == 200:
+            break
+        if r.status_code not in (429, 503):
+            break
+        log.info("gemini %s busy (%d); trying the next model", model, r.status_code)
+    if r is None or r.status_code != 200:
         msg = ""
         try:
             msg = r.json().get("error", {}).get("message", "")
-        except ValueError:
+        except (ValueError, AttributeError):
             pass
-        raise RuntimeError(f"gemini {r.status_code}: {msg[:200]}")
+        raise RuntimeError(f"gemini {r.status_code if r else '?'}: {msg[:200]}")
     data = r.json()
     text = "".join(p.get("text", "") for c in data.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))

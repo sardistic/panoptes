@@ -923,12 +923,14 @@ def explain_scene(req: ExplainRequest, request: Request):
             break
     try:
         out = explainer.explain(ctx, stills)
+    # 424 (not 502/503): Cloudflare swaps origin 5xx bodies for its own error page,
+    # which would hide the message from the UI.
     except RuntimeError as e:
         log.warning("explain failed: %s", e)
-        return JSONResponse({"error": str(e)[:240]}, status_code=502)
+        return JSONResponse({"error": str(e)[:240]}, status_code=424)
     except httpx.HTTPError as e:
         log.warning("explain upstream error: %s", e)
-        return JSONResponse({"error": "model upstream unreachable"}, status_code=502)
+        return JSONResponse({"error": "model upstream unreachable"}, status_code=424)
     out["camera_ids"] = used_ids
     return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
