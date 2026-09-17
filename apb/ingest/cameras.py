@@ -618,6 +618,48 @@ def _cars_co(reg, src) -> list[dict]:
     return out
 
 
+# ── Iteris ATIS platform: GeoJSON camera icons (found by the sniffer on 511sc.org) ──
+# CDN shape: features whose properties carry HLS urls (`https_url`/`ios_url`) or a
+# `cameras[]` list of stills (`image`). VDOT serves the same shape on its own host.
+ATIS: dict[str, tuple[str, str]] = {
+    "sc": ("https://sc.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "SC"),
+    "mt": ("https://mt.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "MT"),
+    "sd": ("https://sd.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "SD"),
+    "va": ("https://511.vdot.virginia.gov/services/map/array/cameras", "VA"),
+}
+
+
+def _atis(reg, src) -> list[dict]:
+    url, state = ATIS[src.key.split("_", 1)[1]]
+    r = reg._client.get(url, headers={"Referer": f"https://{url.split('/')[2]}/", "Accept": "application/json"})
+    r.raise_for_status()
+    doc = json.loads(r.text.lstrip())
+    feats = (doc.get("features") or doc.get("data") or []) if isinstance(doc, dict) else doc
+    out = []
+    for f in feats:
+        p, g = f.get("properties") or {}, f.get("geometry") or {}
+        c = g.get("coordinates") or [None, None]
+        if c and isinstance(c[0], list):
+            c = c[0]
+        base = p.get("description") or p.get("name") or p.get("route") or ""
+        views = p.get("cameras") or []
+        if views:                                   # multi-still sites (MT, SD)
+            for v in views:
+                r_ = _row(src.key, f"{p.get('id')}.{v.get('id')}", f"{base} · {v.get('name') or v.get('description') or ''}".strip(" ·"),
+                          c[1], c[0], state=state, roadway=p.get("route"), direction=v.get("direction"),
+                          image_url=v.get("image"))
+                if r_:
+                    out.append(r_)
+            continue
+        hls = p.get("https_url") or p.get("ios_url")
+        if hls and not p.get("problem_stream"):
+            r_ = _row(src.key, p.get("id") or p.get("guid"), base, c[1], c[0], state=state,
+                      roadway=p.get("route"), direction=p.get("direction"), stream_url=hls)
+            if r_:
+                out.append(r_)
+    return out
+
+
 # ── discovered feeds: specs written by apb.discover.camera_sniff ──────────────
 _DISCOVERIES = Path(__file__).resolve().parents[2] / "data" / "camera_discoveries.json"
 _PATH_PART = re.compile(r"([^\[]+)(?:\[(\d+)\])?$")
@@ -762,6 +804,8 @@ SOURCES: dict[str, CameraSource] = {
     "ab511": CameraSource("ab511", "511 Alberta cameras", _carmanah_v2, "AB",
                           env_key="T511_AB_KEY", host="511.alberta.ca"),
 }
+SOURCES.update({f"at_{k}": CameraSource(f"at_{k}", f"{v[1]} 511 cameras (Iteris ATIS)", _atis, v[1])
+                for k, v in ATIS.items()})
 SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")
 SOURCES.update({f"it_{k}": CameraSource(f"it_{k}", f"{v[1]} 511 cameras (one-network)", _iteris, v[1])
                 for k, v in ITERIS.items()})
@@ -779,6 +823,8 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://*.wowza.com",              # ALGO Alabama HLS CDN
     "https://*.modot.mo.gov",           # MoDOT (discovered) HLS
     "https://*.cotrip.org",             # COtrip HLS
+    "https://*.skyvdn.com",             # Iteris ATIS streamers (SC, NY)
+    "https://*.vdotcameras.com",        # VDOT HLS
 )
 
 

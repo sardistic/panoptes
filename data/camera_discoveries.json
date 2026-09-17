@@ -32,12 +32,18 @@
    "lon": "mapCameras[0].longitude",
    "image": "mapCameras[0].urlVar",
    "name": "cameraLocationLinks[0].linkedCameraPole.name",
-   "id": "cameraLocationLinks[0].cameraPole.id",
+   "id": "mapCameras[0].cameraId",
    "count": 227
   },
+  "replay_verified": true,
   "method": "GET",
   "post_data": null,
   "media": "still",
+  "cookies": "_ga=GA1.1.663816467.1789654515; _ga_50HP3PMN79=GS2.1.s1789654514$o1$g0$t1789654514$j60$l0$h0; cf_clearance=SUSGQ9zUkZLwy0gV8ZBIfxKru_YjrLJAu_uMCbGVC8k-1789654514-1.2.1.1-_EmLLJzjaOHTyx5cD6uDANtzpjE66vccKG1SMHsuC0a.52qif19NtoeuBKzvHzZpYHjcSnvPsueVPjuwNOSPlzhIu5ubeCBNExFfWDWsRUkeENRU7A6x_Ph7ISVkq4nT0xKbdXVOvnWUmV8OJ2tUXNiuDRceOMkZwEw5z6XFDhRlP0p7dGeStFt2oWYVENSGs8Y0ailwfqHTxS7k7q0LZZvuE1gdPFPWHvd29Le46UnIjoUhJnszVmSqVI0CrTThdfKeMaUc51w8J7JhrAsvwuV88yAOABy_osHAkIdkIyAJmsdLqV91YiGXbIpzsxw3Fs1c6foYFUJ3c2.cJXJldf6yqZfdXN2yjYhEWQAN2kOLcvo3wvCiRq5ZtrKOtTWwSIjayTCW8pPHLy0wYAIn_A",
+  "headers": {
+   "accept": "application/json, text/plain, */*",
+   "content-type": "application/json"
+  },
   "referer": "https://oktraffic.org/",
   "sample_image": "https://oktraffic.org/api/axis-media/media.amp?resolution=800x600&camera=2",
   "image_verified": false,
@@ -45,8 +51,7 @@
   "found_at": "2026-09-17",
   "enabled": false,
   "label": "OKtraffic",
-  "state": "OK",
-  "reason": "stills 404 through their media proxy"
+  "state": "OK"
  },
  "nm": {
   "key": "nm",
@@ -79,7 +84,7 @@
   "fields": {
    "lat": "attributes.latitude",
    "lon": "attributes.longitude",
-   "image": "attributes.name",
+   "image": "attributes.snapshot",
    "name": "attributes.name",
    "id": "attributes.name",
    "count": 254
@@ -88,10 +93,10 @@
   "method": "GET",
   "post_data": null,
   "media": "still",
-  "cookies": "_ga=GA1.1.2132486263.1789654238; _ga_K7E4W83L9R=GS2.1.s1789654237$o1$g0$t1789654237$j60$l0$h0; mapcenter=390386,-845457,8",
+  "cookies": "_ga=GA1.1.2135440434.1789654579; _ga_K7E4W83L9R=GS2.1.s1789654578$o1$g0$t1789654578$j60$l0$h0; mapcenter=390386,-845457,8",
   "headers": {},
   "referer": "https://goky.ky.gov/",
-  "sample_image": null,
+  "sample_image": "http://pws.trafficwise.org/pullover/172_65_56_11.jpg",
   "image_verified": false,
   "token_in_url": false,
   "found_at": "2026-09-17",
@@ -136,13 +141,13 @@
    "image": "iconFile",
    "name": "iconFile",
    "id": "iconFile",
-   "count": 803
+   "count": 798
   },
   "replay_verified": false,
   "method": "POST",
   "post_data": "{\"encryptedData\":\"6bfb960f774de3325100d3d5c6005d90e5dfd0036f9e1190db396cf8a6caf38e\"}",
   "media": "still",
-  "cookies": "_ga=GA1.1.1691073283.1789653864; googtrans=%2Fen%2Fen; _ga_2459515ZCZ=GS2.1.s1789653864$o1$g1$t1789653872$j52$l0$h0",
+  "cookies": "_ga=GA1.1.724247996.1789654637; googtrans=%2Fen%2Fen; _ga_2459515ZCZ=GS2.1.s1789654637$o1$g1$t1789654645$j52$l0$h0",
   "headers": {
    "accept": "application/json",
    "content-type": "application/json"
@@ -163,22 +168,56 @@
   "fields": {
    "lat": "lat",
    "lon": "lon",
-   "image": "cameraImageURL",
+   "image": "streamingURL",
    "name": "description",
    "id": "id",
    "count": 336
   },
+  "replay_verified": false,
   "method": "GET",
   "post_data": null,
-  "media": "still",
+  "media": "hls",
+  "cookies": "icxtgMapCookie=VERSION%7C1.4.1%7CicxtgTest%7Clat%3D21.47612755856366%26lon%3D-157.98620475676668%26zoom%3D10%26layers%3D; _gid=GA1.2.148236478.1789654639; _gat_gtag_UA_17453586_1=1; _ga=GA1.1.1378792710.1789654639; atisCamera=H-1%20and%20H-201%20All; atisCamFil=; _ga_0BFNQYKFG7=GS2.1.s1789654638$o1$g1$t1789654648$j50$l0$h0",
+  "headers": {
+   "accept": "application/json, text/javascript, */*; q=0.01",
+   "content-type": "application/json; charset=utf-8"
+  },
   "referer": "https://goakamai.org/",
-  "sample_image": "http://cctv.cdn.goakamai.org/SnapShot/320x240/TL-0001.jpg",
+  "sample_image": "https://cdn3.wowza.com/5/SXBEWXZIK3ZOTG5U/W1CCHNL_A/TL-0001_Ala_Moana_and_Ala_Moana_Makai_Exit.stream/playlist.m3u8",
   "image_verified": true,
   "token_in_url": false,
   "found_at": "2026-09-17",
   "enabled": false,
   "label": "GoAkamai Hawaii",
-  "state": "HI",
-  "reason": "camera service answers only the page's own session (403/500 on replay)"
+  "state": "HI"
+ },
+ "tn": {
+  "key": "tn",
+  "endpoint": "https://www.tdot.tn.gov/opendata/api/public/RoadwayCameras",
+  "items_path": "$",
+  "fields": {
+   "lat": "lat",
+   "lon": "lng",
+   "image": "rtmpVideoUrl",
+   "name": "name",
+   "id": "id",
+   "count": 668
+  },
+  "replay_verified": false,
+  "method": "GET",
+  "post_data": null,
+  "media": "still",
+  "cookies": "ai_user=pR1ldgkejO69JCWaiBZeHj|2026-09-17T14:20:14.344Z; ai_session=vbyQa8k9GEOLWrwy0tsO0I|1789654814349|1789654814349",
+  "headers": {
+   "accept": "application/json, text/plain, */*"
+  },
+  "referer": "https://smartway.tn.gov/",
+  "sample_image": "rtmp://mcleansfs1.us-east-1.skyvdn.com:1935/rtplive/R1_010",
+  "image_verified": false,
+  "token_in_url": false,
+  "found_at": "2026-09-17",
+  "enabled": false,
+  "label": null,
+  "state": "TN"
  }
 }

@@ -1,5 +1,7 @@
 """Public live-camera registry — parsers on captured shapes, query sampling, proxy
 guard rails. Offline: the registry's fetch helpers are stubbed per test."""
+import json
+
 import httpx
 import pytest
 
@@ -20,6 +22,18 @@ class _Stub(CameraRegistry):
 
     def get_text(self, url):
         return self.get_json(url)
+
+    def __getattribute__(self, name):       # parsers that call the raw client get the same stubs
+        if name == "_client":
+            stub = self
+            class _C:
+                def get(self, url, **kw):
+                    class _R:
+                        text = json.dumps(stub.get_json(url))
+                        def raise_for_status(self): pass
+                    return _R()
+            return _C()
+        return super().__getattribute__(name)
 
 
 def test_row_rejects_unplaceable_or_blind_cameras():
@@ -225,3 +239,18 @@ def test_cars_colorado_skips_broken_and_private_views():
          "views": [{"url": "https://p/z.m3u8", "videoPreviewUrl": "https://c/z.png"}]}}]}
     rows = cameras._cars_co(_Stub({"map-features": data}), SOURCES["cotrip"])
     assert len(rows) == 1 and rows[0]["id"] == "cotrip:1.0" and rows[0]["stream_url"].endswith("x/playlist.m3u8")
+
+
+def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper():
+    doc = {"data": [
+        {"geometry": {"coordinates": [-77.3, 38.8]}, "properties": {"id": "1", "description": "Univ Dr", "route": "",
+         "https_url": "https://m.vdotcameras.com/rtplive/x/playlist.m3u8", "problem_stream": False}},
+        {"geometry": {"coordinates": [-77.4, 38.9]}, "properties": {"id": "2", "description": "broken",
+         "https_url": "https://m.vdotcameras.com/rtplive/y/playlist.m3u8", "problem_stream": True}},
+        {"geometry": {"coordinates": [-100.0, 44.9]}, "properties": {"id": "7", "name": "Watertown North", "route": "I-29",
+         "cameras": [{"id": "a", "name": "Looking South", "image": "https://sd.cdn.iteris-atis.com/c/1/latest.jpg"},
+                     {"id": "b", "name": "Looking North", "image": "https://sd.cdn.iteris-atis.com/c/4/latest.jpg"}]}}]}
+    rows = cameras._atis(_Stub({"": doc}), SOURCES["at_va"])
+    ids = [r["id"] for r in rows]
+    assert ids == ["at_va:1", "at_va:7.a", "at_va:7.b"]           # broken stream skipped, stills expanded
+    assert rows[0]["stream_url"].endswith("x/playlist.m3u8") and rows[1]["image_url"].endswith("1/latest.jpg")
