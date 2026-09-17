@@ -147,8 +147,11 @@ def _worldpop(s, w, n, e):
     tid = None
     for attempt in range(3):                       # the service drops connections under load
         try:
-            tid = _j("https://api.worldpop.org/v1/services/stats",
-                     params={"dataset": "wpgppop", "year": 2020, "geojson": gj}).get("taskid")
+            # fresh connection each time: the service resets pooled keep-alive sockets
+            r0 = httpx.get("https://api.worldpop.org/v1/services/stats", headers=_UA, timeout=20.0,
+                           params={"dataset": "wpgppop", "year": 2020, "geojson": gj})
+            r0.raise_for_status()
+            tid = r0.json().get("taskid")
             break
         except httpx.HTTPError:
             if attempt == 2:
@@ -156,7 +159,7 @@ def _worldpop(s, w, n, e):
             time.sleep(0.8)
     for _ in range(7):
         time.sleep(1.4)
-        r = _j(f"https://api.worldpop.org/v1/tasks/{tid}")
+        r = httpx.get(f"https://api.worldpop.org/v1/tasks/{tid}", headers=_UA, timeout=15.0).json()
         if r.get("status") == "finished":
             if r.get("error"):
                 raise RuntimeError(r.get("error_message"))
