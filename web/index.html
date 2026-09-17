@@ -62,7 +62,7 @@
     box-shadow:0 1px 0 rgba(0,0,0,.5), 0 12px 34px rgba(0,0,0,.30)}
 
   /* ── command bar ── */
-  #top{top:16px;left:16px;right:16px;display:flex;align-items:center;gap:16px;
+  #top{top:16px;left:16px;right:16px;display:flex;align-items:center;gap:12px;
     padding:11px 16px;flex-wrap:wrap}
   /* spectrum strip along the top edge — same drift as the logo */
   #top::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
@@ -85,8 +85,15 @@
     color:var(--txt-2);height:26px;padding:0 11px;border:1px solid var(--line-2);
     border-radius:3px;background:var(--panel-2);text-transform:uppercase}
   #status{letter-spacing:.14em}
-  #loadPill{color:var(--amber);border-color:rgba(224,160,48,.45);width:250px;flex:0 0 250px;justify-content:flex-start}
-  #loadPill[hidden]{display:flex;visibility:hidden}   /* keep the slot; the deck never reflows */
+  /* status and loading share ONE fixed slot (loading overlays status), and the slot +
+     surge pill move as a unit — nothing in the deck reflows when loads start/stop */
+  .pills{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .pills .slot{position:relative;width:200px;height:26px;flex:0 0 200px}
+  #metro{max-width:250px}
+  @media (max-width:2200px){ #top .sub{display:none} }   /* tagline is the first thing to go: one row beats a wrap */
+  .pills .slot .pill{position:absolute;inset:0;justify-content:flex-start}
+  #loadPill{color:var(--amber);border-color:rgba(224,160,48,.45);background:var(--panel)}
+  #loadPill[hidden]{display:none}
   #loadText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .loadmark{width:7px;height:7px;border:1px solid var(--amber);display:block;
     animation:loadstep 1s steps(2,end) infinite}
@@ -300,7 +307,8 @@
       overflow:auto;align-content:flex-start}
     #top .spacer{display:none}
     #top .brand{font-size:15px}
-    #top .sub,#footer,#envReadout,#loadPill{display:none}
+    #top .sub,#footer,#envReadout{display:none}
+    .pills .slot{width:170px;flex-basis:170px}
     #top .ctl{flex:1 1 42%;min-width:130px}
     #top .ctl:has(.segwrap){flex-basis:100%}
     .segwrap{flex-wrap:wrap}
@@ -363,11 +371,15 @@
     <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
   </span></label>
   <span class="spacer"></span>
-  <span class="pill" id="loadPill" role="status" aria-live="polite" hidden>
-    <span class="loadmark"></span><span id="loadText">LOADING</span></span>
-  <span class="pill"><span class="dot"></span><span id="status" role="status" aria-live="polite">LIVE</span></span>
-  <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
-    <span id="alertCount">0</span> SURGE</span>
+  <span class="pills">
+    <span class="slot">
+      <span class="pill"><span class="dot"></span><span id="status" role="status" aria-live="polite">LIVE</span></span>
+      <span class="pill" id="loadPill" role="status" aria-live="polite" hidden>
+        <span class="loadmark"></span><span id="loadText">LOADING</span></span>
+    </span>
+    <span class="pill" id="alertPill" style="display:none;border-color:var(--hot);color:var(--hot)">
+      <span id="alertCount">0</span> SURGE</span>
+  </span>
 </div>
 
 <div id="envReadout" class="hud" hidden></div>
@@ -1999,18 +2011,18 @@ document.getElementById('camerasBtn').onclick=async e=>{
 (function steerLogo(){
   const logo=document.getElementById('logo'), root=document.documentElement.style;
   const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
-  let angle=90, target=90, pos=0, speed=reduced?0:.08, glow=1, last=null, lastT=performance.now();
+  let angle=90, target=90, pos=0, speed=reduced?0:.012, glow=1, last=null, lastT=performance.now();
   document.addEventListener('mousemove',e=>{
     const r=logo.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
     target=Math.atan2(e.clientY-cy,e.clientX-cx)*180/Math.PI+90;      // CSS angles: 0deg points up
     const now=performance.now();
     if(last){ const v=Math.hypot(e.clientX-last[0],e.clientY-last[1])/Math.max(1,now-lastT); // px per ms
-      if(!reduced) speed=Math.min(3,speed+v*.9); glow=Math.min(1.6,glow+v*.25); }
+      if(!reduced) speed=Math.min(.35,speed+v*.05); glow=Math.min(1.25,glow+v*.05); }
     last=[e.clientX,e.clientY]; lastT=now;
   },{passive:true});
   (function tick(){
-    let d=((target-angle+540)%360)-180; angle+=d*.12;                      // ease toward the pointer
-    pos=(pos+speed)%100; speed=Math.max(reduced?0:.08,speed*.94); glow=1+(glow-1)*.93;
+    let d=((target-angle+540)%360)-180; angle+=d*.04;                      // ease toward the pointer
+    pos=(pos+speed)%100; speed=Math.max(reduced?0:.012,speed*.97); glow=1+(glow-1)*.96;
     root.setProperty('--logo-angle',`${angle.toFixed(1)}deg`);
     root.setProperty('--logo-pos',`${pos.toFixed(2)}% ${pos.toFixed(2)}%`);
     root.setProperty('--logo-glow',glow.toFixed(3));
