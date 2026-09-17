@@ -15,6 +15,7 @@ and surge-score source-diversity.
 | EPA AirNow | `AIRNOW_KEY` | Official AQI by station; smoke/hazmat proxy | https://docs.airnowapi.org/ → "Request an API key" |
 | OpenAQ | `OPENAQ_KEY` | PM2.5 air-quality spikes (v3 API) | https://openaq.org/ → account → API key (https://docs.openaq.org/) |
 | aisstream.io | `AISSTREAM_KEY` | Live maritime AIS vessel positions (websocket) | https://aisstream.io/ → free signup → API key |
+| Gemini (scene explainer) | `GEMINI_API_KEY` (or an unrestricted `GOOGLE_API_KEY`) | "What am I looking at?" — the clip's box summaries, camera image analysis, drill-downs. `GEMINI_MODEL` pins a model; otherwise the newest Flash is auto-picked | https://aistudio.google.com/apikey — the key must allow the Generative Language API (the Custom-Search-restricted key returns 403) |
 | ACLED | `ACLED_EMAIL` + `ACLED_PASSWORD` | Protests, riots, political-violence events | https://acleddata.com/user/register → myACLED account (OAuth login; the old key+email API is retired) |
 | 511 Georgia | `T511_GA_KEY` | Statewide GA DOT traffic incidents | https://511ga.org → developer resources (free key) |
 | 511 Louisiana | `T511_LA_KEY` | Statewide LA DOT traffic incidents | https://511la.org → developer resources |
@@ -62,12 +63,23 @@ local pipeline and source discovery:
 `apb/ingest/cameras.py` — verified 2026-09-17: Caltrans (12 districts, ~3.6k),
 NYC DOT TMC (~1k), 511NY (~2.9k, most with HLS), DelDOT (HLS only), Maryland CHART
 (HLS only), Seattle SDOT+WSDOT (~650), Ontario 511 (~1.7k views), TfL JamCams
-(London, ~900), NZTA (~300). Stills are served through `/live/cameras/{id}/image`;
+(London, ~900), NZTA (~300), ODOT TripCheck (~1.1k), ALGO Alabama (~650, stills +
+HLS), TravelMidwest gateway (IDOT/Tollway/Lake County/InDOT/WisDOT/KYTC, ~2.1k
+views), Austin (~1k), Baton Rouge (118), ALERTCalifornia wildfire cams (~1.3k, kind
+`wildfire`), Calgary (216), Ottawa (428), Vancouver (~840 views), Fintraffic
+weather cams (~2.3k presets, kind `weather`), Singapore LTA, Hong Kong TD (~1k),
+Transport NSW (147 via ArcGIS mirror). ~22k cameras total. Found via endpoint
+probing plus ArcGIS Hub / Socrata catalog searches for "traffic cameras" /
+"webcam" — re-run those searches when hunting for more. Stills are served through `/live/cameras/{id}/image`;
 HLS plays directly from the DOT streamer (hosts allow-listed in the API CSP via
 `STREAM_HOSTS`). Keyed platforms in the table above add cameras once their key is
 set. Evaluated and not usable server-side: DriveBC (connection reset from non-BC
-clients), 511NJ / Quebec 511 (bot protection), WSDOT / ODOT TripCheck / OHGO /
-COtrip (keyed, not yet registered), FAA WeatherCams (auth required).
+clients), 511NJ / Quebec 511 / Montreal (bot protection), MnDOT IRIS camera.xml
+(WAF-rejected; stills at video.dot.state.mn.us work if you have ids), KYTC ArcGIS
+(snapshot host refuses connections), Honolulu open data (image host gone), Toronto
+(API method retired), WSDOT / OHGO / COtrip / Alberta+Atlantic 511s (keyed, not yet
+registered), FAA WeatherCams (auth required), Germany Autobahn API (webcam lists
+empty), TDOT SmartWay (401).
 
 ## Evaluated and not viable (so far)
 

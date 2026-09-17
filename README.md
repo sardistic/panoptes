@@ -33,10 +33,15 @@ register to unlock the keyed lanes.
 - **Traffic & transport** — 511 traffic (NY keyless; GA/LA/PA/ID/VA/New England
   unlock with free `T511_*_KEY`s), FAA TFRs, FAA airport delays, Amtrak trains
   running 1h+ late (rail-corridor anomaly signal).
-- **Live cameras** — public DOT/traffic cameras (Caltrans, NYC DOT, 511NY, DelDOT,
-  Maryland CHART, Seattle, Ontario 511, TfL, NZTA keyless — ~12k lenses; more
-  Carmanah 511 states unlock with `T511_*_KEY`s). Stills are proxied same-origin,
-  HLS streams play in the popup. `APB_CAMERAS_OFF=1` disables the lane.
+- **Live cameras** — 22 keyless public camera sources (~22k lenses): Caltrans, NYC DOT,
+  511NY, DelDOT, Maryland CHART, Seattle, ODOT TripCheck, ALGO Alabama, TravelMidwest
+  (IL/IN/WI/KY), Austin, Baton Rouge, ALERTCalifornia wildfire cams, Ontario 511,
+  Ottawa, Calgary, Vancouver, TfL, Transport NSW, NZTA, Fintraffic weather cams,
+  Singapore, Hong Kong; more Carmanah 511 states unlock with `T511_*_KEY`s. Stills
+  are proxied same-origin, HLS streams play in the popup. `APB_CAMERAS_OFF=1` disables.
+- **Scene explainer ("the clip")** — draw a box on the map and Gemini Flash summarises
+  the layers, weather and live camera stills inside it, with drill-downs per facet
+  (cameras, incidents, hazards, social, weather, place). Needs `GEMINI_API_KEY`.
 - **Aircraft & maritime** — ADS-B (`APB_ADSB`, heavier/opt-in), AIS stream, NDBC buoys.
 - **Civil unrest** — ACLED (`ACLED_KEY` + `ACLED_EMAIL`).
 - **News & social** — news RSS, social RSS (Reddit/Mastodon), Bluesky/ATProto
@@ -61,6 +66,9 @@ register to unlock the keyed lanes.
 - `/live/cameras?bbox=w,s,e,n&limit=` — public cameras in view (hash-sampled over
   `limit`); `/live/cameras/{id}/image` is the snapshot proxy (registry ids only, never
   arbitrary URLs); `/live/cameras/sources` is the lane's per-vendor health.
+- `POST /explain` — scene explainer for a drawn rectangle (abstracted layers + filters
+  from the client, weather + camera stills added server-side, Gemini Flash answer;
+  `focus` selects a drill-down). Throttled 6/min/IP; 503 until `GEMINI_API_KEY` is set.
 - `/live/stream` — Server-Sent Events snapshots for the selected metro/window. The
   map uses this instead of fixed 15-second polling, with a slow compatibility fallback.
 - `/live/emerging`, `/emerging`, `/baseline/anomalies` — surge / anomaly detection

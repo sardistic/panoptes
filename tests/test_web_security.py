@@ -101,3 +101,12 @@ def test_camera_layer_uses_same_origin_proxy_and_registry_ids():
     assert "safeLink(c.stream_url)" in HTML          # HLS URL never reaches <video> unchecked
     assert "map.on('popupclose',stopCameraPopup)" in HTML
     assert 'id="classbar"' not in HTML               # classification banner retired
+
+
+def test_clip_assistant_and_view_state_are_wired():
+    assert 'id="clip"' in HTML and "fetch('/explain'" in HTML
+    assert "function clipContext(b)" in HTML and "function clipSnippet(b,ctx)" in HTML
+    assert "history.replaceState(null,'',hash)" in HTML and "function readViewState()" in HTML
+    assert "body.loading #top::before" in HTML            # strip animates only while loading
+    assert "#loadPill[hidden]{display:flex;visibility:hidden}" in HTML   # fixed slot, no reflow
+    assert "L.circle(" not in HTML

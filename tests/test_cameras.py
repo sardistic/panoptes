@@ -130,3 +130,62 @@ def test_snapshot_only_resolves_registered_stills(monkeypatch):
 def test_stream_hosts_are_https_origins_for_csp():
     for h in STREAM_HOSTS:
         assert h.startswith("https://") and "/" not in h[8:]
+
+
+def test_second_sweep_parsers_on_captured_shapes():
+    tm = {"reportTables": [{"displayName": "I-90", "cells": [
+        {"externalId": "IL-IDOTD4-3019", "agency": "IDOT", "location": "US-51 at LaSalle",
+         "latitude": 41.58, "longitude": -89.06, "url": None,
+         "imageDirections": {"N": {"url": "https://cctv.travelmidwest.com/snapshots/a_N.jpg"},
+                             "S": {"url": "https://cctv.travelmidwest.com/snapshots/a_S.jpg"}}},
+        {"externalId": "WI-WisDOT-117", "agency": "WisDOT", "location": "I-39 at County V",
+         "latitude": 43.25, "longitude": -89.37, "url": "https://511wi.gov/map/Cctv/1053",
+         "singleView": True, "imageDirections": None, "videoUrl": None}]}]}
+    rows = cameras._travelmidwest(_Stub({"cameraReport.json": tm}), SOURCES["travelmidwest"])
+    assert [r["id"] for r in rows] == ["travelmidwest:IL-IDOTD4-3019.N", "travelmidwest:IL-IDOTD4-3019.S",
+                                       "travelmidwest:WI-WisDOT-117"]
+    assert rows[0]["state"] == "IL" and rows[2]["state"] == "WI" and rows[0]["direction"] == "N"
+
+    js = 'var x = {"features":[{"attributes":{"cameraId":277,"filename":"A.jpg","latitude":46.1,'          '"longitude":-123.8,"route":"US101 ","title":"US101 at Astoria"}}]};'
+    rows = cameras._tripcheck(_Stub({"cctvinventory": js}), SOURCES["tripcheck"])
+    assert rows[0]["image_url"] == "https://tripcheck.com/RoadCams/cams/A.jpg" and rows[0]["roadway"] == "US101"
+
+    algo = [{"id": 1, "location": {"latitude": 30.5, "longitude": -88.2, "displayRouteDesignator": "I-10",
+             "displayCrossStreet": "McDonald Rd", "direction": "East"},
+             "playbackUrls": {"hls": "https://cdn3.wowza.com/x/playlist.m3u8"},
+             "snapshotImageUrl": "https://api.algotraffic.com/v4.0/Cameras/1/Snapshot"}]
+    rows = cameras._algo(_Stub({"Cameras": algo}), SOURCES["algo"])
+    assert rows[0]["name"] == "I-10 @ McDonald Rd" and rows[0]["stream_url"].startswith("https://cdn3.wowza.com")
+
+    fi = {"features": [{"geometry": {"coordinates": [24.0, 60.05]}, "properties": {
+        "name": "kt51_Inkoo", "collectionStatus": "GATHERING",
+        "presets": [{"id": "C0150301", "inCollection": True}, {"id": "C0150302", "inCollection": False}]}}]}
+    rows = cameras._digitraffic(_Stub({"weathercam": fi}), SOURCES["digitraffic"])
+    assert len(rows) == 1 and rows[0]["kind"] == "weather" and rows[0]["lat"] == 60.05
+
+    hk = "<image-list><image><key>H1</key><description>Praya Rd</description><latitude>22.2</latitude>"          "<longitude>114.1</longitude><district>Southern</district><url>https://tdcctv.data.one.gov.hk/H1.JPG</url></image></image-list>"
+    assert cameras._hongkong(_Stub({"Traffic_Camera_Locations": hk}), SOURCES["hk"])[0]["id"] == "hk:H1"
+
+
+def test_arcgis_reader_pages_until_transfer_limit_clears():
+    pages = [{"features": [{"attributes": {"n": i}, "geometry": {"x": -120, "y": 40}} for i in range(50)],
+              "exceededTransferLimit": True},
+             {"features": [{"attributes": {"n": 50}, "geometry": {"x": -120, "y": 40}}]}]
+    calls = []
+    class _Reg(CameraRegistry):
+        def get_json(self, url):
+            calls.append(url); return pages[len(calls) - 1]
+    rows = cameras._arcgis_points(_Reg(), SOURCES["alertca"], "https://x/FeatureServer/0",
+                                  build=lambda a, g: _row("alertca", a["n"], "c", g["y"], g["x"], image_url="u"))
+    assert len(rows) == 51 and "resultOffset=50" in calls[1]
+
+
+def test_snapshot_sniffs_octet_stream_images(monkeypatch):
+    reg = CameraRegistry()
+    reg._rows = {"a": [_row("a", 1, "s", 1.3, 103.8, image_url="https://images.data.gov.sg/x.jpg")]}
+    reg._at = {k: 1e12 for k in SOURCES}; reg._rebuild_index()
+    class _R:
+        content = bytes.fromhex("ffd8ff") + b"rest"; headers = {"content-type": "application/octet-stream"}
+        def raise_for_status(self): pass
+    monkeypatch.setattr(reg._client, "get", lambda *a, **k: _R())
+    assert reg.snapshot("a:1")[1] == "image/jpeg"

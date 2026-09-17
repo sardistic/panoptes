@@ -137,3 +137,16 @@ def test_readiness_tolerates_a_long_sweep(client, monkeypatch):
     wedged = client.get("/health/ready")
     assert wedged.status_code == 503
     assert "poller stale" in wedged.json()["reasons"]
+
+
+def test_explain_is_off_without_a_key_and_validates_bounds(client, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    r = client.post("/explain", json={"bounds": {"south": 1, "north": 2, "west": 3, "east": 4}})
+    assert r.status_code == 503 and "GEMINI_API_KEY" in r.json()["error"]
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    r = client.post("/explain", json={"bounds": {"south": 5, "north": 2, "west": 3, "east": 4}})
+    assert r.status_code == 400
+    r = client.post("/explain", json={"bounds": {"south": 1, "north": 2, "west": 3, "east": 4},
+                                      "focus": "bogus"})
+    assert r.status_code == 422

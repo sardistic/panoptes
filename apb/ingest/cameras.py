@@ -5,8 +5,10 @@ optional HLS stream) that the map draws as a layer and refreshes on click. So th
 module is a REGISTRY of sources (mirrors the traffic511 pattern), each fetched on its
 own long TTL and flattened to one normalized dict:
 
-    {id, source, name, lat, lon, state, roadway, direction, image_url, stream_url,
-     online, page_url}
+    {id, source, kind, name, lat, lon, state, roadway, direction, image_url,
+     stream_url, online, page_url}
+
+`kind` is "traffic" (default), "wildfire" or "weather" so the UI can style/filter.
 
 `id` is "<source>:<native id>" and is the only thing the browser sends back — the
 snapshot proxy in apb.api.main resolves it through this registry, so the server never
@@ -15,17 +17,26 @@ fetches arbitrary URLs.
 Verified keyless on 2026-09-17 (row counts at probe time): Caltrans 12 districts
 (3.6k), NYC DOT TMC (979), 511NY (2.9k, 1.7k with HLS), DelDOT (361, HLS only),
 Maryland CHART (552, HLS only), Seattle SDOT+WSDOT city set (653), Ontario 511 (944
-cameras / 1.7k views), TfL JamCams (890), NZTA (~1k). The Carmanah 511 platform's
+cameras / 1.7k views), TfL JamCams (890), NZTA (~300). Second sweep (catalog
+search + endpoint probing, same day): ODOT TripCheck (1.1k), ALGO Alabama (646,
+stills + HLS), TravelMidwest gateway (IL/IN/WI/KY + Tollway + Lake County, 1.7k
+sites, multi-direction stills), Austin (1k), Baton Rouge (118), ALERTCalifornia
+wildfire cams (1.3k), Calgary (216), Ottawa (428), Vancouver (218 x 4 views),
+Finland Digitraffic weather cams (810 stations), Singapore, Hong Kong (1k), TfNSW
+(147 via ArcGIS mirror). The Carmanah 511 platform's
 `/api/v2/get/cameras?key=` is keyed on every other state; those entries light up
 when the matching `T511_*_KEY` is set (same key as the events lane).
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
+import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable
 from xml.etree import ElementTree as ET
@@ -34,7 +45,8 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-_UA = {"User-Agent": "apb/0.1 (panoptes.run; public-safety map)"}
+# Browser-shaped UA with our identity: some DOT image hosts (TfNSW) 403 bare bots.
+_UA = {"User-Agent": "Mozilla/5.0 (compatible; apb/0.1; +https://panoptes.run)"}
 _LIST_TTL = 45 * 60.0          # camera inventories change rarely
 _FAIL_TTL = 5 * 60.0           # retry a failed source after this long
 _SNAPSHOT_TTL = 6.0            # most DOT stills refresh every 5-60s
@@ -61,14 +73,14 @@ def _f(v) -> float | None:
 
 def _row(source: str, native_id, name, lat, lon, *, state=None, roadway=None,
          direction=None, image_url=None, stream_url=None, online=True,
-         page_url=None) -> dict | None:
+         page_url=None, kind: str = "traffic") -> dict | None:
     lat, lon = _f(lat), _f(lon)
     if lat is None or lon is None or not (-90 <= lat <= 90 and -180 <= lon <= 180):
         return None
     if not (lat or lon) or not (image_url or stream_url):
         return None
     return {
-        "id": f"{source}:{native_id}", "source": source,
+        "id": f"{source}:{native_id}", "source": source, "kind": kind,
         "name": str(name or "").strip()[:140], "lat": round(lat, 5), "lon": round(lon, 5),
         "state": state, "roadway": (roadway or None) and str(roadway)[:80],
         "direction": (direction or None) and str(direction)[:40],
@@ -239,6 +251,231 @@ def _nzta(reg, src) -> list[dict]:
     return out
 
 
+def _tripcheck(reg, src) -> list[dict]:
+    """ODOT TripCheck: the public map's inventory JS (ArcGIS-shaped JSON in a script
+    file); stills live at tripcheck.com/RoadCams/cams/{filename}."""
+    txt = reg.get_text("https://tripcheck.com/Scripts/map/data/cctvinventory.js")
+    data = json.loads(txt[txt.index("{"):txt.rindex("}") + 1])
+    out = []
+    for f in data.get("features", []):
+        a = f.get("attributes") or {}
+        if not a.get("filename"):
+            continue
+        r = _row("tripcheck", a.get("cameraId"), a.get("title"), a.get("latitude"),
+                 a.get("longitude"), state="OR", roadway=(a.get("route") or "").strip(),
+                 image_url="https://tripcheck.com/RoadCams/cams/" + a["filename"])
+        if r:
+            out.append(r)
+    return out
+
+
+def _algo(reg, src) -> list[dict]:
+    """ALGO Traffic (Alabama DOT): keyless v4 API, every camera has a still + HLS."""
+    out = []
+    for c in reg.get_json("https://api.algotraffic.com/v4.0/Cameras"):
+        loc = c.get("location") or {}
+        name = " @ ".join(x for x in (loc.get("displayRouteDesignator"),
+                                      loc.get("displayCrossStreet")) if x)
+        r = _row("algo", c.get("id"), name or loc.get("city"), loc.get("latitude"),
+                 loc.get("longitude"), state="AL", roadway=loc.get("routeDesignator"),
+                 direction=loc.get("direction"), image_url=c.get("snapshotImageUrl"),
+                 stream_url=(c.get("playbackUrls") or {}).get("hls"),
+                 page_url=c.get("permLink"))
+        if r:
+            out.append(r)
+    return out
+
+
+def _travelmidwest(reg, src) -> list[dict]:
+    """Gary-Chicago-Milwaukee gateway: IDOT, Illinois Tollway, Lake County, InDOT,
+    WisDOT (via the keyless 511wi /map/Cctv still endpoint) and a few KYTC cameras.
+    Multi-direction sites emit one row per direction."""
+    data = reg.get_json("https://www.travelmidwest.com/lmiga/cameraReport.json?path=GATEWAY")
+    out = []
+    for table in data.get("reportTables", []):
+        for c in table.get("cells", []):
+            agency = str(c.get("agency", "")).replace("&nbsp;", " ")
+            base = dict(state={"IDOT": "IL", "Illinois Tollway": "IL", "Lake County": "IL",
+                               "InDOT": "IN", "WisDOT": "WI", "KYTC": "KY"}.get(agency),
+                        roadway=table.get("displayName"))
+            views = c.get("imageDirections") or {}
+            if views:
+                for d, v in views.items():
+                    r = _row("travelmidwest", f"{c.get('externalId')}.{d}",
+                             f"{c.get('location')} · {d}", c.get("latitude"), c.get("longitude"),
+                             direction=d, image_url=v.get("url"), **base)
+                    if r:
+                        out.append(r)
+            else:
+                r = _row("travelmidwest", c.get("externalId"), c.get("location"),
+                         c.get("latitude"), c.get("longitude"), direction=c.get("direction"),
+                         image_url=c.get("url"), stream_url=c.get("videoUrl"), **base)
+                if r:
+                    out.append(r)
+    return out
+
+
+def _socrata_points(reg, src, url, *, id_key, name_key, img, geom_key, state, kind="traffic",
+                    status=None):
+    """Shared Socrata reader: GeoJSON point column + an image-URL column/lambda."""
+    out = []
+    for c in reg.get_json(url + ("&" if "?" in url else "?") + "$limit=5000"):
+        g = c.get(geom_key) or {}
+        coords = g.get("coordinates") or [None, None]
+        image = img(c) if callable(img) else c.get(img)
+        online = status(c) if status else True
+        r = _row(src.key, c.get(id_key), c.get(name_key), coords[1], coords[0], state=state,
+                 image_url=image, online=online, kind=kind)
+        if r:
+            out.append(r)
+    return out
+
+
+def _austin(reg, src) -> list[dict]:
+    return _socrata_points(reg, src, "https://data.austintexas.gov/resource/b4k4-adkb.json",
+                           id_key="camera_id", name_key="location_name",
+                           img="screenshot_address", geom_key="location", state="TX",
+                           status=lambda c: c.get("camera_status") == "TURNED_ON")
+
+
+def _brla(reg, src) -> list[dict]:
+    """Baton Rouge: the 511la still endpoint (/map/Cctv/{id}) is keyless even though
+    the statewide list API is not."""
+    return _socrata_points(reg, src, "https://data.brla.gov/resource/6z6u-ts44.json",
+                           id_key="id", name_key="id", img="image_view",
+                           geom_key="the_geom", state="LA")
+
+
+def _calgary(reg, src) -> list[dict]:
+    return _socrata_points(reg, src, "https://data.calgary.ca/resource/k7p9-kppz.json",
+                           id_key="camera_location", name_key="camera_location",
+                           img=lambda c: (c.get("camera_url") or {}).get("url"),
+                           geom_key="point", state="AB")
+
+
+def _arcgis_points(reg, src, layer_url, *, build, where="1=1"):
+    """Shared ArcGIS FeatureServer reader (WGS84, paged)."""
+    out, offset = [], 0
+    while True:
+        data = reg.get_json(f"{layer_url}/query?where={where}&outFields=*&outSR=4326&f=json"
+                            f"&resultRecordCount=2000&resultOffset={offset}")
+        feats = data.get("features", [])
+        for f in feats:
+            r = build(f.get("attributes") or {}, f.get("geometry") or {})
+            if r:
+                out.append(r)
+        if not feats or not data.get("exceededTransferLimit"):   # server page size varies (50..2000)
+            return out
+        offset += len(feats)
+
+
+def _alertca(reg, src) -> list[dict]:
+    """ALERTCalifornia (UC San Diego) wildfire cameras — public latest-frame stills."""
+    def build(a, g):
+        return _row("alertca", a.get("siteId") or a.get("OBJECTID"), a.get("cameraName"),
+                    g.get("y"), g.get("x"), state="CA", roadway=(a.get("county") or "").title(),
+                    image_url=a.get("imageURL"), page_url=a.get("cameraURL"),
+                    online=a.get("isOnline") == "online" and a.get("isActive") == "active",
+                    kind="wildfire")
+    return _arcgis_points(reg, src, "https://services8.arcgis.com/X84q166Srnyl4JMV/arcgis/"
+                          "rest/services/ALERTCalifornia_Camera_Feed/FeatureServer/0", build=build)
+
+
+def _tfnsw(reg, src) -> list[dict]:
+    """Transport for NSW live cameras via a public ArcGIS mirror of the (keyed) API;
+    the image URLs on transport.nsw.gov.au are keyless."""
+    def build(a, g):
+        return _row("tfnsw", a.get("id"), a.get("properti02"), a.get("F_latitude"),
+                    a.get("F_longitude"), state="NSW", roadway=a.get("properti01"),
+                    direction=a.get("properties"), image_url=a.get("properti00"))
+    return _arcgis_points(reg, src, "https://services7.arcgis.com/uFAr0LUPy14bDaLg/arcgis/"
+                          "rest/services/LiveTraffic_Cameras_TfNSW/FeatureServer/0", build=build)
+
+
+def _ottawa(reg, src) -> list[dict]:
+    out = []
+    for c in reg.get_json("https://traffic.ottawa.ca/beta/camera_list"):
+        r = _row("ottawa", c.get("number"), c.get("description"), c.get("latitude"),
+                 c.get("longitude"), state="ON", roadway=c.get("type"),
+                 image_url=f"https://traffic.ottawa.ca/beta/camera?c={c.get('number')}")
+        if r:
+            out.append(r)
+    return out
+
+
+def _vancouver(reg, src) -> list[dict]:
+    """City of Vancouver: open-data list of camera pages; each page embeds 1-4 stills
+    (one per direction) under trafficcams.vancouver.ca/cameraimages/."""
+    base = ("https://opendata.vancouver.ca/api/explore/v2.1/catalog/datasets/"
+            "web-cam-url-links/records?limit=100&offset=")
+    data = reg.get_json(base + "0")
+    recs = list(data.get("results", []))
+    for off in range(100, int(data.get("total_count", 0)), 100):
+        recs += reg.get_json(base + str(off)).get("results", [])
+    out = []
+
+    def page(rec):
+        try:
+            html = reg.get_text(rec["url"])
+        except httpx.HTTPError:
+            return []
+        pt = rec.get("geo_point_2d") or {}
+        rows = []
+        for i, img in enumerate(re.findall(r'src="(cameraimages/[^"]+\.jpg)"', html)):
+            rows.append(_row("vancouver", f"{rec.get('mapid')}.{i}", rec.get("name"),
+                             pt.get("lat"), pt.get("lon"), state="BC",
+                             image_url="https://trafficcams.vancouver.ca/" + img,
+                             page_url=rec["url"]))
+        return rows
+    with ThreadPoolExecutor(6) as ex:
+        for rows in ex.map(page, [r for r in recs if r.get("url")]):
+            out.extend(r for r in rows if r)
+    return out
+
+
+def _digitraffic(reg, src) -> list[dict]:
+    """Fintraffic weather cameras (Finland): one row per preset (viewing direction)."""
+    out = []
+    for f in reg.get_json("https://tie.digitraffic.fi/api/weathercam/v1/stations").get("features", []):
+        p = f.get("properties") or {}
+        coords = (f.get("geometry") or {}).get("coordinates") or [None, None]
+        for preset in p.get("presets") or []:
+            if not preset.get("inCollection"):
+                continue
+            r = _row("digitraffic", preset.get("id"), p.get("name", "").replace("_", " "),
+                     coords[1], coords[0], state="FI",
+                     image_url=f"https://weathercam.digitraffic.fi/{preset.get('id')}.jpg",
+                     online=p.get("collectionStatus") == "GATHERING", kind="weather")
+            if r:
+                out.append(r)
+    return out
+
+
+def _singapore(reg, src) -> list[dict]:
+    out = []
+    for item in reg.get_json("https://api.data.gov.sg/v1/transport/traffic-images").get("items", []):
+        for c in item.get("cameras", []):
+            loc = c.get("location") or {}
+            r = _row("sg", c.get("camera_id"), f"LTA camera {c.get('camera_id')}",
+                     loc.get("latitude"), loc.get("longitude"), state="SG", image_url=c.get("image"))
+            if r:
+                out.append(r)
+    return out
+
+
+def _hongkong(reg, src) -> list[dict]:
+    root = ET.fromstring(reg.get_text("https://static.data.gov.hk/td/traffic-snapshot-images/"
+                                      "code/Traffic_Camera_Locations_En.xml"))
+    out = []
+    for c in root.findall("image"):
+        r = _row("hk", c.findtext("key"), c.findtext("description"), c.findtext("latitude"),
+                 c.findtext("longitude"), state="HK", roadway=c.findtext("district"),
+                 image_url=c.findtext("url"))
+        if r:
+            out.append(r)
+    return out
+
+
 SOURCES: dict[str, CameraSource] = {
     "caltrans": CameraSource("caltrans", "Caltrans CCTV (12 districts)", _caltrans, "CA"),
     "nyctmc": CameraSource("nyctmc", "NYC DOT traffic cameras", _nyctmc, "NY"),
@@ -249,6 +486,20 @@ SOURCES: dict[str, CameraSource] = {
     "on511": CameraSource("on511", "Ontario 511 cameras", _carmanah_v2, "ON", host="511on.ca"),
     "tfl": CameraSource("tfl", "TfL JamCams (London)", _tfl, "UK"),
     "nzta": CameraSource("nzta", "NZTA cameras (New Zealand)", _nzta, "NZ"),
+    "tripcheck": CameraSource("tripcheck", "ODOT TripCheck cameras", _tripcheck, "OR"),
+    "algo": CameraSource("algo", "ALGO Traffic cameras (Alabama)", _algo, "AL"),
+    "travelmidwest": CameraSource("travelmidwest", "TravelMidwest gateway cameras (IL/IN/WI/KY)",
+                                  _travelmidwest, None),
+    "austin": CameraSource("austin", "Austin Transportation cameras", _austin, "TX"),
+    "brla": CameraSource("brla", "Baton Rouge traffic cameras", _brla, "LA"),
+    "alertca": CameraSource("alertca", "ALERTCalifornia wildfire cameras", _alertca, "CA"),
+    "calgary": CameraSource("calgary", "City of Calgary cameras", _calgary, "AB"),
+    "ottawa": CameraSource("ottawa", "City of Ottawa / MTO cameras", _ottawa, "ON"),
+    "vancouver": CameraSource("vancouver", "City of Vancouver cameras", _vancouver, "BC"),
+    "digitraffic": CameraSource("digitraffic", "Fintraffic weather cameras (Finland)", _digitraffic, "FI"),
+    "sg": CameraSource("sg", "Singapore LTA traffic images", _singapore, "SG"),
+    "hk": CameraSource("hk", "Hong Kong TD traffic snapshots", _hongkong, "HK"),
+    "tfnsw": CameraSource("tfnsw", "Transport for NSW cameras", _tfnsw, "NSW"),
     # Carmanah v2 hosts that answered "Invalid Key" (2026-09-17): same free key as
     # the 511 events lane where one exists. Shape unverified until a key is set.
     "ga511": CameraSource("ga511", "511 Georgia cameras", _carmanah_v2, "GA",
@@ -288,7 +539,18 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://video.deldot.gov",         # DelDOT
     "https://*.sha.maryland.gov",       # Maryland CHART
     "https://s3-eu-west-1.amazonaws.com",   # TfL mp4 clips
+    "https://*.wowza.com",              # ALGO Alabama HLS CDN
 )
+
+
+def _sniff_image(b: bytes) -> str | None:
+    if b[:3] == bytes.fromhex("ffd8ff"):
+        return "image/jpeg"
+    if b[:8] == bytes.fromhex("89504e470d0a1a0a"):
+        return "image/png"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    return None
 
 
 def available() -> dict[str, CameraSource]:
@@ -409,6 +671,8 @@ class CameraRegistry:
         r = self._client.get(cam["image_url"], timeout=15.0)
         r.raise_for_status()
         ctype = r.headers.get("content-type", "").split(";")[0].strip().lower()
+        if not ctype.startswith("image/"):          # some CDNs (data.gov.sg) send octet-stream
+            ctype = _sniff_image(r.content) or ctype
         if not ctype.startswith("image/") or len(r.content) > _SNAPSHOT_MAX_BYTES:
             raise httpx.HTTPError(f"unexpected snapshot payload ({ctype}, {len(r.content)}B)")
         with self._snap_lock:

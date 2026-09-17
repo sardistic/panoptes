@@ -33,3 +33,26 @@ Snapshot bandwidth flows through the host; the ~6s per-camera cache bounds it to
 one upstream fetch per camera per cache window regardless of viewers.
 `APB_CAMERAS_OFF=1` disables the lane. UI: the classification banner is gone and
 panel offsets now derive from the command bar's measured height (`--deck-top`).
+
+### 2026-09-17 — Scene explainer ("the clip"): client abstracts, server grounds, Gemini answers
+
+Context: users wanted "what the $!@# am I looking at?" for any drawn box, combining
+map layers, time, weather, place and image analysis of the live cameras, with the
+ability to dive into one facet (cameras/incidents/hazards/social/weather/place).
+
+Decision: the browser sends only what is on screen (bounded pydantic model — rows
+inside the rectangle, filters, layer toggles, environment readout, registry camera
+ids). `apb/context/explain.py` adds keyless Open-Meteo conditions at the box
+center, placed news headlines from the live buffer, and up to 5 (10 for the cameras
+focus) stills fetched through the registry — never a client-supplied URL — and
+calls Gemini Flash. The model is discovered from ListModels (highest-version
+`*flash*` chat model, stable over preview at equal version, 1h cache, `GEMINI_MODEL`
+override) so "newest Flash" stays true without code changes. `/explain` is
+throttled 6/min/IP because every call costs money, and returns 503 until
+`GEMINI_API_KEY` exists. The UI renders a basemap snippet of the box with the
+grounding data overlaid so the user sees exactly what the model was given.
+
+Consequences: the existing `GOOGLE_API_KEY` in prod is Custom-Search-restricted and
+returns 403 for the Generative Language API — a separate `GEMINI_API_KEY` must be
+added to `/srv/panoptes/.env` before the clip answers in production. Shareable view
+state now lives in the URL hash (`v`, `m`, `w`, `t`, `s`, `l`).

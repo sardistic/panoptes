@@ -25,6 +25,7 @@ from typing import Annotated, Callable, Literal
 from uuid import uuid4
 
 from fastapi import FastAPI, Query, Request
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -256,7 +257,7 @@ def _db():
 
 app = FastAPI(title="APB", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "OPTIONS"],
+    CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Accept", "Content-Type"], allow_credentials=False,
 )
 
@@ -839,6 +840,97 @@ def live_camera_image(cam_id: str):
     body, ctype = got
     return Response(body, media_type=ctype,
                     headers={"Cache-Control": "public, max-age=5"})
+
+
+class ExplainRequest(BaseModel):
+    """Abstracted view the browser sends for the scene explainer. Everything is
+    bounded: the server fetches nothing the client names except registry camera ids."""
+    bounds: dict[str, float]
+    view: dict[str, float] = Field(default_factory=dict)
+    local_time: str = Field("", max_length=60)
+    metro: str = Field("", max_length=80)
+    window: str = Field("", max_length=20)
+    type: str = Field("", max_length=60)
+    severity: str = Field("", max_length=10)
+    layers: list[str] = Field(default_factory=list, max_length=12)
+    environment: str = Field("", max_length=400)
+    incidents: list[dict] = Field(default_factory=list, max_length=40)
+    hazards: list[dict] = Field(default_factory=list, max_length=30)
+    surges: list[dict] = Field(default_factory=list, max_length=10)
+    clusters: list[dict] = Field(default_factory=list, max_length=10)
+    counts: dict[str, int] = Field(default_factory=dict)
+    cameras: list[str] = Field(default_factory=list, max_length=12)
+    social: list[dict] = Field(default_factory=list, max_length=30)
+    focus: Literal["overview", "cameras", "incidents", "hazards", "social", "weather",
+                   "place"] = "overview"
+
+
+_explain_hits: dict[str, deque] = defaultdict(deque)
+
+
+@app.post("/explain")
+def explain_scene(req: ExplainRequest, request: Request):
+    """"What am I looking at?" — Gemini Flash summary of a drawn rectangle: the
+    abstracted layers + filters, live weather at its center, and image analysis of up
+    to five camera stills inside it. Costs money per call, so it is throttled harder
+    than the rest of the API (6/min/IP) and refuses when no key is configured."""
+    from apb.context import explain as explainer
+    if not explainer.api_key():
+        return JSONResponse({"error": "scene explainer is not configured (GEMINI_API_KEY)"},
+                            status_code=503)
+    ip = request.client.host if request.client else "?"
+    now = _time.time()
+    q = _explain_hits[ip]
+    while q and q[0] < now - 60:
+        q.popleft()
+    if len(q) >= 6:
+        return JSONResponse({"error": "slow down — six looks a minute"}, status_code=429,
+                            headers={"Retry-After": "20"})
+    q.append(now)
+    b = req.bounds
+    if not all(k in b for k in ("south", "north", "west", "east")) or b["south"] > b["north"]:
+        return JSONResponse({"error": "bounds must be south/north/west/east"}, status_code=400)
+    ctx = req.model_dump()
+    for key in ("incidents", "hazards", "surges", "clusters", "social"):   # bound prompt size
+        ctx[key] = [{k: (str(v)[:200] if isinstance(v, str) else v) for k, v in row.items()
+                     if k in ("type", "threat", "ago", "location", "summary", "source", "cat",
+                              "event", "headline", "severity", "metro", "count", "score",
+                              "types", "zscore", "current", "baseline", "name", "text", "url")}
+                    for row in ctx[key][:40] if isinstance(row, dict)]
+    view = req.view or {}
+    if req.focus in ("social", "place", "overview") and "lat" in view and "lon" in view:
+        try:                                    # placed headlines from the live news buffer
+            ctx["news"] = [{"title": n["title"], "domain": n["domain"], "at": n["at"]}
+                           for n in _local_news(float(view["lat"]), float(view["lon"]),
+                                                radius_km=40.0, limit=8)]
+        except Exception as e:                  # never let context enrichment sink the answer
+            log.info("explain news context failed: %s", e)
+    max_stills = 10 if req.focus == "cameras" else 5
+    stills: list[tuple[str, bytes, str]] = []
+    used_ids: list[str] = []
+    for cam_id in req.cameras[:12]:
+        cam = _cameras.get(cam_id)
+        if not cam or not cam.get("image_url"):
+            continue
+        try:
+            got = _cameras.snapshot(cam_id)
+        except httpx.HTTPError:
+            continue
+        if got and len(got[0]) <= 900_000:
+            stills.append((f"{cam['name']} ({cam['source']})", got[0], got[1]))
+            used_ids.append(cam_id)
+        if len(stills) >= max_stills:
+            break
+    try:
+        out = explainer.explain(ctx, stills)
+    except RuntimeError as e:
+        log.warning("explain failed: %s", e)
+        return JSONResponse({"error": str(e)[:240]}, status_code=502)
+    except httpx.HTTPError as e:
+        log.warning("explain upstream error: %s", e)
+        return JSONResponse({"error": "model upstream unreachable"}, status_code=502)
+    out["camera_ids"] = used_ids
+    return JSONResponse(out, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/events")

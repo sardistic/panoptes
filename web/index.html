@@ -29,7 +29,9 @@
     /* compat aliases for inline-styled JS output */
     --hot:#a8202c; --warn:#e0a030; --accent:#a8202c;
     --deck-top:86px;   /* set from #top's real height (it wraps on narrow screens) */
-    --rainbow:linear-gradient(90deg,#ff3b6b,#ffb02e,#37e0c4,#5b8cff,#b14bff,#ff3b6b);
+    /* thermal (ironbow) ramp: indigo → magenta → red → orange → yellow → white and back */
+    --thermal:#2b0a4f,#7a1a8c,#c62a3a,#f07a1a,#ffd23f,#fff6d0,#ffd23f,#f07a1a,#c62a3a,#7a1a8c,#2b0a4f;
+    --rainbow:linear-gradient(90deg,var(--thermal));
     --font:"Archivo",system-ui,-apple-system,sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   }
@@ -64,11 +66,15 @@
     padding:11px 16px;flex-wrap:wrap}
   /* spectrum strip along the top edge — same drift as the logo */
   #top::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;
-    background:var(--rainbow);background-size:200% 100%;animation:rainbow 7s linear infinite}
+    background:var(--rainbow);background-size:200% 100%;background-position:50% 0;opacity:.7;transition:opacity .3s}
+  body.loading #top::before{opacity:1;animation:rainbow 1.4s linear infinite}
   /* the mark is a single-color PNG on alpha, so it works as a mask: the drifting
      spectrum paints only the glyph */
+  /* the logo's gradient is steered by the cursor: it points at the pointer, flows
+     as fast as the pointer moves, and glows brighter with speed (see steerLogo) */
   #logo{height:44px;width:44px;flex:0 0 auto;display:block;margin:-6px 0;
-    background:var(--rainbow);background-size:200% 100%;animation:rainbow 7s linear infinite;
+    background:linear-gradient(var(--logo-angle,90deg),var(--thermal));background-size:300% 300%;
+    background-position:var(--logo-pos,0% 50%);filter:brightness(var(--logo-glow,1));
     -webkit-mask:url(/assets/logo.png) center/contain no-repeat;mask:url(/assets/logo.png) center/contain no-repeat}
   #top .brand{font-weight:700;letter-spacing:.26em;font-size:15px;color:var(--txt);
     background:none;-webkit-text-fill-color:currentColor}
@@ -79,8 +85,8 @@
     color:var(--txt-2);height:26px;padding:0 11px;border:1px solid var(--line-2);
     border-radius:3px;background:var(--panel-2);text-transform:uppercase}
   #status{letter-spacing:.14em}
-  #loadPill{color:var(--amber);border-color:rgba(224,160,48,.45);max-width:270px}
-  #loadPill[hidden]{display:none}
+  #loadPill{color:var(--amber);border-color:rgba(224,160,48,.45);width:250px;flex:0 0 250px;justify-content:flex-start}
+  #loadPill[hidden]{display:flex;visibility:hidden}   /* keep the slot; the deck never reflows */
   #loadText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .loadmark{width:7px;height:7px;border:1px solid var(--amber);display:block;
     animation:loadstep 1s steps(2,end) infinite}
@@ -122,7 +128,7 @@
   button#surgesBtn.on .led{background:var(--amber)}
 
   /* ── incident rail (LEFT) ── */
-  #side{top:var(--deck-top);left:16px;width:320px;max-height:calc(100% - var(--deck-top) - 96px);
+  #side{top:var(--deck-top);left:16px;width:320px;max-height:calc(100% - var(--deck-top) - 110px);
     display:flex;flex-direction:column;padding:0;overflow:hidden}
   #sideTitle{margin:0;padding:14px 16px 0;font:600 9.5px/1 var(--font);
     letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
@@ -240,6 +246,46 @@
   #envReadout b{color:var(--txt-2);font-weight:600}
   #envReadout i{display:inline-block;width:8px;height:2px;background:var(--ec);margin-right:5px;vertical-align:middle}
 
+  /* ── the clip: a paperclip with eyes that explains the map ── */
+  #clip{left:16px;bottom:18px;width:56px;height:56px;padding:0;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;background:var(--panel);transition:transform .15s,border-color .15s}
+  #clip:hover{transform:translateY(-2px);border-color:var(--line-3)}
+  #clip.armed{border-color:#ffd23f;box-shadow:0 0 0 1px rgba(255,210,63,.35),0 12px 34px rgba(0,0,0,.3)}
+  #clip svg{width:40px;height:40px;overflow:visible}
+  #clip .wire{fill:none;stroke:url(#clipGrad);stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}
+  #clip .eye{fill:#f4f1e8}
+  #clip .pupil{fill:#0b0d10;transition:transform .08s linear}
+  #clip .lid{fill:var(--panel);transform-origin:center;transform:scaleY(0);animation:blink 6s infinite}
+  @keyframes blink{0%,92%,100%{transform:scaleY(0)}95%,97%{transform:scaleY(1)}}
+  #clip.thinking .pupil{animation:lookaround 1.2s ease-in-out infinite alternate}
+  @keyframes lookaround{from{transform:translate(-2px,1px)}to{transform:translate(2px,-1px)}}
+  #clipBubble{left:16px;bottom:86px;width:360px;max-width:calc(100% - 32px);padding:14px 16px 12px;font-size:12.5px;line-height:1.5;color:var(--txt-2)}
+  #clipBubble::after{content:"";position:absolute;left:22px;bottom:-7px;width:12px;height:12px;background:var(--panel);
+    border-right:1px solid var(--line-2);border-bottom:1px solid var(--line-2);transform:rotate(45deg)}
+  #clipBubble .kick{font:600 9px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:#ffd23f;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+  #clipBubble .kick button{height:20px;padding:0 7px;font-size:9px;letter-spacing:.1em}
+  #clipBubble .body{max-height:52vh;overflow:auto;white-space:pre-wrap}
+  #clipBubble .body .snip,#clipBubble .body .dive,#clipBubble .body .thumbs{white-space:normal}
+  #clipBubble .body::-webkit-scrollbar{width:0}
+  #clipBubble .foot{margin-top:9px;font:500 9px/1.4 var(--mono);color:var(--dim);letter-spacing:.03em}
+  #clipBubble .act{margin-top:10px;display:flex;gap:6px}
+  #clipBubble .act button{height:24px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+  #clipBubble .act button.go{color:#0b0d10;background:#ffd23f;border-color:#ffd23f}
+  #clipBubble .dive{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+  #clipBubble .dive .lab{font:600 8.5px/1 var(--font);letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-right:3px}
+  #clipBubble .dive button{height:22px;padding:0 8px;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+  #clipBubble .dive button.cur{color:#ffd23f;border-color:#ffd23f}
+  #clipBubble .snip{position:relative;margin:0 0 10px;border:1px solid var(--line-2);border-radius:2px;overflow:hidden;background:#0b0d10}
+  #clipBubble .snip canvas{display:block;width:100%;height:auto}
+  #clipBubble .snip .key{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;display:flex;gap:8px;flex-wrap:wrap;
+    font:600 7.5px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);background:rgba(9,11,15,.72)}
+  #clipBubble .snip .key i{display:inline-block;width:7px;height:7px;margin-right:4px;vertical-align:-1px;transform:rotate(45deg);background:var(--kc)}
+  #clipBubble .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:4px;margin-top:9px}
+  #clipBubble .thumbs img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#000;border:1px solid var(--line-2);border-radius:2px;cursor:pointer}
+  #clipBubble .thumbs img:hover{border-color:#ffd23f}
+  #map.drawing .leaflet-container,#map.drawing{cursor:crosshair!important}
+  @media (max-width:760px){ #clip{bottom:calc(34vh + 16px)} #clipBubble{bottom:calc(34vh + 84px)} }
+
   /* ── compact density ── */
   body.compact #side{width:300px}
   body.compact #top{padding:8px 14px;gap:12px}
@@ -254,7 +300,7 @@
       overflow:auto;align-content:flex-start}
     #top .spacer{display:none}
     #top .brand{font-size:15px}
-    #top .sub,#footer,#envReadout{display:none}
+    #top .sub,#footer,#envReadout,#loadPill{display:none}
     #top .ctl{flex:1 1 42%;min-width:130px}
     #top .ctl:has(.segwrap){flex-basis:100%}
     .segwrap{flex-wrap:wrap}
@@ -276,7 +322,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#logo,#top::before{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip .lid,#clip .pupil{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -341,6 +387,17 @@
   <div id="feed"></div>
 </div>
 
+<button id="clip" class="hud" aria-label="What am I looking at?" title="What am I looking at?">
+  <svg viewBox="0 0 64 64" aria-hidden="true">
+    <defs><linearGradient id="clipGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7a1a8c"/><stop offset=".45" stop-color="#f07a1a"/><stop offset="1" stop-color="#fff6d0"/></linearGradient></defs>
+    <path class="wire" d="M22 46 V16 a10 10 0 0 1 20 0 V48 a6 6 0 0 1 -12 0 V22 a2 2 0 0 1 4 0 V44"/>
+    <g class="eyeL"><circle class="eye" cx="24" cy="27" r="6.5"/><circle class="pupil" cx="24" cy="27" r="2.8"/><ellipse class="lid" cx="24" cy="27" rx="6.6" ry="6.6"/></g>
+    <g class="eyeR"><circle class="eye" cx="41" cy="27" r="6.5"/><circle class="pupil" cx="41" cy="27" r="2.8"/><ellipse class="lid" cx="41" cy="27" rx="6.6" ry="6.6"/></g>
+  </svg>
+</button>
+<div id="clipBubble" class="hud" role="dialog" aria-live="polite" hidden></div>
+
 <div id="footer" class="hud">
   <span>© 2026 PANOPTES</span><span class="sep">·</span>
   <span>built by</span>
@@ -379,6 +436,7 @@ function updateLoadPill(){
   const pill=document.getElementById('loadPill'),now=performance.now();
   const labels=[...activeLoads.entries()].map(([label,r])=>`${label} ${((now-r.started)/1000).toFixed(1)}s`);
   pill.hidden=!labels.length&&!completedLoad;
+  document.body.classList.toggle('loading',labels.length>0);
   document.getElementById('loadText').textContent=labels.length
     ? `LOADING · ${labels.slice(0,2).join(' + ')}${labels.length>2?` +${labels.length-2}`:''}`
     : completedLoad ? `LOADED · ${completedLoad.label} ${completedLoad.seconds.toFixed(1)}s` : 'LOADING';
@@ -1822,7 +1880,11 @@ setGoes(true);                  // user decision: live GOES clouds are core to t
 // streamer (hosts are allow-listed in the API's CSP) via hls.js loaded on first use.
 const CAM_C='#9fc4d0';
 const CAM_SRC={caltrans:'Caltrans',nyctmc:'NYC DOT',ny511:'511NY',deldot:'DelDOT',chart_md:'MD CHART',
-  seattle:'Seattle DOT',on511:'Ontario 511',tfl:'TfL JamCam',nzta:'NZTA'};
+  seattle:'Seattle DOT',on511:'Ontario 511',tfl:'TfL JamCam',nzta:'NZTA',tripcheck:'ODOT TripCheck',
+  algo:'ALGO Alabama',travelmidwest:'TravelMidwest',austin:'Austin TX',brla:'Baton Rouge',
+  alertca:'ALERTCalifornia',calgary:'Calgary',ottawa:'Ottawa',vancouver:'Vancouver',
+  digitraffic:'Fintraffic',sg:'Singapore LTA',hk:'Hong Kong TD',tfnsw:'Transport NSW'};
+const CAM_KIND_C={traffic:CAM_C,wildfire:'#e0873a',weather:'#8fb0d8'};
 let showCameras=false, cameraRows=[], cameraFetchT=null, cameraCtl=null;
 let camPopupTimer=null, camHls=null, camPopup=null;
 const cameraLayer=L.layerGroup().addTo(map);
@@ -1848,8 +1910,9 @@ function cameraGlyph(c,z){
   const s=z>=14?4.5:z>=12?3.5:2.6,at=(dx,dy)=>screenOffset(c.lat,c.lon,dx,dy,z);
   const paths=[[[-s,-s*.35],[-s,-s],[-s*.35,-s]],[[s*.35,s],[s,s],[s,s*.35]],[[-s*.45,s*.45],[s*.45,-s*.45]]];
   const op=(c.stream_url&&!c.image_url?.62:.8)*(z>=12?1:.75);
+  const color=CAM_KIND_C[c.kind]||CAM_C;
   return L.featureGroup(paths.map(path=>L.polyline(path.map(p=>at(p[0],p[1])),{
-    color:CAM_C,weight:z>=12?1.4:1.1,opacity:op,lineCap:'square',lineJoin:'miter',interactive:true
+    color,weight:z>=12?1.4:1.1,opacity:op,lineCap:'square',lineJoin:'miter',interactive:true
   })));
 }
 function drawCameras(){
@@ -1862,7 +1925,7 @@ function drawCameras(){
     if(!b.contains([c.lat,c.lon])) return;
     n++;
     const g=cameraGlyph(c,z);
-    g.bindTooltip(`${esc(c.name)} · ${esc(CAM_SRC[c.source]||c.source)}`,{direction:'top'});
+    g.bindTooltip(`${esc(c.name)} · ${esc(CAM_SRC[c.source]||c.source)}${c.kind!=='traffic'?' · '+esc(c.kind):''}`,{direction:'top'});
     g.on('click',()=>openCamera(c));
     g.addTo(cameraLayer);
   });
@@ -1909,7 +1972,8 @@ function openCamera(c){
   const src=CAM_SRC[c.source]||String(c.source).toUpperCase();
   const meta=[c.roadway,c.direction&&c.direction!=='Unknown'?c.direction:null,c.state].filter(Boolean).map(esc).join(' · ');
   const el=document.createElement('div'); el.className='pop cam';
-  el.innerHTML=`<div class="kick" style="color:${CAM_C}">Live camera · ${esc(src)}</div>`
+  const kindLabel={wildfire:'Wildfire camera',weather:'Weather camera'}[c.kind]||'Live camera';
+  el.innerHTML=`<div class="kick" style="color:${CAM_KIND_C[c.kind]||CAM_C}">${kindLabel} · ${esc(src)}</div>`
     +`<div class="ttl">${esc(c.name||c.id)}</div>`
     +`<div class="frame"></div>`
     +`<div class="meta">${meta}${meta?' · ':''}<span class="stamp">—</span></div>`
@@ -1931,9 +1995,250 @@ document.getElementById('camerasBtn').onclick=async e=>{
   await loadCameras();
 };
 
+// ── logo steering: gradient direction, flow speed and glow follow the pointer ──
+(function steerLogo(){
+  const logo=document.getElementById('logo'), root=document.documentElement.style;
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let angle=90, target=90, pos=0, speed=reduced?0:.08, glow=1, last=null, lastT=performance.now();
+  document.addEventListener('mousemove',e=>{
+    const r=logo.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+    target=Math.atan2(e.clientY-cy,e.clientX-cx)*180/Math.PI+90;      // CSS angles: 0deg points up
+    const now=performance.now();
+    if(last){ const v=Math.hypot(e.clientX-last[0],e.clientY-last[1])/Math.max(1,now-lastT); // px per ms
+      if(!reduced) speed=Math.min(3,speed+v*.9); glow=Math.min(1.6,glow+v*.25); }
+    last=[e.clientX,e.clientY]; lastT=now;
+  },{passive:true});
+  (function tick(){
+    let d=((target-angle+540)%360)-180; angle+=d*.12;                      // ease toward the pointer
+    pos=(pos+speed)%100; speed=Math.max(reduced?0:.08,speed*.94); glow=1+(glow-1)*.93;
+    root.setProperty('--logo-angle',`${angle.toFixed(1)}deg`);
+    root.setProperty('--logo-pos',`${pos.toFixed(2)}% ${pos.toFixed(2)}%`);
+    root.setProperty('--logo-glow',glow.toFixed(3));
+    requestAnimationFrame(tick);
+  })();
+})();
+
+// ── the clip: draw a box, get a grounded explanation ──
+// Second click arms a rectangle drag; the abstracted layers inside it (incidents,
+// hazards, surges, clusters), the filters, the environment readout and the ids of
+// cameras in the box go to /explain, which adds weather and camera stills and asks
+// Gemini Flash. Nothing sensitive leaves the browser: it is what is on screen.
+const clipEl=document.getElementById('clip'), clipBubble=document.getElementById('clipBubble');
+let clipState='idle', clipRect=null, clipStart=null, clipCtl=null, clipBox=null, clipCams=[];
+document.addEventListener('mousemove',e=>{         // the eyes follow the cursor
+  clipEl.querySelectorAll('.pupil').forEach(p=>{
+    const r=p.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const dx=e.clientX-cx, dy=e.clientY-cy, d=Math.hypot(dx,dy)||1, k=Math.min(2.6,d/40);
+    if(!clipEl.classList.contains('thinking')) p.style.transform=`translate(${(dx/d*k).toFixed(2)}px,${(dy/d*k).toFixed(2)}px)`;
+  });
+},{passive:true});
+function clipSay(kick,html,foot,actions,snippet){
+  clipBubble.hidden=false;
+  clipBubble.innerHTML=`<div class="kick"><span>${kick}</span><button class="x" aria-label="close">✕</button></div>`
+    +`<div class="body">${html}</div>${foot?`<div class="foot">${foot}</div>`:''}`
+    +(actions?`<div class="act">${actions}</div>`:'');
+  if(snippet) clipBubble.querySelector('.body').prepend(snippet);
+  clipBubble.querySelector('.x').onclick=clipReset;
+}
+function clipReset(){
+  clipBubble.hidden=true; clipState='idle'; clipEl.classList.remove('armed','thinking'); clipCams=[]; clipBox=null;
+  if(clipRect){ map.removeLayer(clipRect); clipRect=null; }
+  if(clipCtl){ clipCtl.abort(); clipCtl=null; }
+  clipStopDraw();
+}
+function clipArm(){
+  clipState='drawing'; clipEl.classList.add('armed');
+  clipSay('Draw a box','Drag a rectangle on the map around what you want explained.<br/>Esc cancels.',null,null);
+  map.dragging.disable(); document.getElementById('map').classList.add('drawing');
+  map.on('mousedown',clipDown);
+}
+function clipStopDraw(){
+  map.off('mousedown',clipDown); map.off('mousemove',clipMove); map.off('mouseup',clipUp);
+  document.removeEventListener('mouseup',clipUpDoc);
+  map.dragging.enable(); document.getElementById('map').classList.remove('drawing');
+}
+function clipDown(e){
+  if(clipRect){ map.removeLayer(clipRect); }
+  clipStart=e.latlng;
+  clipRect=L.rectangle([clipStart,clipStart],{color:'#ffd23f',weight:1.3,dashArray:'5 4',fillColor:'#ffd23f',fillOpacity:.05,interactive:false}).addTo(map);
+  map.on('mousemove',clipMove); map.on('mouseup',clipUp); document.addEventListener('mouseup',clipUpDoc);
+}
+function clipMove(e){ if(clipRect&&clipStart) clipRect.setBounds(L.latLngBounds(clipStart,e.latlng)); }
+function clipUpDoc(){ if(clipRect) clipUp({latlng:clipRect.getBounds().getNorthEast()}); }
+function clipUp(e){
+  clipStopDraw(); clipEl.classList.remove('armed');
+  if(!clipRect||!clipStart) return;
+  const b=L.latLngBounds(clipStart,e.latlng); clipRect.setBounds(b);
+  const px=map.latLngToContainerPoint(b.getNorthEast()).distanceTo(map.latLngToContainerPoint(b.getSouthWest()));
+  if(px<14){ map.removeLayer(clipRect); clipRect=null; clipState='hint'; clipSay('Too small','That box was a click. Click me again and drag a real rectangle.',null,null); return; }
+  clipExplain(b);
+}
+function clipContext(b){
+  const inB=d=>d&&d.lat!=null&&d.lon!=null&&b.contains([d.lat,d.lon]);
+  const on=Object.entries(LAYER_BTNS).filter(([,id])=>document.getElementById(id).classList.contains('on')).map(([k])=>k);
+  const inc=applyFilters(currentData).filter(inB).sort((a,c)=>(c.threat_score||0)-(a.threat_score||0));
+  const haz=[...warningData,...hazardData].filter(inB).sort((a,c)=>(c.threat_score||0)-(a.threat_score||0));
+  const sel=id=>document.getElementById(id);
+  return {
+    bounds:{south:+b.getSouth().toFixed(4),north:+b.getNorth().toFixed(4),west:+b.getWest().toFixed(4),east:+b.getEast().toFixed(4)},
+    view:{lat:+b.getCenter().lat.toFixed(4),lon:+b.getCenter().lng.toFixed(4),zoom:map.getZoom()},
+    local_time:new Date().toString().slice(0,33),
+    metro:sel('metro').value==='__all__'?'national overview':sel('metro').selectedOptions[0]?.textContent||'',
+    window:sel('window').selectedOptions[0]?.textContent||'', type:sel('type').value, severity:sel('minThreat').value,
+    layers:on, environment:(document.getElementById('envReadout').textContent||'').slice(0,400),
+    incidents:inc.slice(0,40).map(d=>({type:d.type,threat:+(+d.threat_score||0).toFixed(2),ago:ago(d.ts),location:d.location||'',summary:(d.summary||'').slice(0,160),metro:d.metro,source:d.source_kind||d.source||''})),
+    hazards:haz.slice(0,30).map(d=>({cat:d._cat,event:d.event||'',headline:(d.headline||d.summary||'').slice(0,160),severity:d.severity||'',threat:+(+d.threat_score||0).toFixed(2),ago:ago(d.ts),source:d.source,location:d.location||''})),
+    surges:surgeAlerts.filter(inB).slice(0,10).map(a=>({metro:a.name||a.metro,current:a.current,baseline:a.baseline_mean,zscore:+(+a.zscore||0).toFixed(1)})),
+    social:(typeof socialPosts!=='undefined'?socialPosts:[]).filter(inB).slice(0,30).map(p=>({source:p.source,text:(p.summary||'').slice(0,200),ago:ago(p.observed_at?Date.parse(p.observed_at)/1000:p.ts),location:p.location_text||'',url:p.url||''})),
+    clusters:emergingClusters.filter(inB).slice(0,10).map(c=>({metro:c.metro,count:c.count,score:+(+c.score||0).toFixed(2),types:c.types,ago:ago(c.latest_ts)})),
+    counts:{incidents_in_box:inc.length,hazards_in_box:haz.length,incidents_loaded:currentData.length,
+      social_in_box:(typeof socialPosts!=='undefined'?socialPosts:[]).filter(inB).length},
+  };
+}
+// Drill-down chips: only facets that actually have data in the box, plus the two
+// that always make sense (weather, place). Re-asks the same rectangle with a focus.
+const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place']];
+function clipFacetsHtml(ctx,current){
+  const has={overview:true,cameras:(ctx.cameras||[]).length>0,incidents:ctx.counts.incidents_in_box>0,hazards:ctx.counts.hazards_in_box>0,
+    social:ctx.counts.social_in_box>0,weather:true,place:true};
+  const chips=CLIP_FACETS.filter(([k])=>has[k]).map(([k,l])=>`<button data-focus="${k}" class="${k===current?'cur':''}">${l}${k==='cameras'?` · ${ctx.cameras.length}`:k==='incidents'?` · ${ctx.counts.incidents_in_box}`:k==='hazards'?` · ${ctx.counts.hazards_in_box}`:k==='social'?` · ${ctx.counts.social_in_box}`:''}</button>`).join('');
+  return `<div class="dive"><span class="lab">Dive into</span>${chips}</div>`;
+}
+// Snippet: the drawn box as a small basemap crop (Carto dark tiles, already CSP-allowed)
+// with everything the answer is grounded on overlaid — cameras, incidents, hazards,
+// surges, clusters — so the user sees exactly what the model was given.
+const SNIP_C={camera:'#9fc4d0',wildfire:'#e0873a',weather:'#8fb0d8',incident:'#ff6b57',hazard:'#d98a2b',surge:'#a8202c',cluster:'#ffd23f',social:'#b48cff'};
+function clipSnippet(b,ctx){
+  const W=328,H=190,wrap=document.createElement('div'); wrap.className='snip';
+  const cv=document.createElement('canvas'); cv.width=W*2; cv.height=H*2; cv.style.width=W+'px'; wrap.appendChild(cv);
+  const g=cv.getContext('2d'); g.scale(2,2); g.fillStyle='#0b0d10'; g.fillRect(0,0,W,H);
+  const proj=(lat,lon,z)=>{const n=2**z;const x=(lon+180)/360*n;const r=lat*Math.PI/180;const y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n;return [x*256,y*256];};
+  let z=17; for(;z>2;z--){ const [x1,y1]=proj(b.getNorth(),b.getWest(),z),[x2,y2]=proj(b.getSouth(),b.getEast(),z); if(x2-x1<=W-16&&y2-y1<=H-16) break; }
+  const [cx,cy]=proj(b.getCenter().lat,b.getCenter().lng,z), ox=cx-W/2, oy=cy-H/2;
+  const toPx=(lat,lon)=>{const [x,y]=proj(lat,lon,z);return [x-ox,y-oy];};
+  const tx0=Math.floor(ox/256),tx1=Math.floor((ox+W)/256),ty0=Math.floor(oy/256),ty1=Math.floor((oy+H)/256);
+  let pending=0;
+  const overlays=()=>{
+    const [ax,ay]=toPx(b.getNorth(),b.getWest()),[bx,by]=toPx(b.getSouth(),b.getEast());
+    g.save(); g.fillStyle='rgba(0,0,0,.42)'; g.fillRect(0,0,W,H); g.clearRect(ax,ay,bx-ax,by-ay); g.restore();
+    // re-draw tiles inside the box at full strength happens naturally: we only dimmed outside
+    const mark=(lat,lon,c,kind)=>{ if(!b.contains([lat,lon])) return; const [x,y]=toPx(lat,lon); g.strokeStyle=c; g.fillStyle=c; g.lineWidth=1.2;
+      if(kind==='camera'){ g.strokeRect(x-3,y-3,6,6); }
+      else if(kind==='hazard'){ g.beginPath(); g.moveTo(x-4,y+3); g.lineTo(x,y-4); g.lineTo(x+4,y+3); g.stroke(); }
+      else if(kind==='surge'){ g.beginPath(); g.arc(x,y,6,0,Math.PI*2); g.stroke(); }
+      else if(kind==='cluster'){ g.beginPath(); g.arc(x,y,4,0,Math.PI*2); g.stroke(); }
+      else { g.beginPath(); g.moveTo(x,y-3.5); g.lineTo(x+3.5,y); g.lineTo(x,y+3.5); g.lineTo(x-3.5,y); g.closePath(); g.fill(); } };
+    const counts={};
+    const add=(kind,c)=>{counts[kind]=(counts[kind]||0)+1;};
+    (typeof hazardData!=='undefined'?[...warningData,...hazardData]:[]).forEach(d=>{ if(d.lat!=null&&b.contains([d.lat,d.lon])){ mark(d.lat,d.lon,SNIP_C.hazard,'hazard'); add('hazard'); } });
+    applyFilters(currentData).forEach(d=>{ if(d.lat!=null&&b.contains([d.lat,d.lon])){ mark(d.lat,d.lon,SNIP_C.incident,'incident'); add('incident'); } });
+    (typeof socialPosts!=='undefined'?socialPosts:[]).forEach(p=>{ if(p.lat!=null&&b.contains([p.lat,p.lon])){ mark(p.lat,p.lon,SNIP_C.social,'incident'); add('social'); } });
+    emergingClusters.forEach(c=>{ if(b.contains([c.lat,c.lon])){ mark(c.lat,c.lon,SNIP_C.cluster,'cluster'); add('cluster'); } });
+    surgeAlerts.forEach(a=>{ if(a.lat!=null&&b.contains([a.lat,a.lon])){ mark(a.lat,a.lon,SNIP_C.surge,'surge'); add('surge'); } });
+    clipCams.forEach(c=>{ mark(c.lat,c.lon,SNIP_C[c.kind]||SNIP_C.camera,'camera'); add(c.kind==='traffic'?'camera':c.kind); });
+    g.strokeStyle='#ffd23f'; g.lineWidth=1; g.setLineDash([4,3]); g.strokeRect(ax+.5,ay+.5,bx-ax-1,by-ay-1); g.setLineDash([]);
+    const key=document.createElement('div'); key.className='key';
+    const labels={camera:'cameras',wildfire:'fire cams',weather:'weather cams',incident:'incidents',hazard:'hazards',surge:'surges',cluster:'clusters',social:'social'};
+    key.innerHTML=Object.entries(counts).map(([k,n])=>`<span style="--kc:${SNIP_C[k]||SNIP_C.camera}"><i></i>${n} ${labels[k]||k}</span>`).join('')||`<span>nothing placed inside the box · z${z}</span>`;
+    wrap.appendChild(key);
+  };
+  for(let tx=tx0;tx<=tx1;tx++) for(let ty=ty0;ty<=ty1;ty++){
+    const n=2**z; if(ty<0||ty>=n) continue; const wx=((tx%n)+n)%n;
+    const img=new Image(); img.crossOrigin='anonymous'; pending++;
+    img.onload=()=>{ g.drawImage(img,tx*256-ox,ty*256-oy,256,256); if(--pending===0) overlays(); };
+    img.onerror=()=>{ if(--pending===0) overlays(); };
+    img.src=`https://${'abcd'[(wx+ty)%4]}.basemaps.cartocdn.com/dark_all/${z}/${wx}/${ty}@2x.png`;
+  }
+  if(!pending) overlays();
+  return wrap;
+}
+const CLIP_TITLES={overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
+async function clipExplain(b,focus='overview'){
+  clipState='thinking'; clipEl.classList.add('thinking'); clipBox=b;
+  clipSay(focus==='overview'?'Looking…':`Looking closer · ${esc(focus)}`,
+    focus==='cameras'?'Pulling every camera still in the box and reading each frame.':'Reading the layers, pulling weather and the nearest camera stills, thinking.',null,null,clipSnippet(b));
+  clipCtl=new AbortController(); const ctl=clipCtl;
+  try{
+    const ctx=clipContext(b); ctx.focus=focus;
+    const bbox=[ctx.bounds.west,ctx.bounds.south,ctx.bounds.east,ctx.bounds.north].join(',');
+    if(focus==='overview'||!clipCams.length){
+      try{ const r=await fetch(`/live/cameras?bbox=${bbox}&limit=400`,{signal:ctl.signal}); if(r.ok) clipCams=(await r.json()).filter(c=>c.image_url); }catch(_){ clipCams=[]; }
+      if(ctl===clipCtl){ const old=clipBubble.querySelector('.snip'); if(old) old.replaceWith(clipSnippet(b)); }   // now with the cameras marked
+    }
+    ctx.cameras=clipCams.slice(0,12).map(c=>c.id);       // the snippet marks them all; the model sees up to 12
+    const res=await withLoad('LOOK',()=>fetch('/explain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ctx),signal:ctl.signal}));
+    const data=await res.json().catch(()=>({}));
+    if(ctl!==clipCtl) return;
+    clipEl.classList.remove('thinking'); clipState='result';
+    if(!res.ok){ clipSay('Hmm','<span style="color:var(--amber)">'+esc(data.error||`explainer returned ${res.status}`)+'</span>',null,'<button class="go">Draw another</button>'); }
+    else{
+      const w=data.weather||{};
+      const foot=[data.model&&`model ${esc(data.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C · wind ${esc(w.wind_speed_10m)} km/h`,
+        (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box'].filter(Boolean).join(' · ');
+      const ids=data.camera_ids||[]; ctx.cameras=ids.length?ctx.cameras:[];
+      const thumbs=focus==='cameras'&&ids.length?`<div class="thumbs">${ids.map((id,i)=>{const c=clipCams.find(x=>x.id===id);return `<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(c?c.name:id)}" title="[${i+1}] ${esc(c?c.name:id)}" data-id="${esc(id)}"/>`;}).join('')}</div>`:'';
+      clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(data.text||'(no answer)')+thumbs+clipFacetsHtml(ctx,focus),foot,'<button class="go">Draw another</button>',clipSnippet(b));
+      clipBubble.querySelectorAll('.dive button').forEach(btn=>{ btn.onclick=()=>{ if(btn.dataset.focus!==focus) clipExplain(clipBox,btn.dataset.focus); }; });
+      clipBubble.querySelectorAll('.thumbs img').forEach(img=>{ img.onclick=()=>{ const c=clipCams.find(x=>x.id===img.dataset.id); if(c) openCamera(c); }; });
+    }
+    clipBubble.querySelector('.go').onclick=()=>{ if(clipRect){ map.removeLayer(clipRect); clipRect=null; } clipCams=[]; clipArm(); };
+  }catch(e){
+    if(e.name==='AbortError') return;
+    clipEl.classList.remove('thinking'); clipState='result';
+    clipSay('Hmm','<span style="color:var(--amber)">could not reach the explainer</span>',null,'<button class="go">Try again</button>');
+    clipBubble.querySelector('.go').onclick=()=>clipArm();
+  }
+}
+clipEl.onclick=()=>{
+  if(clipState==='idle'){
+    clipState='hint';
+    clipSay('Hey.','Want to know what the $!@# you\'re looking at?<br/><br/>Click me again, then draw a rectangle around an area on the map. I\'ll read the layers, the weather and the live cameras inside it and tell you what\'s going on.',null,'<button class="go">Draw a box</button>');
+    clipBubble.querySelector('.go').onclick=clipArm;
+  }else if(clipState==='hint'||clipState==='result'){ if(clipRect){ map.removeLayer(clipRect); clipRect=null; } clipArm(); }
+  else if(clipState==='drawing'){ clipReset(); }
+  else if(clipState==='thinking'){ /* wait */ }
+};
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&clipState!=='idle') clipReset(); });
+
+// ── shareable view state ──
+// The hash mirrors what is on screen (center/zoom, area, window, type, severity,
+// layer toggles) so a URL reproduces the exact view. Written with replaceState so
+// panning never floods history; read once at boot before the first load.
+const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',hazards:'hazardsBtn',
+  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn'};
+let urlT=null, urlReady=false;
+function readViewState(){
+  const q=new URLSearchParams(location.hash.replace(/^#/,''));
+  const st={};
+  const v=(q.get('v')||'').split(',').map(Number);
+  if(v.length===3&&v.every(Number.isFinite)&&Math.abs(v[0])<=90&&Math.abs(v[1])<=180) st.view={lat:v[0],lon:v[1],z:Math.min(19,Math.max(2,v[2]))};
+  if(q.has('m')) st.metro=q.get('m').slice(0,80);
+  if(q.has('w')) st.window=q.get('w');
+  if(q.has('t')) st.type=q.get('t').slice(0,60);
+  if(q.has('s')) st.sev=q.get('s');
+  if(q.has('l')) st.layers=new Set(q.get('l').split(',').filter(Boolean));
+  return st;
+}
+function writeViewState(){
+  if(!urlReady) return;
+  const c=map.getCenter(), z=map.getZoom();
+  const q=new URLSearchParams();
+  q.set('v',`${c.lat.toFixed(4)},${c.lng.toFixed(4)},${Math.round(z*10)/10}`);
+  const metro=document.getElementById('metro').value; if(metro&&metro!=='__all__') q.set('m',metro);
+  const w=document.getElementById('window').value; if(w!=='0.0833') q.set('w',w);
+  const t=document.getElementById('type').value; if(t) q.set('t',t);
+  const sv=document.getElementById('minThreat').value; if(sv!=='0') q.set('s',sv);
+  const on=Object.entries(LAYER_BTNS).filter(([,id])=>document.getElementById(id).classList.contains('on')).map(([k])=>k);
+  q.set('l',on.join(','));
+  const hash='#'+q.toString().replace(/%2C/g,',');
+  if(hash!==location.hash) history.replaceState(null,'',hash);
+}
+function scheduleUrl(){ clearTimeout(urlT); urlT=setTimeout(writeViewState,300); }
+['window','type','minThreat','metro'].forEach(id=>document.getElementById(id).addEventListener('change',scheduleUrl));
+Object.values(LAYER_BTNS).forEach(id=>document.getElementById(id).addEventListener('click',scheduleUrl));
 // re-render (no refetch) when the visible area changes — keeps everything scoped to view
 let moveT=null;
-map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120);
+map.on('moveend zoomend',()=>{ clearTimeout(moveT); moveT=setTimeout(draw,120); scheduleUrl();
   if(showCameras){ clearTimeout(cameraFetchT); cameraFetchT=setTimeout(loadCameras,260); } });
 
 async function loadMetros(){
@@ -1990,11 +2295,25 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 (async ()=>{
+  const st=readViewState();
   await loadMetros();
-  document.getElementById('metro').value='__all__';   // default: live national overview
-  map.fitBounds(US_BOUNDS,{padding:[20,20]});
+  const metroSel=document.getElementById('metro');
+  metroSel.value=(st.metro&&LIVE_METROS.has(st.metro))?st.metro:'__all__';   // default: live national overview
+  if(st.window&&[...document.getElementById('window').options].some(o=>o.value===st.window)) document.getElementById('window').value=st.window;
+  if(st.sev&&[...document.getElementById('minThreat').options].some(o=>o.value===st.sev)) document.getElementById('minThreat').value=st.sev;
+  if(st.view) map.setView([st.view.lat,st.view.lon],st.view.z);
+  else if(metroSel.value!=='__all__'&&CENTERS[metroSel.value]) map.setView(CENTERS[metroSel.value],12);
+  else map.fitBounds(US_BOUNDS,{padding:[20,20]});
+  if(st.layers){                       // click each toggle whose state differs from the URL
+    Object.entries(LAYER_BTNS).forEach(([k,id])=>{
+      const btn=document.getElementById(id);
+      if(btn.classList.contains('on')!==st.layers.has(k)) btn.click();
+    });
+  }
   await load();
+  if(st.type){ const sel=document.getElementById('type'); if([...sel.options].some(o=>o.value===st.type)){ sel.value=st.type; draw(); } }
   restartStream();
+  urlReady=true; writeViewState();
 })();
 });
 </script>
