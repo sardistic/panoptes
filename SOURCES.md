@@ -65,6 +65,16 @@ local pipeline and source discovery:
 
 ## Live cameras (keyless, on by default)
 
+**Finding new feeds is automated:** `python -m apb.discover.camera_sniff` (needs
+Playwright + Chromium, build-time only) opens each DOT/511 map in `SEEDS`, captures
+the JSON the page loads, recognises camera lists by shape, validates a still or HLS
+playlist, and writes replayable specs to `data/camera_discoveries.json`; every
+`enabled` spec becomes a live source (`dx_<key>`) with no code. `--url X --key Y`
+sniffs a new site. Sweep of 2026-09-17: MoDOT (880, HLS) and NMRoads (183) enabled;
+511NJ (679) and GoAkamai HI (336) found but session-gated (replay 401/403); OK/KY
+found but their image hosts refuse us; 26 other maps exposed nothing camera-shaped
+(vector tiles, keyed APIs, or cameras loaded only per-tile).
+
 `apb/ingest/cameras.py` — verified 2026-09-17: Caltrans (12 districts, ~3.6k),
 NYC DOT TMC (~1k), 511NY (~2.9k, most with HLS), DelDOT (HLS only), Maryland CHART
 (HLS only), Seattle SDOT+WSDOT (~650), Ontario 511 (~1.7k views), TfL JamCams

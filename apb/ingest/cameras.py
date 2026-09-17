@@ -38,6 +38,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urljoin
 from typing import Callable
 from xml.etree import ElementTree as ET
 
@@ -61,6 +63,7 @@ class CameraSource:
     state: str | None = None
     env_key: str | None = None      # keyed sources stay dark until this env var is set
     host: str | None = None         # Carmanah v2 host, e.g. "511ga.org"
+    spec: dict | None = None        # discovered-feed spec (apb.discover.camera_sniff)
 
 
 def _f(v) -> float | None:
@@ -543,6 +546,90 @@ def _ohgo(reg, src) -> list[dict]:
     return out
 
 
+# ── discovered feeds: specs written by apb.discover.camera_sniff ──────────────
+_DISCOVERIES = Path(__file__).resolve().parents[2] / "data" / "camera_discoveries.json"
+_PATH_PART = re.compile(r"([^\[]+)(?:\[(\d+)\])?$")
+
+
+def _dget(d, dotted):
+    cur = d
+    for part in dotted.split("."):
+        m = _PATH_PART.match(part)
+        if not m or not isinstance(cur, dict):
+            return None
+        cur = cur.get(m.group(1))
+        if m.group(2) is not None and isinstance(cur, list):
+            cur = cur[int(m.group(2))] if cur else None
+    return cur
+
+
+def _discovered(reg, src) -> list[dict]:
+    """Replay a sniffed endpoint (GET or POST with its body, page Referer) and map
+    records through the discovered field paths. A `X[0].` prefix shared by the
+    lat/lon/image paths means X is a per-site list of cameras: expand it."""
+    spec = src.spec
+    hdr = {"Referer": spec.get("referer") or "", "Accept": "application/json, text/plain, */*"}
+    if spec.get("method", "GET").upper() == "POST":
+        r = reg._client.post(spec["endpoint"], content=spec.get("post_data") or "", headers={
+            **hdr, "Content-Type": "application/json"})
+    else:
+        r = reg._client.get(spec["endpoint"], headers=hdr)
+    r.raise_for_status()
+    text = r.text
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        m = re.search(r"[\[{]", text)
+        doc = json.loads(text[m.start():text.rindex("}") + 1]) if m else []
+    items = doc
+    for part in spec["items_path"].split(".")[1:]:
+        m = _PATH_PART.match(part)
+        items = items.get(m.group(1)) if isinstance(items, dict) else None
+        if m and m.group(2) is not None and isinstance(items, list):
+            items = items[int(m.group(2))]
+    if not isinstance(items, list):
+        return []
+    f = spec["fields"]
+    prefix = None
+    m = re.match(r"^(.+?)\[0\]\.", f["lat"])
+    if m and f["lon"].startswith(m.group(0)) and f["image"].startswith(m.group(0)):
+        prefix = m.group(1)
+    out = []
+    for i, rec in enumerate(items):
+        subs = [(rec, "")] if not prefix else [(x, "") for x in (_dget(rec, prefix) or []) if isinstance(x, dict)]
+        for j, (node, _) in enumerate(subs):
+            strip = lambda p: p[len(prefix) + 4:] if prefix and p.startswith(prefix + "[0].") else p
+            img = _dget(node, strip(f["image"]))
+            if not img:
+                continue
+            img = urljoin(spec["endpoint"], str(img))
+            stream = img if ".m3u8" in img or "/rtplive/" in img else None
+            name = _dget(node, strip(f["name"])) if f.get("name") else None
+            nid = _dget(node, strip(f["id"])) if f.get("id") else None
+            row = _row(src.key, nid if nid not in (None, "") else f"{i}.{j}", name or spec.get("label") or src.key,
+                       _dget(node, strip(f["lat"])), _dget(node, strip(f["lon"])), state=spec.get("state"),
+                       image_url=None if stream else img, stream_url=stream, page_url=spec.get("referer"))
+            if row:
+                out.append(row)
+    return out
+
+
+def _load_discoveries() -> dict[str, "CameraSource"]:
+    try:
+        specs = json.loads(_DISCOVERIES.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for key, spec in specs.items():
+        if not spec.get("enabled"):
+            continue
+        cs = CameraSource(f"dx_{key}", f"{spec.get('label') or key.upper()} (discovered)", _discovered,
+                          spec.get("state") or key.upper())
+        cs.spec = spec
+        out[cs.key] = cs
+    return out
+
+
 SOURCES: dict[str, CameraSource] = {
     "caltrans": CameraSource("caltrans", "Caltrans CCTV (12 districts)", _caltrans, "CA"),
     "nyctmc": CameraSource("nyctmc", "NYC DOT traffic cameras", _nyctmc, "NY"),
@@ -600,6 +687,7 @@ SOURCES: dict[str, CameraSource] = {
     "ab511": CameraSource("ab511", "511 Alberta cameras", _carmanah_v2, "AB",
                           env_key="T511_AB_KEY", host="511.alberta.ca"),
 }
+SOURCES.update(_load_discoveries())      # sniffed feeds (data/camera_discoveries.json)
 
 # Hosts the browser may pull HLS playlists/segments from directly (hls.js fetch +
 # <video>). The API's Content-Security-Policy is built from this list so a new
@@ -611,6 +699,7 @@ STREAM_HOSTS: tuple[str, ...] = (
     "https://*.sha.maryland.gov",       # Maryland CHART
     "https://s3-eu-west-1.amazonaws.com",   # TfL mp4 clips
     "https://*.wowza.com",              # ALGO Alabama HLS CDN
+    "https://*.modot.mo.gov",           # MoDOT (discovered) HLS
 )
 
 
