@@ -5,7 +5,7 @@ import os
 import pytest
 
 _FLAGS = ("APB_POLLER_OFF", "APB_BLUESKY_OFF", "APB_NEWS_OFF",
-          "APB_GNEWS_OFF", "APB_SOCIAL_RSS_OFF", "APB_ADSB_OFF")
+          "APB_GNEWS_OFF", "APB_SOCIAL_RSS_OFF", "APB_ADSB_OFF", "APB_CAMERAS_OFF")
 
 
 @pytest.fixture(scope="module")

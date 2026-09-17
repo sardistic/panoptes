@@ -20,6 +20,7 @@ jobs:
       APB_GNEWS_OFF: "1"
       APB_SOCIAL_RSS_OFF: "1"
       APB_ADSB_OFF: "1"
+      APB_CAMERAS_OFF: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -70,6 +71,7 @@ jobs:
       APB_GNEWS_OFF: "1"
       APB_SOCIAL_RSS_OFF: "1"
       APB_ADSB_OFF: "1"
+      APB_CAMERAS_OFF: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

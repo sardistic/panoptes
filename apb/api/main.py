@@ -217,6 +217,11 @@ def _startup() -> None:
         from apb.fusion import maritime_store
         maritime_store.start()
 
+    # Warm the public-camera inventories (background threads, ~20s for all vendors)
+    # so the first CAMERAS toggle after a deploy is not an empty layer.
+    if not _off("APB_CAMERAS_OFF"):
+        _cameras.ensure_loaded()
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
