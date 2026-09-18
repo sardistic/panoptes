@@ -866,7 +866,7 @@ class ExplainRequest(BaseModel):
     stream_cameras: list[str] = Field(default_factory=list, max_length=20)   # names, HLS-only
     frames: list[dict] = Field(default_factory=list, max_length=4)   # {id, data} browser frame grabs
     focus: Literal["overview", "cameras", "incidents", "hazards", "social", "weather",
-                   "place", "facts"] = "overview"
+                   "place", "facts", "street"] = "overview"
 
 
 _explain_hits: dict[str, deque] = defaultdict(deque)
@@ -938,6 +938,25 @@ def explain_scene(req: ExplainRequest, request: Request):
             used_ids.append(cam_id)
         if len(stills) >= max_stills:
             break
+    # Street-level frames: free providers ride along on overview/place; the Street
+    # facet also spends Street View (billed) and sends more.
+    from apb.context import street as street_mod
+    street_frames: list[dict] = []
+    if req.focus in ("street", "overview", "place"):
+        try:
+            street_frames = street_mod.frames(b, paid=(req.focus == "street"))[: 8 if req.focus == "street" else 3]
+        except Exception as e:
+            log.info("street frames unavailable: %s", e)
+        for fr in street_frames:
+            got = None
+            try:
+                got = street_mod.image(fr["token"])
+            except httpx.HTTPError:
+                pass
+            if got:
+                stills.append((f"street level, {fr['provider']} {fr.get('captured') or ''} at {fr['lat']},{fr['lon']}"
+                               + (f" ({fr['note']})" if fr.get("note") else ""), got[0], got[1]))
+    ctx["street_frames"] = len(street_frames)
     # Frames the browser grabbed from HLS-only cameras (canvas capture). Only ids that
     # are registered stream cameras are accepted, and the bytes must be a real image.
     import base64
@@ -965,6 +984,7 @@ def explain_scene(req: ExplainRequest, request: Request):
         log.warning("explain upstream error: %s", e)
         return JSONResponse({"error": "model upstream unreachable"}, status_code=424)
     out["camera_ids"] = used_ids
+    out["street"] = street_frames
     try:
         out["uid"] = look_store.record(b, req.focus, out, req.counts)
     except Exception as e:                      # persistence must never sink the answer
@@ -992,6 +1012,37 @@ def facts_for_box(bbox: str = Query(..., max_length=80), stream: bool = False):
         return StreamingResponse(gen(), media_type="application/x-ndjson",
                                  headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
     return JSONResponse(facts_mod.facts(box), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/street")
+def street_for_box(bbox: str = Query(..., max_length=80), paid: bool = False):
+    """Street-level frames sampled across a box (Mapillary / KartaView; Street View when
+    `paid=true` and GOOGLE_MAPS_KEY is set). Images are served by /street/{token}."""
+    from apb.context import street as street_mod
+    try:
+        w, s, e, n = (float(x) for x in bbox.split(","))
+    except ValueError:
+        return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+    if not (-180 <= w < e <= 180 and -90 <= s < n <= 90) or (n - s) * (e - w) > 4:
+        return JSONResponse({"error": "bbox out of range or larger than 4 deg^2"}, status_code=400)
+    return JSONResponse({"providers": street_mod.providers(),
+                         "frames": street_mod.frames({"south": s, "north": n, "west": w, "east": e}, paid=paid)},
+                        headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.get("/street/{token}")
+def street_image(token: str):
+    """Proxy for a street-level frame issued by /street or /explain (token only)."""
+    from apb.context import street as street_mod
+    if len(token) != 18 or not all(c in "0123456789abcdef" for c in token):
+        return Response(status_code=404)
+    try:
+        got = street_mod.image(token)
+    except httpx.HTTPError:
+        return Response(status_code=424)
+    if not got:
+        return Response(status_code=404)
+    return Response(got[0], media_type=got[1], headers={"Cache-Control": "public, max-age=600"})
 
 
 @app.delete("/looks/{uid}")

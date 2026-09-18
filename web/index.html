@@ -329,6 +329,13 @@
   #clipBubble .facts table{width:100%;border-collapse:collapse;font:500 10px/1.35 var(--mono)}
   #clipBubble .facts th{text-align:left;color:var(--dim);font-weight:500;padding:2px 6px 2px 0;vertical-align:top;width:44%}
   #clipBubble .facts td{color:var(--txt-2);padding:2px 0;vertical-align:top;word-break:break-word}
+  #clipBubble .street{margin-top:9px;white-space:normal}
+  #clipBubble .street .lab{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+  #clipBubble .street .strip{display:flex;gap:4px;overflow-x:auto;padding-bottom:3px}
+  #clipBubble .street .strip::-webkit-scrollbar{height:4px}
+  #clipBubble .street figure{margin:0;flex:0 0 150px;position:relative}
+  #clipBubble .street img{width:150px;height:94px;object-fit:cover;display:block;background:#000;border:1px solid var(--line-2);border-radius:2px}
+  #clipBubble .street figcaption{position:absolute;left:0;right:0;bottom:0;padding:2px 5px;font:600 7.5px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2);background:rgba(9,11,15,.7)}
   #clipBubble .thumbs img.live{background:#0b0d10 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5v14l11-7z' fill='%239fc4d0'/%3E%3C/svg%3E") center/40% no-repeat}
   #map.drawing .leaflet-container,#map.drawing{cursor:crosshair!important}
   @media (max-width:760px){ #clip{bottom:calc(34vh + 12px);width:72px;height:72px} #clip svg{width:64px;height:64px} #clipBubble{bottom:calc(34vh + 90px)} }
@@ -2115,7 +2122,7 @@ document.addEventListener('mousemove',e=>{         // the eyes follow the cursor
 let clipTick=null;
 function clipThinking(b,focus){
   const steps=['reading the layers in the box','fetching cameras in the box','pulling weather at the center',
-    'grabbing frames from stream-only cameras','cropping GOES satellite + radar over the box',focus==='cameras'?'sending up to 10 stills to the model':'sending up to 3 stills to the model','waiting for Gemini Flash'];
+    'grabbing frames from stream-only cameras','cropping GOES satellite + radar over the box','sampling street-level imagery across the box',focus==='cameras'?'sending up to 10 stills to the model':'sending up to 3 stills to the model','waiting for Gemini Flash'];
   clipSay(focus==='overview'?'Looking…':`Looking closer · ${esc(focus)}`,
     `<div class="prog"><i></i></div><div class="steps">${steps.map((t,i)=>`<div data-step="${i}">${i===0?'<b>▸</b> ':'&nbsp;&nbsp;'}${esc(t)}</div>`).join('')}<div class="elapsed">0.0s</div></div>`,null,null,clipSnippet(b));
   const started=performance.now(); clearInterval(clipTick);
@@ -2190,10 +2197,10 @@ function clipContext(b){
 }
 // Drill-down chips: only facets that actually have data in the box, plus the two
 // that always make sense (weather, place). Re-asks the same rectangle with a focus.
-const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place'],['facts','Facts']];
+const CLIP_FACETS=[['overview','Overview'],['cameras','Cameras'],['incidents','Incidents'],['hazards','Hazards'],['social','Social'],['weather','Weather'],['place','Place'],['facts','Facts'],['street','Street']];
 function clipFacetsHtml(ctx,current){
   const has={overview:true,cameras:(ctx.cameras||[]).length>0||(ctx.stream_cameras||[]).length>0,incidents:ctx.counts.incidents_in_box>0,hazards:ctx.counts.hazards_in_box>0,
-    social:ctx.counts.social_in_box>0,weather:true,place:true,facts:true};
+    social:ctx.counts.social_in_box>0,weather:true,place:true,facts:true,street:true};
   const chips=CLIP_FACETS.filter(([k])=>has[k]).map(([k,l])=>`<button data-focus="${k}" class="${k===current?'cur':''}">${l}${k==='cameras'?` · ${ctx.cameras.length+(ctx.stream_cameras||[]).length}`:k==='incidents'?` · ${ctx.counts.incidents_in_box}`:k==='hazards'?` · ${ctx.counts.hazards_in_box}`:k==='social'?` · ${ctx.counts.social_in_box}`:''}</button>`).join('');
   return `<div class="dive"><span class="lab">Dive into</span>${chips}</div>`;
 }
@@ -2322,9 +2329,10 @@ function renderLook(look,b,foot){
   const names=(look.cameras||[]);
   const thumbs=ids.length?`<div class="thumbs">${ids.map((id,i)=>`<img src="/live/cameras/${encodeURIComponent(id)}/image?t=${Date.now()}" alt="${esc(names[i]||id)}" title="[${i+1}] ${esc(names[i]||id)}" data-id="${esc(id)}" onerror="this.outerHTML='<span class=&quot;livetile&quot; data-id=&quot;'+this.dataset.id+'&quot; title=&quot;'+this.title+'&quot;>▶<small>live</small></span>'"/>`).join('')}</div>`:'';
   const w=look.weather||{};
+  const street=(look.street||[]).length?`<div class="street"><div class="lab">Street level</div><div class="strip">${look.street.map(f=>`<figure><img src="/street/${esc(f.token)}" alt="${esc(f.provider)}" loading="lazy"/><figcaption>${esc(f.provider)}${f.captured?' · '+esc(f.captured):''}</figcaption></figure>`).join('')}</div></div>`:'';
   const sky=look.sky&&Object.keys(look.sky).length?`<div class="sky">${Object.entries(look.sky).map(([k,u])=>`<figure><img src="${esc(safeLink(u))}" alt="${k}"/><figcaption>${k==='goes'?'GOES GeoColor · region':'NEXRAD radar · region'}</figcaption></figure>`).join('')}</div>`:'';
   foot=foot||[look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ');
-  clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+thumbs+clipFacetsHtml(ctx,focus),foot,
+  clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+street+thumbs+clipFacetsHtml(ctx,focus),foot,
     '<button class="go">Draw another</button>'+(look.uid?'<button class="rm" title="delete this look and its box">Remove box</button>':''),clipSnippet(b));
   clipBox=b; clipState='result';
   const rm=clipBubble.querySelector('.rm');
@@ -2370,7 +2378,7 @@ function addLook(look,fresh){
 async function loadLooks(){
   try{ (await (await fetch('/looks?max_age_hours=24&limit=200')).json()).reverse().forEach(l=>addLook(l,false)); }catch(_){}
 }
-const CLIP_TITLES={facts:'The facts',overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
+const CLIP_TITLES={facts:'The facts',street:'At ground level',overview:'What you are looking at',cameras:'What the cameras see',incidents:'The incidents',hazards:'The hazards',social:'What people are saying',weather:'Weather & environment',place:'The place'};
 async function clipExplain(b,focus='overview'){
   clipState='thinking'; clipEl.classList.add('thinking'); clipBox=b;
   clipThinking(b,focus);
@@ -2391,7 +2399,7 @@ async function clipExplain(b,focus='overview'){
     const want=focus==='cameras'?4:Math.max(0,3-withStill.length);
     if(want&&streamOnly.length){ clipStep(3); ctx.frames=(await Promise.all(streamOnly.slice(0,want).map(c=>grabFrame(c)))).filter(Boolean); }
     if(ctl!==clipCtl) return;
-    setTimeout(()=>clipStep(4),200); setTimeout(()=>clipStep(5),1200); setTimeout(()=>clipStep(6),2200);
+    setTimeout(()=>clipStep(4),200); setTimeout(()=>clipStep(5),1200); setTimeout(()=>clipStep(6),2000); setTimeout(()=>clipStep(7),3000);
     const res=await withLoad('LOOK',()=>fetch('/explain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ctx),signal:ctl.signal}));
     const data=await res.json().catch(()=>({}));
     if(ctl!==clipCtl) return;
@@ -2401,7 +2409,7 @@ async function clipExplain(b,focus='overview'){
       const w=data.weather||{};
       const foot=[data.model&&`model ${esc(data.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C · wind ${esc(w.wind_speed_10m)} km/h`,
         (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box'].filter(Boolean).join(' · ');
-      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,sky:data.sky||{},
+      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,sky:data.sky||{},street:data.street||[],
         cameras:data.cameras||[],camera_ids:data.camera_ids||[],counts:ctx.counts};
       addLook(look,true);
       renderLook(look,b,foot);

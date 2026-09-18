@@ -75,3 +75,18 @@ OSM POI counts stand in for "business activity".
 
 Consequences: `/facts` is cheap to add to (one function + one tuple in `_tasks`).
 Windy webcams are looked up per view, not preloaded (100k+ cams).
+
+### 2026-09-18 — Street-level imagery via token proxy; Street View only on the Street facet
+
+Context: the clip's looks benefit from ground-level context. Providers: Mapillary
+(free token), KartaView (keyless but its public API mostly refuses/timeouts),
+Google Street View Static (billed per image).
+
+Decision: `apb/context/street.py` samples a 3x2 grid across the box, takes the newest
+frame per cell, and hands frames to the model as image parts. Browser never sees
+provider URLs (or the Google key): frames are served by `/street/{token}` from a
+short-lived token→URL map. Street View is only requested for the Street facet
+(`paid=True`) and only after its free metadata call confirms coverage; overview and
+place get up to 3 free frames. Frames are cached 6 h per rounded box and saved with
+the look. Consequence: cost is bounded to ≤6 billed images per Street-facet look
+(~4¢), zero otherwise.

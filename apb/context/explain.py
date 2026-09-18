@@ -165,6 +165,15 @@ FOCUS_BRIEFS = {
         "Nature:, Activity:). Quote the numbers with units; say which are estimates "
         "(WorldPop, tract-level ACS, model-derived weather). Note anything notable or "
         "contradictory. Do not invent metrics that are not in the digest."),
+    "street": (
+        "The user asked what this area looks like AT GROUND LEVEL. You are given street-"
+        "level frames (Mapillary / KartaView / Google Street View), each labelled with "
+        "provider, capture date and position, plus any live camera stills. Describe the "
+        "built environment: road type and width, lanes, sidewalks, storefronts vs housing "
+        "vs industrial, vegetation, signage you can read, condition, anything notable. "
+        "Say how old each frame is and where in the box it sits (north/south/east/west). "
+        "Then relate it to the live data: does the ground view explain the incidents or "
+        "cameras? 140-240 words, plain English."),
     "place": (
         "Focus on the place itself: what area/city/roads/landmarks the rectangle covers "
         "(infer from coordinates, incident locations, roadway names, camera names and news), "
@@ -272,6 +281,9 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
         lines.append("The FIRST attached images are sky/weather crops, in order: "
                      + "; ".join(f"[S{i + 1}] {n}" for i, n in enumerate(ctx["sky_labels"]))
                      + ". Use them for cloud cover, storms, smoke and lights; say what they show.")
+    if ctx.get("street_frames"):
+        lines.append(f"{ctx['street_frames']} street-level frames are attached (labelled 'street level'); "
+                     "they are static imagery, months or years old — say so.")
     if camera_names:
         lines.append("Then live camera stills, in order: "
                      + "; ".join(f"[{i + 1}] {n}" for i, n in enumerate(camera_names)))
