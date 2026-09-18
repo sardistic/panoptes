@@ -407,7 +407,7 @@
     <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
     <button id="envBtn" class="on" aria-pressed="true" title="combined thermal, moisture, rain, UV and air-quality field"><span class="led"></span>ENV</button>
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
-    <button id="goesBtn" aria-pressed="false" title="live GOES GeoColor satellite imagery (real clouds, ~10 min old)"><span class="led"></span>GOES</button>
+    <button id="goesBtn" aria-pressed="false" title="satellite: live GOES GeoColor clouds (~10 min old) zoomed out, Esri World Imagery detail zoomed in"><span class="led"></span>GOES</button>
     <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
   </span></label>
   <span class="spacer"></span>
@@ -1912,6 +1912,23 @@ function goesRefresh(){
 map.createPane('goes');
 map.getPane('goes').style.zIndex = 210;
 map.getPane('goes').style.pointerEvents = 'none';
+// GOES is ~2 km/pixel (native zoom 7): past z9 it is only blur. As you zoom in it
+// cross-fades into Esri World Imagery (sub-metre, keyless with attribution), so the
+// satellite layer keeps meaning street-level detail instead of upscaled pixels.
+let imageryLayer=null;
+const GOES_FADE=[8.5,10.5];          // GOES fully on below, fully off above
+function satBlend(){
+  if(!goesLayers) return;
+  const z=map.getZoom(), t=Math.min(1,Math.max(0,(z-GOES_FADE[0])/(GOES_FADE[1]-GOES_FADE[0])));
+  goesLayers.forEach(l=>l.setOpacity(.65*(1-t)));
+  if(t>0&&!imageryLayer){
+    imageryLayer=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {pane:'goes',maxZoom:19,maxNativeZoom:18,opacity:0,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}).addTo(map);
+    watchTiles('IMAGERY',[imageryLayer]);
+  }
+  if(imageryLayer) imageryLayer.setOpacity(.62*t);
+  if(t===0&&imageryLayer){ map.removeLayer(imageryLayer); imageryLayer=null; }
+}
 function setGoes(on){
   const btn=document.getElementById('goesBtn');
   btn.classList.toggle('on',on);
@@ -1921,11 +1938,14 @@ function setGoes(on){
       {pane:'goes',maxNativeZoom:7,maxZoom:19,opacity:.65,attribution:'GOES © NOAA / NASA GIBS'}).addTo(map));
     watchTiles('SATELLITE',goesLayers);
     goesTimer=setInterval(()=>{ if(!document.hidden) goesRefresh(); },600000);
+    satBlend();
   }else if(!on && goesLayers){
     clearInterval(goesTimer); goesTimer=null;
     goesLayers.forEach(l=>map.removeLayer(l)); goesLayers=null;
+    if(imageryLayer){ map.removeLayer(imageryLayer); imageryLayer=null; }
   }
 }
+map.on('zoomend',satBlend);
 document.getElementById('goesBtn').onclick=()=>setGoes(!goesLayers);
 setGoes(true);                  // user decision: live GOES clouds are core to the map
 

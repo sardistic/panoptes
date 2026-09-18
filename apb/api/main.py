@@ -298,7 +298,8 @@ _SECURITY_HEADERS = {
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
         "font-src 'self' https://fonts.gstatic.com;",
         "img-src 'self' data: blob: https://*.basemaps.cartocdn.com"
-        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu;",
+        " https://gibs.earthdata.nasa.gov https://mesonet.agron.iastate.edu"
+        " https://server.arcgisonline.com;",         # Esri World Imagery at high zoom
         # camera stills go through /live/cameras/{id}/image (same-origin); only HLS
         # playlists/segments are fetched by hls.js straight from the DOT streamers
         "media-src 'self' blob: " + " ".join(STREAM_HOSTS) + ";",
