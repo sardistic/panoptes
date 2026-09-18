@@ -2331,7 +2331,8 @@ function renderLook(look,b,foot){
   const w=look.weather||{};
   const street=(look.street||[]).length?`<div class="street"><div class="lab">Street level</div><div class="strip">${look.street.map(f=>`<figure><img src="/street/${esc(f.token)}" alt="${esc(f.provider)}" loading="lazy"/><figcaption>${esc(f.provider)}${f.captured?' · '+esc(f.captured):''}</figcaption></figure>`).join('')}</div></div>`:'';
   const sky=look.sky&&Object.keys(look.sky).length?`<div class="sky">${Object.entries(look.sky).map(([k,u])=>`<figure><img src="${esc(safeLink(u))}" alt="${k}"/><figcaption>${k==='goes'?'GOES GeoColor · region':'NEXRAD radar · region'}</figcaption></figure>`).join('')}</div>`:'';
-  foot=foot||[look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ');
+  const sb=look.street_budget; const budgetNote=sb?` · street view $${esc(sb.month_usd)} of $${esc(sb.cap_usd)} this month${sb.exhausted?' (paused)':''}`:'';
+  foot=foot||([look.model&&`model ${esc(look.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C`, `${esc(ago(look.ts))}`].filter(Boolean).join(' · ')+budgetNote);
   clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+street+thumbs+clipFacetsHtml(ctx,focus),foot,
     '<button class="go">Draw another</button>'+(look.uid?'<button class="rm" title="delete this look and its box">Remove box</button>':''),clipSnippet(b));
   clipBox=b; clipState='result';
@@ -2408,8 +2409,9 @@ async function clipExplain(b,focus='overview'){
     else{
       const w=data.weather||{};
       const foot=[data.model&&`model ${esc(data.model)}`, w.conditions&&`${esc(w.conditions)} · ${esc(w.temperature_2m)}°C · wind ${esc(w.wind_speed_10m)} km/h`,
-        (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box'].filter(Boolean).join(' · ');
-      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,sky:data.sky||{},street:data.street||[],
+        (data.cameras||[]).length?`${data.cameras.length} camera still${data.cameras.length===1?'':'s'} analysed`:'no cameras in box',
+        data.street_budget&&`street view $${esc(data.street_budget.month_usd)} of $${esc(data.street_budget.cap_usd)} this month${data.street_budget.exhausted?' (paused)':''}`].filter(Boolean).join(' · ');
+      const look={uid:data.uid,ts:Date.now()/1000,bounds:ctx.bounds,focus,model:data.model,text:data.text,weather:w,sky:data.sky||{},street:data.street||[],street_budget:data.street_budget,
         cameras:data.cameras||[],camera_ids:data.camera_ids||[],counts:ctx.counts};
       addLook(look,true);
       renderLook(look,b,foot);

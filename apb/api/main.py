@@ -985,6 +985,8 @@ def explain_scene(req: ExplainRequest, request: Request):
         return JSONResponse({"error": "model upstream unreachable"}, status_code=424)
     out["camera_ids"] = used_ids
     out["street"] = street_frames
+    if req.focus == "street":
+        out["street_budget"] = street_mod.budget()
     try:
         out["uid"] = look_store.record(b, req.focus, out, req.counts)
     except Exception as e:                      # persistence must never sink the answer
@@ -1025,7 +1027,7 @@ def street_for_box(bbox: str = Query(..., max_length=80), paid: bool = False):
         return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
     if not (-180 <= w < e <= 180 and -90 <= s < n <= 90) or (n - s) * (e - w) > 4:
         return JSONResponse({"error": "bbox out of range or larger than 4 deg^2"}, status_code=400)
-    return JSONResponse({"providers": street_mod.providers(),
+    return JSONResponse({"providers": street_mod.providers(), "budget": street_mod.budget(),
                          "frames": street_mod.frames({"south": s, "north": n, "west": w, "east": e}, paid=paid)},
                         headers={"Cache-Control": "public, max-age=600"})
 
@@ -1124,6 +1126,7 @@ def status():
                    "last_beat_s": round(now - _poller_beat["at"]) if _poller_beat["at"] else None},
         "response_cache": len(_resp_cache),
         "cameras": _cameras.stats(),
+        "streetview_budget": __import__("apb.context.street", fromlist=["budget"]).budget(),
     }
 
 

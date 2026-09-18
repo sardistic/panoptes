@@ -34,12 +34,26 @@ _cache: dict[tuple, tuple[float, list[dict]]] = {}     # rounded bbox -> frames
 _tokens: dict[str, tuple[float, str]] = {}             # token -> (at, provider url)
 _bytes: dict[str, tuple[float, bytes, str]] = {}       # token -> (at, image, mime)
 _TTL = 6 * 3600.0
+# Street View Static is $7 per 1,000 images. A hard $10/month ceiling = 1,428 images;
+# 1,400/month with a 60/day smoothing cap, counted at the fetch (the billable event).
+SV_MONTHLY_CAP = int(os.environ.get("STREETVIEW_MONTHLY_CAP", "1400"))
+SV_DAILY_CAP = int(os.environ.get("STREETVIEW_DAILY_CAP", "60"))
+SV_UNIT_USD = 0.007
 
 
 def providers() -> dict[str, bool]:
     return {"mapillary": bool(os.environ.get("MAPILLARY_TOKEN", "").strip()),
             "kartaview": True,
             "streetview": bool(os.environ.get("GOOGLE_MAPS_KEY", "").strip())}
+
+
+def budget() -> dict:
+    """Street View spend so far vs the caps (what /status and the bubble show)."""
+    from apb.store import spend
+    u = spend.used("streetview")
+    return {"month_images": u["month"], "month_cap": SV_MONTHLY_CAP, "day_images": u["day"], "day_cap": SV_DAILY_CAP,
+            "month_usd": round(u["month"] * SV_UNIT_USD, 2), "cap_usd": round(SV_MONTHLY_CAP * SV_UNIT_USD, 2),
+            "exhausted": u["month"] >= SV_MONTHLY_CAP or u["day"] >= SV_DAILY_CAP}
 
 
 def _token(url: str) -> str:
@@ -113,7 +127,7 @@ def kartaview(bounds: dict, limit: int = 4) -> list[dict]:
 
 def streetview(bounds: dict, limit: int = 6) -> list[dict]:
     key = os.environ.get("GOOGLE_MAPS_KEY", "").strip()
-    if not key:
+    if not key or budget()["exhausted"]:
         return []
     out = []
     for lat, lon in _grid(bounds)[:limit]:
@@ -164,11 +178,16 @@ def image(token: str) -> tuple[bytes, str] | None:
     """Fetch (cached 10 min) the frame behind a token. None for unknown tokens."""
     with _lock:
         hit = _bytes.get(token)
-        if hit and time.time() - hit[0] < 600:
+        if hit and time.time() - hit[0] < (86400 if "googleapis" in (_tokens.get(token) or (0, ""))[1] else 600):
             return hit[1], hit[2]
         url = (_tokens.get(token) or (0, None))[1]
     if not url:
         return None
+    if "maps.googleapis.com/maps/api/streetview?" in url:
+        from apb.store import spend
+        if not spend.allow("streetview", 1, SV_MONTHLY_CAP, SV_DAILY_CAP):
+            log.info("street view budget exhausted; frame %s not fetched", token)
+            return None
     r = _client.get(url, timeout=20.0)
     r.raise_for_status()
     ctype = r.headers.get("content-type", "image/jpeg").split(";")[0]
@@ -176,7 +195,7 @@ def image(token: str) -> tuple[bytes, str] | None:
         return None
     with _lock:
         _bytes[token] = (time.time(), r.content, ctype)
-        if len(_bytes) > 300:
-            for k in sorted(_bytes, key=lambda k: _bytes[k][0])[:150]:
+        if len(_bytes) > 900:
+            for k in sorted(_bytes, key=lambda k: _bytes[k][0])[:300]:
                 _bytes.pop(k, None)
     return r.content, ctype

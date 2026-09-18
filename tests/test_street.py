@@ -58,3 +58,21 @@ def test_frames_only_spends_streetview_when_paid(monkeypatch):
     b = {"south": 1, "north": 2, "west": 3, "east": 4}
     assert [f["provider"] for f in street.frames(b)] == ["mapillary"] and not spent
     assert [f["provider"] for f in street.frames(b, paid=True)] == ["streetview", "mapillary"] and spent
+
+
+def test_streetview_budget_is_a_hard_ceiling(monkeypatch, tmp_path):
+    from apb.store import spend, snapshots
+    monkeypatch.setattr(spend, "_ready", False)
+    monkeypatch.setattr(snapshots, "DB_PATH", tmp_path / "s.sqlite", raising=False)
+    monkeypatch.setattr(street, "SV_MONTHLY_CAP", 3)
+    monkeypatch.setattr(street, "SV_DAILY_CAP", 2)
+    assert spend.allow("streetview", 1, 3, 2) and spend.allow("streetview", 1, 3, 2)
+    assert not spend.allow("streetview", 1, 3, 2)                     # daily cap hit: nothing reserved
+    assert spend.used("streetview") == {"month": 2, "day": 2}
+    b = street.budget()
+    assert b["exhausted"] and b["month_usd"] == round(2 * street.SV_UNIT_USD, 2)
+    monkeypatch.setenv("GOOGLE_MAPS_KEY", "g")
+    assert street.streetview({"south": 1, "north": 2, "west": 3, "east": 4}) == []   # paused, no metadata calls either
+    # an exhausted budget also blocks the billable fetch of an already-issued token
+    tok = street._token("https://maps.googleapis.com/maps/api/streetview?size=1&key=g")
+    assert street.image(tok) is None
