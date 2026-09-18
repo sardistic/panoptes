@@ -41,8 +41,8 @@ def test_mapillary_picks_newest_per_cell_and_streetview_bills_only_covered_point
     monkeypatch.setattr(street._client, "get", get)
     b = {"south": 40.0, "north": 40.2, "west": -74.0, "east": -73.7}
     fr = street.mapillary(b)
-    assert [f["captured"] for f in fr] == ["1970-01-01", "1970-01-01"] and len(fr) == 2      # b beat a in its cell; c kept
-    assert fr[1]["note"] == "360° pano"
+    assert len(fr) == 6 and all(f["captured"] == "1970-01-01" for f in fr)   # one query per grid cell, newest wins
+    assert sum(1 for u, _ in calls if "mapillary" in u) == 6
     sv = street.streetview(b)
     assert len(sv) == 3 and all(f["provider"] == "streetview" for f in sv)
     assert not any("maps/api/streetview?" in u for u, _ in calls)      # images are fetched lazily via tokens

@@ -65,31 +65,32 @@ def _frame(provider, url, lat, lon, when=None, heading=None, note=None) -> dict:
 
 # ── providers ─────────────────────────────────────────────────────────────────
 def mapillary(bounds: dict, limit: int = 6) -> list[dict]:
+    """One small query per grid cell (the Graph API rejects big or dense boxes):
+    a ~250 m window around each sample point, newest frame wins."""
     tok = os.environ.get("MAPILLARY_TOKEN", "").strip()
     if not tok:
         return []
-    s, n, w, e = (float(bounds[k]) for k in ("south", "north", "west", "east"))
-    r = _client.get("https://graph.mapillary.com/images", params={
-        "access_token": tok, "fields": "id,thumb_1024_url,captured_at,compass_angle,geometry,is_pano",
-        "bbox": f"{w},{s},{e},{n}", "limit": 200})
-    r.raise_for_status()
-    imgs = r.json().get("data", [])
-    # newest image per grid cell -> spread across the box
-    cells: dict[tuple, dict] = {}
-    for im in imgs:
-        c = (im.get("geometry") or {}).get("coordinates") or [None, None]
-        if c[0] is None or not im.get("thumb_1024_url"):
-            continue
-        cell = (int((c[1] - s) / max(1e-9, n - s) * 2), int((c[0] - w) / max(1e-9, e - w) * 3))
-        if cell not in cells or (im.get("captured_at") or 0) > (cells[cell].get("captured_at") or 0):
-            cells[cell] = im
-    out = []
-    for im in sorted(cells.values(), key=lambda x: -(x.get("captured_at") or 0))[:limit]:
-        c = im["geometry"]["coordinates"]
+    def cell(pt):
+        lat, lon = pt
+        d = 0.0012                                  # ~130 m half-window: dense cities still answer
+        try:
+            r = _client.get("https://graph.mapillary.com/images", params={
+                "access_token": tok, "fields": "id,thumb_1024_url,captured_at,compass_angle,geometry,is_pano",
+                "bbox": f"{lon - d:.5f},{lat - d:.5f},{lon + d:.5f},{lat + d:.5f}", "limit": 12}, timeout=12.0)
+            if r.status_code != 200:
+                return None
+            imgs = [im for im in r.json().get("data", []) if im.get("thumb_1024_url")]
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not imgs:
+            return None
+        im = max(imgs, key=lambda x: x.get("captured_at") or 0)
+        c = (im.get("geometry") or {}).get("coordinates") or [lon, lat]
         when = datetime.fromtimestamp(im["captured_at"] / 1000, timezone.utc).strftime("%Y-%m-%d") if im.get("captured_at") else None
-        out.append(_frame("mapillary", im["thumb_1024_url"], c[1], c[0], when, im.get("compass_angle"),
-                          "360° pano" if im.get("is_pano") else None))
-    return out
+        return _frame("mapillary", im["thumb_1024_url"], c[1], c[0], when, im.get("compass_angle"),
+                      "360° pano" if im.get("is_pano") else None)
+    with ThreadPoolExecutor(6) as ex:               # cells in parallel: ~3 s instead of ~18 s
+        return [f for f in ex.map(cell, _grid(bounds)[:limit]) if f]
 
 
 def kartaview(bounds: dict, limit: int = 4) -> list[dict]:
