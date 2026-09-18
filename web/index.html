@@ -272,7 +272,14 @@
   #clip .pupil{fill:#0b0d10;transition:transform .08s linear}
   #clip .lid{fill:var(--panel);transform-origin:center;transform:scaleY(0);animation:blink 11s infinite}
   @keyframes blink{0%,92%,100%{transform:scaleY(0)}95%,97%{transform:scaleY(1)}}
-  #clip.thinking .pupil{animation:lookaround 2.4s ease-in-out infinite alternate}
+  /* thinking: head tilts, eyes drift up, a finger taps the temple */
+  #clip.thinking .pupil{animation:thinkeyes 3s ease-in-out infinite}
+  @keyframes thinkeyes{0%,100%{transform:translate(1.4px,-1.8px)}45%,55%{transform:translate(-1.6px,-1.4px)}}
+  #clip.thinking svg{animation:thinktilt 3s ease-in-out infinite;transform-origin:50% 80%}
+  @keyframes thinktilt{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(-6deg)}}
+  #clip .finger{opacity:0;transform-origin:56px 34px;transition:opacity .25s}
+  #clip.thinking .finger{opacity:1;animation:thinktap 1.5s ease-in-out infinite}
+  @keyframes thinktap{0%,100%{transform:rotate(0)}50%{transform:rotate(-16deg)}}
   @keyframes lookaround{from{transform:translate(-2px,1px)}to{transform:translate(2px,-1px)}}
   #clipBubble{right:16px;bottom:104px;width:360px;max-width:calc(100% - 32px);padding:14px 16px 12px;font-size:12.5px;line-height:1.5;color:var(--txt-2)}
   #clipBubble::after{content:"";position:absolute;right:34px;bottom:-7px;width:12px;height:12px;background:var(--panel);
@@ -363,7 +370,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil,#clip svg,#clip .finger{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -438,6 +445,7 @@
       <stop offset="0" stop-color="#7a1a8c"/><stop offset=".45" stop-color="#f07a1a"/><stop offset="1" stop-color="#fff6d0"/></linearGradient></defs>
     <path class="wire" d="M25 48 V14 a7 7 0 0 1 14 0 V50 a4.5 4.5 0 0 1 -9 0 V20 a1.5 1.5 0 0 1 3 0 V46"/>
     <g class="eyeL"><circle class="eye" cx="27" cy="26" r="5.6"/><circle class="pupil" cx="27" cy="26" r="2.5"/><ellipse class="lid" cx="27" cy="26" rx="5.7" ry="5.7"/></g>
+    <g class="finger" aria-hidden="true"><path d="M58 50 C60 42 56 36 49 30" fill="none" stroke="url(#clipGrad)" stroke-width="3.4" stroke-linecap="round"/><circle cx="49" cy="30" r="2.4" fill="#fff6d0"/></g>
     <g class="eyeR"><circle class="eye" cx="40" cy="26" r="5.6"/><circle class="pupil" cx="40" cy="26" r="2.5"/><ellipse class="lid" cx="40" cy="26" rx="5.7" ry="5.7"/></g>
   </svg>
 </button>
