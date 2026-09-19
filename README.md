@@ -81,6 +81,12 @@ register to unlock the keyed lanes.
   safety (city open-data crime for NYC/Chicago/LA/SF/Seattle, NYC 311 noise complaints),
   health (US Drought Monitor, CDC wastewater), land cover (NLCD 2021), connectivity (IODA
   internet outages), sound (estimated noise index from aircraft/roads/311/land cover),
+  infrastructure (HIFLD: fire/police/substations/schools/prisons/pipelines, power
+  plants with MW), radio (FCC FM/AM transmitters, land-mobile licensees, tower counts),
+  environment (EPA ECHO compliance and penalties), climate (ACIS 7-day anomaly vs
+  normals, NASA POWER monthly normals), economy (BLS QCEW jobs/wages YoY), health (CDC
+  PLACES outcomes), seismic design (USGS), SNOTEL snowpack, historic places (NPS),
+  FEMA declaration history, active NWS alerts, Wikipedia attention ratio,
   plus keyed lanes when set: Synoptic mesonet, PurpleAir, TomTom flow, Transitland.
   Every pass records its scalars per ~5 km cell; later passes get **baselines**
   (median, percentile vs the last 30 days) and **notable** flags, and the model is told

@@ -2322,7 +2322,14 @@ function clipSnippet(b,ctx){
 }
 // Facts table: every metric for the box, grouped by section, straight from /facts
 // (the same digest the model was given), so the numbers are inspectable, not just prose.
-const FACT_LABEL={worldpop_2020_in_box:'population in box (WorldPop 2020)',median_household_income_usd:'median household income $',
+const FACT_LABEL={regulated_facilities:'EPA-regulated facilities',significant_violators:'significant violators',current_violations:'facilities in violation',formal_actions_5y:'formal actions (5y)',inspections_5y:'inspections (5y)',penalties_5y:'penalties (5y)',hazardous_waste_rcra:'RCRA hazardous-waste sites',toxics_release_inventory:'TRI reporters',clean_air_act:'Clean Air Act sites',clean_water_act:'Clean Water Act sites',
+  high_anomaly_f:'highs vs normal °F (7d)',low_anomaly_f:'lows vs normal °F (7d)',mean_high_f:'mean high °F (7d)',normal_high_f:'normal high °F',mean_low_f:'mean low °F (7d)',normal_low_f:'normal low °F',precip_7d_in:'precip 7d in',normal_precip_7d_in:'normal precip 7d in',monthly_normals:'this month normals (NASA POWER)',annual_solar_kwh_m2_day:'annual solar kWh/m²/day',
+  pga_g:'peak ground accel. g (2%/50y)',ss_g:'Ss g',s1_g:'S1 g',seismic_design_category:'seismic design category',historic_places_listed:'National Register places',snow_water_equivalent_in:'snow water equivalent in',snow_depth_in:'snow depth in',snotel_sites_nearby:'SNOTEL sites nearby',
+  disaster_declarations_10y:'FEMA declarations (10y)',disasters_by_type_10y:'declarations by type',latest_declarations:'latest declarations',active_alerts:'NWS alerts active',
+  establishments:'businesses (QCEW)',employment:'jobs (QCEW)',avg_weekly_wage_usd:'avg weekly wage $',employment_yoy_pct:'jobs YoY %',wage_yoy_pct:'wages YoY %',establishments_yoy_pct:'businesses YoY %',
+  wikipedia_views_yesterday:'Wikipedia views (yesterday)',wikipedia_median_daily_30d:'Wikipedia median/day (30d)',attention_ratio:'attention vs median',wikipedia_peak_30d:'Wikipedia peak (30d)',land_mobile_sites:'land-mobile radio sites',land_mobile_licensees:'land-mobile licensees',fm_stations:'FM transmitters',am_stations:'AM transmitters',microwave_towers:'microwave towers',cellular_towers:'cellular towers',paging_towers:'paging towers',tv_transmitters:'TV transmitters',
+  power_capacity_mw:'generating capacity MW',hospitals_medicare:'hospitals (Medicare)',law_enforcement:'law-enforcement sites',electric_substations:'substations',gas_pipelines:'gas pipelines',
+  worldpop_2020_in_box:'population in box (WorldPop 2020)',median_household_income_usd:'median household income $',
   median_home_value_usd:'median home value $',household_income_bands_pct:'income bands %',county_unemployment_rate_pct:'county unemployment %',
   epa_tri_facilities_in_county:'EPA TRI facilities (county)',elevation_m:'elevation m (min/mean/max)',fema_flood_zone_at_center:'FEMA flood zone',
   nearest_tide_station:'tide station',water_level_ft_mllw:'water level ft (MLLW)',river_discharge_m3s:'river discharge m³/s',
@@ -2344,7 +2351,7 @@ async function loadFactsTable(b){
   const holder=document.createElement('div'); holder.className='facts';
   holder.innerHTML='<div class="prog"><i></i></div><div class="steps note">metrics arrive as each source answers…</div>';
   body.appendChild(holder);
-  const order=['baseline','place','population','economy','safety','sound','health','terrain','water','sky','atmosphere','air','nature','activity','connectivity'];
+  const order=['baseline','place','population','economy','safety','environment','sound','health','terrain','water','sky','climate','atmosphere','air','nature','activity','infrastructure','radio','connectivity'];
   const secEl={};
   const section=k=>{ if(secEl[k]) return secEl[k];
     const d=document.createElement('details'); d.open=true; d.innerHTML=`<summary>${esc(k)}</summary><table></table>`;

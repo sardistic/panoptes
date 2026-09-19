@@ -134,6 +134,30 @@ clients), 511NJ / Quebec 511 / Montreal (bot protection), MnDOT IRIS camera.xml
 registered), FAA WeatherCams (auth required), Germany Autobahn API (webcam lists
 empty), TDOT SmartWay (401).
 
+## Facts lanes added 2026-09-19 (keyless, verified live)
+
+| Section | Source | What |
+|---|---|---|
+| infrastructure | HIFLD open layers (ArcGIS, `services5.arcgis.com/HDRa0B57OVrv2E1q`), EIA power plants, CMS hospitals | counts in the box: fire / police / substations / schools / colleges / child care / nursing homes / prisons / pipelines / urgent care; power plants with fuel + MW |
+| radio | FCC licensing via HIFLD | FM/AM transmitters (callsign, frequency, licensee), land-mobile commercial sites grouped by licensee, cellular / microwave / paging / TV tower counts |
+| environment | EPA ECHO `get_facilities` (bbox) | regulated facilities, significant violators, current violations, inspections + formal actions + penalties (5 y), CAA/CWA/RCRA/TRI counts |
+| climate | NOAA RCC ACIS (`data.rcc-acis.org`) | nearest temperature-reporting station: last 7 days highs/lows/precip vs 1991-2020 normals (anomaly °F) |
+| climate | NASA POWER climatology | this month's normal temp / precip / solar / wind at the point (global) |
+| economy | BLS QCEW county CSV | establishments, employment, average weekly wage and YoY changes (latest published quarter) |
+| health | CDC PLACES county (Socrata `swc5-untb`) | obesity, depression, poor-mental-health days, high BP, short sleep, asthma, binge drinking, smoking, inactivity (%) |
+| terrain | USGS design maps ASCE 7-16 | PGA, Ss, S1, seismic design category |
+| terrain | NRCS AWDB SNOTEL (mountain West only) | nearest SNOTEL: SWE, snow depth, temp; station list warmed in the background (endpoint ignores filters, ~8 s) |
+| place | NPS National Register (ArcGIS) | historic places listed in the box + examples |
+| safety | OpenFEMA DisasterDeclarationsSummaries | county declarations in 10 y by type, latest three |
+| safety | NWS `alerts/active?point=` | active alerts at the box centre (event, severity, headline) |
+| activity | Wikimedia pageviews | the place's Wikipedia article: views yesterday vs 30-day median (attention ratio), peak day |
+
+Probed and rejected this round: NHTSA FARS CrashAPI (403 to non-browsers), ORNL MODIS
+subsets (500s), USFS Wildfire Hazard Potential image service (403), FHWA HPMS AADT
+(service gone), EPA SEMS Superfund tables (removed from Envirofacts), original HIFLD
+`services1/Hp6G80Pky0om7QvQ` host (all layers "Invalid URL" now — the `services5`
+mirror is what works), GDELT GEO 2.0 (404).
+
 ## Evaluated and not viable (so far)
 
 - **Waze live-map GeoRSS** — every host variant (www/embed, live-map api, rtserver)

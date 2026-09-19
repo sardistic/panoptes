@@ -127,3 +127,21 @@ digest (`notable_persistence`) and the NOTABLE tooltip (`streak`). `camera_obs_s
 bins camera reads into 12 slots over 24 h; `/live/camera_activity` returns it and the
 Cameras facet draws it. The sampler watchlist adds the 50 largest US metros so the
 layer covers the map, and skips the camera pass while inventories are still loading.
+
+### 2026-09-19 — Second facts expansion lives in facts_more.py
+
+Context: "look for more data sources". 35 candidates probed live; 13 keyless lanes
+verified (table in SOURCES.md).
+
+Decision: new lanes go in `apb/context/facts_more.py` (own httpx client, same
+contract: return {} for nothing, raise for failure); facts.py only registers them in
+`_tasks` / `run_us_dependents` / the geocode hook. New sections: infrastructure,
+radio, environment, climate. Lane-specific `*_source` keys instead of a shared
+"source" so lanes sharing a section do not overwrite each other. HIFLD is reached via
+the `services5/HDRa0B57OVrv2E1q` mirror (the canonical `services1/Hp6G80Pky0om7QvQ`
+host now 400s on every layer). ACIS picks the nearest station whose *temperature*
+record is current (CoCoRaHS sites are rain-only). Wikipedia attention keeps whichever
+of "City, State" / "City" has the higher median (the former is often a redirect stub).
+New tracked scalars: wikipedia_views, temp_anomaly_f, nws_alerts,
+snow_water_equivalent; new notable flags: attention ≥3× median, |anomaly| ≥10 °F,
+Extreme/Severe NWS alerts, ≥3 EPA significant violators.

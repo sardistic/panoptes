@@ -734,6 +734,16 @@ def notable(sections: dict, base: dict) -> list[str]:
         out.append(f"drought {dm['worst_class']}")
     if (wat.get("river_discharge_m3s") or 0) > 3 * (wat.get("river_discharge_longterm_mean_m3s") or 1e9):
         out.append("river discharge 3x its long-term mean")
+    act, clim, env = (sections.get(k, {}) for k in ("activity", "climate", "environment"))
+    if (act.get("attention_ratio") or 0) >= 3:
+        out.append(f"Wikipedia attention {act['attention_ratio']}x its 30-day median")
+    if abs(clim.get("high_anomaly_f") or 0) >= 10:
+        out.append(f"highs {abs(clim['high_anomaly_f'])}°F {'above' if clim['high_anomaly_f'] > 0 else 'below'} normal this week")
+    for a in (saf.get("alerts") or [])[:3]:
+        if a.get("severity") in ("Extreme", "Severe"):
+            out.append(f"NWS {a.get('event')}")
+    if (env.get("significant_violators") or 0) >= 3:
+        out.append(f"{env['significant_violators']} EPA significant violators in the box")
     for name, b in base.items():
         if b["samples"] >= 8 and b["percentile"] >= 95:
             out.append(f"{name.replace('_', ' ')} at the {b['percentile']}th percentile of its 30-day history")
@@ -747,7 +757,8 @@ _TRACKED = {"air.us_aqi": "aqi", "air.pm2_5": "pm2_5", "sky.count": "aircraft_ov
             "nature.inaturalist_obs_30d": "inat_obs_30d", "atmosphere.kp_now": "kp", "atmosphere.boundary_layer_m": "boundary_layer_m",
             "activity.camera_observations.mean_vehicles_per_frame": "camera_vehicles",
             "activity.flow_vs_free_flow_mean": "traffic_flow_ratio", "air.pm25_10min_median": "pm25_purpleair",
-            "atmosphere.mesonet_stations_in_box": "mesonet_stations"}
+            "atmosphere.mesonet_stations_in_box": "mesonet_stations", "activity.wikipedia_views_yesterday": "wikipedia_views",
+            "climate.high_anomaly_f": "temp_anomaly_f", "safety.active_alerts": "nws_alerts", "terrain.snow_water_equivalent_in": "snow_water_equivalent"}
 
 
 def tracked_values(sections: dict) -> dict[str, float]:
@@ -773,6 +784,9 @@ _FIPS = {"01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO",
 
 
 # ── collector ────────────────────────────────────────────────────────────────
+from apb.context import facts_more as _more
+
+
 def _tasks(bounds: dict, lite: bool = False):
     s, n = float(bounds["south"]), float(bounds["north"])
     w, e = float(bounds["west"]), float(bounds["east"])
@@ -796,7 +810,18 @@ def _tasks(bounds: dict, lite: bool = False):
         ("population", "worldpop", _worldpop, s, w, n, e),
     ]
     tasks += [("atmosphere", "levels", _levels, lat, lon),
-              ("atmosphere", "space_weather", _space, lat, lon)]
+              ("atmosphere", "space_weather", _space, lat, lon),
+              ("climate", "normals", _more.power_climatology, lat, lon)]
+    if us:
+        tasks += [("infrastructure", "hifld", _more.infrastructure, s, w, n, e),
+                  ("radio", "fcc", _more.radio, s, w, n, e),
+                  ("environment", "echo", _more.echo, s, w, n, e),
+                  ("climate", "acis", _more.acis, s, w, n, e),
+                  ("terrain", "seismic", _more.seismic, lat, lon),
+                  ("place", "historic", _more.historic, s, w, n, e),
+                  ("safety", "nws_alerts", _more.nws_alerts, lat, lon)]
+        if lon < -100 and lat > 31:                        # SNOTEL network = mountain West
+            tasks.append(("terrain", "snotel", _more.snotel, s, w, n, e))
     if us:
         tasks += [("place", "nws", _nws, lat, lon), ("terrain", "fema", _fema, lat, lon),
                   ("water", "tides", _tides, lat, lon), ("water", "usgs", _usgs_water, s, w, n, e),
@@ -854,8 +879,12 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
             pending[ex.submit(_drought, geo)] = ("health", "drought")
             pending[ex.submit(_cdc_ww, geo)] = ("health", "wastewater")
             pending[ex.submit(_ioda, geo)] = ("connectivity", "ioda")
+            pending[ex.submit(_more.qcew, geo)] = ("economy", "qcew")
             if geo["county"].get("state") in _FIPS:
-                pending[ex.submit(_tri, geo, _FIPS[geo["county"]["state"]])] = ("economy", "tri")
+                ab = _FIPS[geo["county"]["state"]]
+                pending[ex.submit(_tri, geo, ab)] = ("economy", "tri")
+                pending[ex.submit(_more.cdc_places, geo, ab)] = ("health", "places")
+                pending[ex.submit(_more.fema_declarations, geo, ab)] = ("safety", "fema")
             if census_key and "tract" in geo:
                 pending[ex.submit(_acs, geo, census_key)] = ("population", "acs")
 
@@ -869,6 +898,8 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
                 result["sources_failed"].append(f"{section}.{k}: {type(e_).__name__}")
                 yield {"section": section, "key": k, "error": type(e_).__name__}
                 continue
+            if k == "geocode" and data.get("address"):
+                pending[ex.submit(_more.attention, meta["center"]["lat"], meta["center"]["lon"], data)] = ("activity", "attention")
             if k == "us_geo":
                 run_us_dependents(data)
                 data = {"census_geography": {kk: v.get("name") for kk, v in data.items()}}
