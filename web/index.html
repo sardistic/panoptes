@@ -257,7 +257,7 @@
   /* ── the clip: a paperclip with eyes that explains the map ── */
   #clip{right:14px;bottom:8px;width:92px;height:92px;padding:0;display:flex;align-items:center;justify-content:center;
     cursor:pointer;background:none;border:0;box-shadow:none;transition:transform .15s;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
-  #clip{animation:clipbob 7s ease-in-out infinite;transform-origin:50% 90%}
+  #clip{transform-origin:50% 90%}
   #clip:hover{animation:clipboing .5s ease-out}
   #clip.tap{animation:cliptap 1.1s ease-in-out}
   @keyframes clipbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
@@ -266,27 +266,15 @@
   #clip.armed{filter:drop-shadow(0 0 10px rgba(255,210,63,.55)) drop-shadow(0 6px 14px rgba(0,0,0,.55))}
   #clip svg{width:84px;height:84px;overflow:visible}
   #clip{width:76px}
-  #clip .wire{fill:none;stroke:url(#clipGrad);stroke-width:4.6;stroke-linecap:round;stroke-linejoin:round;
+  #clip .wire{fill:none;stroke:url(#clipGrad);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;
     filter:drop-shadow(0 1px 0 rgba(0,0,0,.6))}
+  #clip .rig{transform-origin:32px 46px}
+  #clip .brows{transform-origin:34px 15px}
   #clip .eye{fill:#f4f1e8}
   #clip .pupil{fill:#0b0d10;transition:transform .08s linear}
   #clip .lid{fill:var(--panel);transform-origin:center;transform:scaleY(0);animation:blink 11s infinite}
   @keyframes blink{0%,92%,100%{transform:scaleY(0)}95%,97%{transform:scaleY(1)}}
-  /* thinking: head tilts, eyes drift up, a finger taps the temple */
-  #clip.thinking .pupil{animation:thinkeyes 3s ease-in-out infinite}
-  @keyframes thinkeyes{0%,100%{transform:translate(-1.2px,-1.6px)}45%,55%{transform:translate(1.4px,-1.2px)}}
-  #clip.thinking svg{animation:thinktilt 3s ease-in-out infinite;transform-origin:50% 80%}
-  @keyframes thinktilt{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(-4deg)}}
-  /* the clip's own free end: idle it hangs inside the loop; thinking it curls up over
-     the top and scratches at the temple (animated path data — Chromium/Firefox) */
-  #clip .tail{transition:d .55s cubic-bezier(.4,0,.2,1)}
-  /* thinking: the arm arcs over and scratches the top of the head, like the original */
-  #clip.thinking .tail{d:path("M22 30 C18 12 22 -4 34 0");animation:scratch 1.1s ease-in-out .55s infinite}
-  @keyframes scratch{0%,100%{d:path("M22 30 C18 12 22 -4 34 0")}50%{d:path("M22 30 C18 12 25 -3 37 3")}}
-  #clip .brow{fill:none;stroke:#0b0d10;stroke-width:2.4;stroke-linecap:round;transform-origin:center;transition:transform .3s}
-  #clip:hover .brows{transform:translateY(-1px)}
-  #clip.thinking .browL{transform:translateY(-1.5px) rotate(-8deg)}       /* one brow up: puzzled */
-  #clip.thinking .browR{transform:translateY(.5px) rotate(6deg)}
+  #clip .brow{fill:none;stroke:#0b0d10;stroke-width:1.9;stroke-linecap:round;transform-box:fill-box;transform-origin:center}
   @keyframes lookaround{from{transform:translate(-2px,1px)}to{transform:translate(2px,-1px)}}
   #clipBubble{right:16px;bottom:104px;width:360px;max-width:calc(100% - 32px);padding:14px 16px 12px;font-size:12.5px;line-height:1.5;color:var(--txt-2)}
   #clipBubble::after{content:"";position:absolute;right:34px;bottom:-7px;width:12px;height:12px;background:var(--panel);
@@ -384,7 +372,7 @@
   }
 
   @media (prefers-reduced-motion:reduce){
-    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil,#clip svg,#clip .tail{animation:none!important}
+    .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -457,13 +445,14 @@
   <svg viewBox="0 0 64 64" aria-hidden="true">
     <defs><linearGradient id="clipGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#7a1a8c"/><stop offset=".45" stop-color="#f07a1a"/><stop offset="1" stop-color="#fff6d0"/></linearGradient></defs>
-    <!-- Clippy orientation: big loop at the bottom, head loop on top, the outer wire's
-         free end at top-left (the "arm"), the inner end tucked below the face -->
-    <path class="wire" d="M22 30 V44 a10 10 0 0 0 20 0 V14 a8 8 0 0 0 -16 0 V40 a4 4 0 0 0 8 0 V26"/>
-    <path class="wire tail" d="M22 30 C22 25 22 20 22 15"/>
-    <g class="brows"><path class="brow browL" d="M26 15 L32 13.5"/><path class="brow browR" d="M36 13.5 L42 15"/></g>
-    <g class="eyeL"><circle class="eye" cx="30" cy="22" r="5"/><circle class="pupil" cx="30" cy="22" r="2.2"/><ellipse class="lid" cx="30" cy="22" rx="5.1" ry="5.1"/></g>
-    <g class="eyeR"><circle class="eye" cx="38" cy="22" r="5"/><circle class="pupil" cx="38" cy="22" r="2.2"/><ellipse class="lid" cx="38" cy="22" rx="5.1" ry="5.1"/></g>
+    <g class="rig">
+      <!-- the whole clip is ONE path: the free end at top-left is the arm; the rig
+           rewrites the path each frame so the arm is literally the wire continuing -->
+      <path class="wire" id="clipWire" d="M22 15 C22 20 22 25 22 30 V44 a10 10 0 0 0 20 0 V14 a8 8 0 0 0 -16 0 V40 a4 4 0 0 0 8 0 V26"/>
+      <g class="brows"><path class="brow browL" d="M25.5 15.5 Q29 13 32.5 14"/><path class="brow browR" d="M35.5 14 Q39 13 42.5 15.5"/></g>
+      <g class="eyeL"><circle class="eye" cx="30" cy="22" r="5"/><circle class="pupil" cx="30" cy="22" r="2.2"/><ellipse class="lid" cx="30" cy="22" rx="5.1" ry="5.1"/></g>
+      <g class="eyeR"><circle class="eye" cx="38" cy="22" r="5"/><circle class="pupil" cx="38" cy="22" r="2.2"/><ellipse class="lid" cx="38" cy="22" rx="5.1" ry="5.1"/></g>
+    </g>
   </svg>
 </button>
 <div id="clipBubble" class="hud" role="dialog" aria-live="polite" hidden></div>
@@ -2122,13 +2111,70 @@ document.getElementById('camerasBtn').onclick=async e=>{
 // Gemini Flash. Nothing sensitive leaves the browser: it is what is on screen.
 const clipEl=document.getElementById('clip'), clipBubble=document.getElementById('clipBubble');
 let clipState='idle', clipRect=null, clipStart=null, clipCtl=null, clipBox=null, clipCams=[];
-document.addEventListener('mousemove',e=>{         // the eyes follow the cursor
-  clipEl.querySelectorAll('.pupil').forEach(p=>{
-    const r=p.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
-    const dx=e.clientX-cx, dy=e.clientY-cy, d=Math.hypot(dx,dy)||1, k=Math.min(2.6,d/40);
-    if(!clipEl.classList.contains('thinking')) p.style.transform=`translate(${(dx/d*k).toFixed(2)}px,${(dy/d*k).toFixed(2)}px)`;
-  });
-},{passive:true});
+// ── the clip's rig: one continuous wire, animated like a character, not a widget ──
+// Poses are arm control points on the SAME path as the body. Between poses the
+// rig eases with anticipation (a small counter-move), overshoot and settle; while
+// thinking the hand scratches on a sine cycle and everything else reacts to it —
+// the head leans in, the brow cocks, the eyes glance at the hand, the loop gives a
+// hair on contact. Idle: breathing, eyes on the cursor. Reduced-motion: static.
+(function clipRig(){
+  const svg=clipEl.querySelector('svg'), wire=document.getElementById('clipWire'), rig=svg.querySelector('.rig');
+  const browL=svg.querySelector('.browL'), browR=svg.querySelector('.browR'), pupils=[...svg.querySelectorAll('.pupil')];
+  const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const BODY=' V44 a10 10 0 0 0 20 0 V14 a8 8 0 0 0 -16 0 V40 a4 4 0 0 0 8 0 V26';
+  // arm = tip, ctrl1, ctrl2 (path runs tip -> shoulder at 22,30 -> body)
+  // ctrl2 stays above the shoulder so the wire leaves the body straight, then hooks
+  const IDLE=[[22,15],[22,20],[22,25]], ANTIC=[[21.4,18],[21.6,22],[22,26]], SCRATCH=[[36,3],[29,-8],[22,9]];
+  const lerp=(a,b,t)=>a+(b-a)*t, mix=(A,B,t)=>A.map((p,i)=>[lerp(p[0],B[i][0],t),lerp(p[1],B[i][1],t)]);
+  const outBack=t=>{const c=1.7;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);};
+  const inOut=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  let phase='idle', t0=performance.now(), pose=IDLE, from=IDLE, mouse=[0,0];
+  document.addEventListener('mousemove',e=>{mouse=[e.clientX,e.clientY];},{passive:true});
+  function draw(arm,lean,squash,browUp,gaze){
+    const [tip,c1,c2]=arm;
+    wire.setAttribute('d',`M${tip[0].toFixed(2)} ${tip[1].toFixed(2)} C${c1[0].toFixed(2)} ${c1[1].toFixed(2)} ${c2[0].toFixed(2)} ${c2[1].toFixed(2)} 22 30`+BODY);
+    rig.style.transform=`rotate(${lean.toFixed(2)}deg) scale(${(1+squash*.6).toFixed(4)},${(1-squash).toFixed(4)})`;
+    browL.style.transform=`translateY(${(-1.6*browUp).toFixed(2)}px) rotate(${(-9*browUp).toFixed(1)}deg)`;
+    browR.style.transform=`translateY(${(.4*browUp).toFixed(2)}px) rotate(${(5*browUp).toFixed(1)}deg)`;
+    pupils.forEach(p=>{p.style.transform=`translate(${gaze[0].toFixed(2)}px,${gaze[1].toFixed(2)}px)`;});
+  }
+  function gazeAtCursor(){
+    const r=svg.getBoundingClientRect(), cx=r.left+r.width*.53, cy=r.top+r.height*.34;
+    const dx=mouse[0]-cx, dy=mouse[1]-cy, d=Math.hypot(dx,dy)||1, k=Math.min(2.2,d/60);
+    return [dx/d*k, dy/d*k];
+  }
+  function tick(now){
+    const thinking=clipEl.classList.contains('thinking');
+    if(thinking&&(phase==='idle'||phase==='return')){ phase='antic'; t0=now; from=pose; }
+    if(!thinking&&(phase==='scratch'||phase==='rise'||phase==='antic')){ phase='return'; t0=now; from=pose; }
+    const el=now-t0; let arm=IDLE, lean=0, squash=0, browUp=0, gaze=gazeAtCursor();
+    if(reduced){ arm=thinking?SCRATCH:IDLE; browUp=thinking?1:0; }
+    else if(phase==='antic'){                       // 140 ms: the hand dips before it rises
+      const u=Math.min(1,el/140); arm=mix(from,ANTIC,inOut(u)); lean=-.6*u; browUp=.2*u;
+      if(u>=1){ phase='rise'; t0=now; from=ANTIC; }
+    }else if(phase==='rise'){                       // 560 ms: sweep over the head with overshoot
+      const u=Math.min(1,el/560), e=outBack(u); arm=mix(ANTIC,SCRATCH,e); lean=-3.2*Math.min(1,e); browUp=Math.min(1,u*1.4);
+      gaze=[-1.6*e,-1.9*e];
+      if(u>=1){ phase='scratch'; t0=now; }
+    }else if(phase==='scratch'){                    // scratch cycle + secondary motion
+      const w=el/1100*Math.PI*2, sw=Math.sin(w), contact=Math.max(0,-Math.cos(w));
+      arm=[[SCRATCH[0][0]+2.4*sw, SCRATCH[0][1]+1.4*contact],[SCRATCH[1][0]+1.6*sw,SCRATCH[1][1]+.8*contact],[SCRATCH[2][0],SCRATCH[2][1]]];
+      lean=-3.2-1.1*sw; squash=.018*contact; browUp=1-.15*contact;
+      const glance=Math.sin(el/3400*Math.PI*2);     // every few seconds the eyes wander then return to the hand
+      gaze=[-1.6+1.2*Math.max(0,glance), -1.9+.6*Math.abs(glance)];
+    }else if(phase==='return'){                     // 480 ms: down, a small settle at the bottom
+      const u=Math.min(1,el/480), e=inOut(u), over=Math.sin(u*Math.PI)*.06;
+      arm=mix(from,IDLE,e).map((p,i)=>[p[0], p[1]+(i===0?over*8:0)]); lean=(from===pose?0:0)-3.2*(1-e); browUp=1-e;
+      if(u>=1){ phase='idle'; t0=now; }
+    }else{                                          // idle: breathe
+      squash=-.006*Math.sin(now/4200*Math.PI*2);
+    }
+    pose=arm; draw(arm,lean,squash,browUp,gaze);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+// (pupil tracking lives in the rig above)
 let clipTick=null;
 function clipThinking(b,focus){
   const steps=['reading the layers in the box','fetching cameras in the box','pulling weather at the center',
