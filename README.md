@@ -75,8 +75,12 @@ register to unlock the keyed lanes.
   (elevation, FEMA flood zone), water (NOAA tides, USGS gauges, river discharge,
   marine), sky (cloud layers, visibility, CAPE, UV, sun/moon, aircraft overhead, solar
   irradiance), air (CAMS AQI/PM/O3/NO2/SO2/CO/dust), nature (iNaturalist, GBIF, OSM
-  trees), activity (OSM POIs, major roads; eBird with `EBIRD_API_KEY`). `stream=1`
-  emits NDJSON as each source answers.
+  trees), activity (OSM POIs, major roads; eBird with `EBIRD_API_KEY`), atmosphere
+  (850/700/500/250 hPa winds & temps, boundary layer, freezing level, lifted index/CIN,
+  nearest NWS station observation, METARs/PIREPs/SIGMETs, NOAA space weather + aurora),
+  safety (city open-data crime for NYC/Chicago/LA/SF/Seattle, NYC 311 noise complaints),
+  health (US Drought Monitor, CDC wastewater), land cover (NLCD 2021), connectivity (IODA
+  internet outages). `stream=1` emits NDJSON as each source answers.
 - `POST /explain` — scene explainer for a drawn rectangle (abstracted layers + filters
   from the client, weather + camera stills added server-side, Gemini Flash answer;
   `focus` selects a drill-down). Throttled 6/min/IP; 503 until `GEMINI_API_KEY` is set.
