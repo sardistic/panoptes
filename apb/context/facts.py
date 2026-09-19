@@ -809,9 +809,14 @@ def _tasks(bounds: dict, lite: bool = False):
         ("activity", "overpass", _overpass, s, w, n, e),
         ("population", "worldpop", _worldpop, s, w, n, e),
     ]
-    tasks += [("atmosphere", "levels", _levels, lat, lon),
-              ("atmosphere", "space_weather", _space, lat, lon),
+    tasks += [("atmosphere", "space_weather", _space, lat, lon),
               ("climate", "normals", _more.power_climatology, lat, lon)]
+    if lite:
+        # Open-Meteo's free tier is 10k weighted calls/day per IP; the background sampler
+        # keeps only the Open-Meteo lanes that feed tracked scalars (sky, air, flood)
+        tasks = [t for t in tasks if t[1] not in ("marine", "solar")]
+    else:
+        tasks.append(("atmosphere", "levels", _levels, lat, lon))
     if us:
         tasks += [("infrastructure", "hifld", _more.infrastructure, s, w, n, e),
                   ("radio", "fcc", _more.radio, s, w, n, e),

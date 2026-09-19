@@ -26,7 +26,7 @@ import time
 
 log = logging.getLogger(__name__)
 
-FACTS_EVERY = float(os.environ.get("APB_SAMPLER_FACTS_SEC", "2700"))     # 45 min
+FACTS_EVERY = float(os.environ.get("APB_SAMPLER_FACTS_SEC", "3600"))     # hourly: ~120 Open-Meteo calls per pass
 FACTS_BATCH = int(os.environ.get("APB_SAMPLER_FACTS_BATCH", "40"))
 CAMS_EVERY = float(os.environ.get("APB_SAMPLER_CAMS_SEC", "3600"))
 CAMS_BATCH = int(os.environ.get("APB_SAMPLER_CAMS_BATCH", "50"))

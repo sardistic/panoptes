@@ -145,3 +145,14 @@ of "City, State" / "City" has the higher median (the former is often a redirect 
 New tracked scalars: wikipedia_views, temp_anomaly_f, nws_alerts,
 snow_water_equivalent; new notable flags: attention ≥3× median, |anomaly| ≥10 °F,
 Extreme/Severe NWS alerts, ≥3 EPA significant violators.
+
+### 2026-09-19 — Sampler stays inside Open-Meteo's daily allowance
+
+Context: the first full sampler day exhausted Open-Meteo's 10k weighted calls/day
+("Daily API request limit exceeded") for the whole home IP — every sky / air /
+elevation lane then 429'd for users too.
+
+Decision: lite passes drop the marine, solar and pressure-level lanes (only sky, air
+and flood feed tracked scalars) and the facts cadence is hourly (~120 Open-Meteo calls
+per pass, ~3k/day). If the layer still starves, the next step is an Open-Meteo API key
+(commercial tier) or self-hosting.
