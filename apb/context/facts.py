@@ -897,7 +897,8 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
         result["baseline"] = base
         result["notable"] = notable(result["sections"], base)
         mstore.record_notable(cell, meta["center"]["lat"], meta["center"]["lon"], result["notable"], lite)
-        yield {"baseline": base, "notable": result["notable"], "cell": cell}
+        result["notable_history"] = mstore.notable_history(cell)
+        yield {"baseline": base, "notable": result["notable"], "cell": cell, "notable_history": result["notable_history"]}
     except Exception as e_:
         log.info("facts derived metrics failed: %s", e_)
     result["generated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -913,6 +914,8 @@ def facts(bounds: dict, timeout: float = 15.0, lite: bool = False) -> dict:
     """Collected form of facts_stream (what the explainer and the JSON endpoint use)."""
     out: dict = {"sections": {}, "sources_failed": []}
     for ev in facts_stream(bounds, timeout, lite):
+        if "notable_history" in ev:
+            out["notable_history"] = ev["notable_history"]
         if "meta" in ev:
             out.update(ev["meta"])
         elif "done" in ev:
@@ -926,6 +929,9 @@ def facts(bounds: dict, timeout: float = 15.0, lite: bool = False) -> dict:
 
 def digest(f: dict, limit: int = 3500) -> str:
     """Compact JSON for the model prompt: notable flags + baselines first, then sections."""
-    head = {"notable": f.get("notable") or [], "baseline_vs_30d": f.get("baseline") or {}}
+    hist = f.get("notable_history") or {}
+    head = {"notable": f.get("notable") or [], "baseline_vs_30d": f.get("baseline") or {},
+            "notable_persistence": {"flagged_passes_of_last_5": hist.get("flagged_recent"), "passes_7d": hist.get("passes"),
+                                    "recurring_flags": hist.get("recurring")} if hist.get("passes") else {}}
     return (json.dumps(head, ensure_ascii=False, default=str) + " " +
             json.dumps(f.get("sections", {}), ensure_ascii=False, default=str))[:limit]

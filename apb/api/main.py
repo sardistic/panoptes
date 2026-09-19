@@ -1100,7 +1100,7 @@ def live_camera_activity(bbox: str = Query(..., max_length=80), hours: float = Q
             cell = mstore.cell_for(lat, lon)
             agg = mstore.camera_obs(cell, hours)
             if agg:
-                out.append({"cell": cell, **agg})
+                out.append({"cell": cell, **agg, "series": mstore.camera_obs_series(cell, hours)})
             lon += mstore.CELL_DEG
         lat += mstore.CELL_DEG
         if len(out) > 400:

@@ -31,12 +31,13 @@ def test_facts_pass_rotates_and_uses_lite(monkeypatch):
     calls = []
     monkeypatch.setattr(facts, "facts", lambda bounds, timeout, lite: calls.append((bounds, lite)))
     monkeypatch.setattr(sampler, "FACTS_BATCH", 2)
-    centers = [(47.6, -122.3), (39.1, -77.2), (37.81, -122.3)]
+    monkeypatch.setattr(sampler, "METROS", [(37.81, -122.3)])
+    centers = [(47.6, -122.3), (39.1, -77.2)]
     assert sampler.facts_pass(centers) == 2
     assert sampler.facts_pass(centers) == 2
     assert all(lite for _, lite in calls)
     souths = [c[0]["south"] for c in calls]
-    assert souths == [47.6, 39.1, 37.8, 47.6]          # wraps around
+    assert souths == [47.6, 39.1, 37.8, 47.6]          # CAD centers first, then metros, then wraps
 
 
 def test_cams_pass_records_observations(monkeypatch):
@@ -78,3 +79,31 @@ def test_start_respects_off_switch(monkeypatch):
     monkeypatch.setattr(sampler, "_thread", None)
     sampler.start([], None)
     assert sampler.status()["running"] is False
+
+
+def test_notable_history_and_streak():
+    cell = "35.75,-78.65"
+    import time
+    for i, flags in enumerate([["drought D2"], [], ["drought D2"], ["AQI 120 (usg)"]]):
+        mstore.record_notable(cell, 35.775, -78.625, flags)
+        with mstore._lock:                                   # space the passes past the 10-min de-dup
+            mstore._conn().execute("UPDATE cell_notable_log SET ts = ts - ? WHERE cell = ? AND ts > ?",
+                                   (3600 * (4 - i), cell, time.time() - 30)).connection.commit()
+    h = mstore.notable_history(cell)
+    assert h["passes"] == 4 and h["flagged"] == 3 and h["flagged_recent"] == 3
+    assert h["recurring"][0] == ("drought D2", 2)
+    rows = mstore.notable_cells(max_age_hours=24)
+    assert rows[0]["streak"] == 3 and rows[0]["passes"] == 4
+
+
+def test_camera_obs_series_bins():
+    cell = "35.75,-78.65"
+    mstore.record_camera_obs(cell, [{"camera_id": "x:1", "vehicles": 4, "pedestrians": 1}, {"camera_id": "x:2", "vehicles": 6}])
+    s = mstore.camera_obs_series(cell, hours=24, bins=12)
+    assert len(s) == 12 and s[-1]["frames"] == 2 and s[-1]["vehicles"] == 5.0 and s[-1]["pedestrians"] == 1.0
+    assert s[0]["vehicles"] is None
+
+
+def test_watchlist_includes_metros():
+    cells = sampler._cells_to_watch([(47.6, -122.3)])
+    assert len(cells) >= 50 and (47.6, -122.3) in cells

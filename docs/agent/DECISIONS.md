@@ -115,3 +115,15 @@ Session-bound camera maps (511NJ, GoAkamai HI, OKtraffic, TDOT) ship as static
 inventories in `data/camera_discoveries.json`. `.github/workflows/resniff.yml` runs
 the Playwright sniffer weekly and commits the file when it changes, so they do not
 silently rot; prod picks it up on the next deploy.
+
+### 2026-09-19 — Notable persistence and camera-activity series
+
+Context: a single flag says little; whether a cell keeps flagging does.
+
+Decision: `cell_notable_log` records every facts pass per cell (flagged or not, one
+per 10 min, 30-day retention). `notable_history()` yields passes / flagged / flagged
+within the last 5 / recurring flag names; it rides the facts stream event, the model
+digest (`notable_persistence`) and the NOTABLE tooltip (`streak`). `camera_obs_series()`
+bins camera reads into 12 slots over 24 h; `/live/camera_activity` returns it and the
+Cameras facet draws it. The sampler watchlist adds the 50 largest US metros so the
+layer covers the map, and skips the camera pass while inventories are still loading.

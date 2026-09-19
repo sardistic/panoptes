@@ -27,13 +27,29 @@ import time
 log = logging.getLogger(__name__)
 
 FACTS_EVERY = float(os.environ.get("APB_SAMPLER_FACTS_SEC", "2700"))     # 45 min
-FACTS_BATCH = int(os.environ.get("APB_SAMPLER_FACTS_BATCH", "30"))
+FACTS_BATCH = int(os.environ.get("APB_SAMPLER_FACTS_BATCH", "40"))
 CAMS_EVERY = float(os.environ.get("APB_SAMPLER_CAMS_SEC", "3600"))
 CAMS_BATCH = int(os.environ.get("APB_SAMPLER_CAMS_BATCH", "50"))
 _stop = threading.Event()
 _thread: threading.Thread | None = None
 _state = {"facts_runs": 0, "facts_cells": 0, "cams_runs": 0, "cams_frames": 0, "last_facts": 0.0, "last_cams": 0.0,
           "cursor": 0, "cam_cursor": 0, "errors": 0}
+
+
+# Top US metros by population — watched even without a CAD feed so the NOTABLE layer
+# and baselines cover the whole map, not only cities that publish dispatch data.
+METROS: list[tuple[float, float]] = [
+    (40.7128, -74.0060), (34.0522, -118.2437), (41.8781, -87.6298), (32.7767, -96.7970), (29.7604, -95.3698),
+    (38.9072, -77.0369), (25.7617, -80.1918), (39.9526, -75.1652), (33.7490, -84.3880), (33.4484, -112.0740),
+    (42.3601, -71.0589), (37.7749, -122.4194), (33.9806, -117.3755), (32.7157, -117.1611), (44.9778, -93.2650),
+    (27.9506, -82.4572), (39.7392, -104.9903), (47.6062, -122.3321), (38.6270, -90.1994), (39.2904, -76.6122),
+    (28.5383, -81.3792), (35.2271, -80.8431), (29.4241, -98.4936), (30.3322, -81.6557), (45.5152, -122.6784),
+    (36.1627, -86.7816), (36.1699, -115.1398), (39.7684, -86.1581), (37.3382, -121.8863), (36.8508, -76.2859),
+    (30.2672, -97.7431), (39.9612, -82.9988), (35.4676, -97.5164), (42.8864, -78.8784), (39.1031, -84.5120),
+    (35.7796, -78.6382), (40.4406, -79.9959), (37.5407, -77.4360), (36.7378, -119.7871), (42.2808, -83.7430),
+    (40.7608, -111.8910), (38.5816, -121.4944), (43.0389, -87.9065), (41.4993, -81.6944), (35.1495, -90.0490),
+    (43.6150, -116.2023), (35.0844, -106.6504), (32.2226, -110.9747), (35.3733, -119.0187), (21.3069, -157.8583),
+]
 
 
 def _cells_to_watch(metro_centers: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -49,7 +65,7 @@ def _cells_to_watch(metro_centers: list[tuple[float, float]]) -> list[tuple[floa
             seen.setdefault(mstore.cell_for(lat, lon), (lat, lon))
     except Exception as e:
         log.info("sampler: looks unavailable: %s", e)
-    for lat, lon in metro_centers:
+    for lat, lon in list(metro_centers) + METROS:
         seen.setdefault(mstore.cell_for(lat, lon), (lat, lon))
     return list(seen.values())
 
@@ -96,6 +112,10 @@ def cams_pass(registry) -> int:
     from apb.store import metrics as mstore
     import base64
     if not explain.api_key():
+        return 0
+    if getattr(registry, "_loading", None):                  # inventories still warming after boot
+        log.info("sampler cams: inventory still loading, skipping this pass")
+        _state["last_cams"] = 0.0                            # try again next minute
         return 0
     rows = registry.query(limit=100000, online_only=True)
     rows = [r for r in rows if r.get("image_url")]

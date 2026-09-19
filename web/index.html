@@ -322,6 +322,11 @@
   #clipBubble .facts{margin-top:10px;white-space:normal}
   #clipBubble .notable{font:500 11px/1.45 var(--font);color:#ffd23f;padding:6px 8px;border:1px solid rgba(255,210,63,.35);border-radius:2px;margin-bottom:8px}
   #clipBubble .notable b{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;margin-right:6px}
+  #clipBubble .notable small{display:block;color:var(--ink-3);font:400 10px/1.4 var(--font);margin-top:3px}
+  #clipBubble .spark{margin:8px 0 10px;padding:6px 8px;border:1px solid var(--line-2);border-radius:2px;background:#0b0d10}
+  #clipBubble .spark .lab{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+  #clipBubble .spark svg{display:block;width:100%;height:38px}
+  #clipBubble .spark .leg{font:400 10px/1.3 var(--font);color:var(--ink-3);margin-top:3px}
   #clipBubble .ask{display:flex;gap:5px;margin-top:8px}
   #clipBubble .ask input{flex:1;height:26px;background:var(--panel-2);color:var(--txt);border:1px solid var(--line-2);border-radius:3px;padding:0 8px;font:500 11px var(--font)}
   #clipBubble .ask button{height:26px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
@@ -2359,7 +2364,10 @@ async function loadFactsTable(b){
         let ev; try{ ev=JSON.parse(line); }catch(_){ continue; }
         if(ev.data) addRows(ev.section,ev.data);
         else if(ev.baseline){
-          if(ev.notable&&ev.notable.length){ const nb=document.createElement('div'); nb.className='notable'; nb.innerHTML='<b>Notable</b> '+ev.notable.map(esc).join(' · '); holder.prepend(nb); }
+          const h=ev.notable_history||{};
+          if(ev.notable&&ev.notable.length){ const nb=document.createElement('div'); nb.className='notable'; nb.innerHTML='<b>Notable</b> '+ev.notable.map(esc).join(' · ')
+            +(h.passes>1?`<small>flagged ${esc(h.flagged_recent)} of the last ${esc(Math.min(5,h.passes))} passes · ${esc(h.passes)} passes in 7 d${h.recurring&&h.recurring.length?' · recurring: '+h.recurring.map(r=>esc(r[0])+' ×'+esc(r[1])).join(', '):''}</small>`:''); holder.prepend(nb); }
+          else if(h.flagged>0){ const nb=document.createElement('div'); nb.className='notable'; nb.innerHTML=`<b>Notable</b> nothing right now<small>but ${esc(h.flagged)} of the last ${esc(h.passes)} passes flagged: ${(h.recurring||[]).map(r=>esc(r[0])+' ×'+esc(r[1])).join(', ')}</small>`; holder.prepend(nb); }
           const bk=Object.keys(ev.baseline||{}); if(bk.length){ const t=section('baseline').querySelector('table'); bk.forEach(k=>{ const b=ev.baseline[k]; const tr=document.createElement('tr'); tr.innerHTML=`<th>${esc(k.replace(/_/g,' '))}</th><td>${esc(b.percentile)}th pct · median ${esc(b.median)} · ${esc(b.samples)} samples</td>`; t.appendChild(tr); }); }
         }
         else if(ev.done){ holder.querySelector('.prog')?.remove();
@@ -2368,6 +2376,27 @@ async function loadFactsTable(b){
       }
     }
   }catch(_){ holder.innerHTML='<div class="steps">facts unavailable</div>'; }
+}
+// Camera-derived activity over the last 24 h (sampler + Cameras-facet reads), merged
+// across the box's cells and drawn as a sparkline under the briefing.
+async function loadCameraSpark(b){
+  const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(',');
+  let rows=[]; try{ rows=await (await fetch(`/live/camera_activity?bbox=${bb}&hours=24`)).json(); }catch(_){ return; }
+  if(!Array.isArray(rows)||!rows.length||clipBox!==b) return;
+  const bins=rows[0].series.length, veh=[], ped=[], frames=[];
+  for(let i=0;i<bins;i++){ const v=rows.map(r=>r.series[i]?.vehicles).filter(x=>x!=null), p=rows.map(r=>r.series[i]?.pedestrians).filter(x=>x!=null);
+    veh.push(v.length?v.reduce((a,c)=>a+c,0)/v.length:null); ped.push(p.length?p.reduce((a,c)=>a+c,0)/p.length:null); frames.push(rows.reduce((a,r)=>a+(r.series[i]?.frames||0),0)); }
+  if(!veh.some(x=>x!=null)) return;
+  const W=300,H=38,max=Math.max(1,...veh.filter(x=>x!=null),...ped.filter(x=>x!=null));
+  const path=(arr,color)=>{ let d='',pen=false; arr.forEach((v,i)=>{ if(v==null){ pen=false; return; } const x=(i+.5)/bins*W, y=H-3-(v/max)*(H-8); d+=(pen?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' '; pen=true; });
+    const dots=arr.map((v,i)=>v==null?'':`<circle cx="${((i+.5)/bins*W).toFixed(1)}" cy="${(H-3-(v/max)*(H-8)).toFixed(1)}" r="1.6" fill="${color}"/>`).join('');
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/>${dots}`; };
+  const total=frames.reduce((a,c)=>a+c,0), latest=[...veh].reverse().find(x=>x!=null);
+  const el=document.createElement('div'); el.className='spark';
+  el.innerHTML=`<div class="lab">Camera activity · 24 h · ${esc(rows.length)} cell${rows.length>1?'s':''} · ${esc(total)} frames read</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${path(veh,'#9fc4d0')}${path(ped,'#ffd23f')}</svg>
+    <div class="leg"><span style="color:#9fc4d0">■</span> vehicles / frame (peak ${esc(max.toFixed(1))}, now ${esc(latest?.toFixed(1))}) &nbsp; <span style="color:#ffd23f">■</span> pedestrians / frame${rows.some(r=>r.wet_road_share>0.3)?' · wet road seen':''}</div>`;
+  const anchor=clipBubble.querySelector('.thumbs')||clipBubble.querySelector('.dive'); if(anchor) anchor.before(el); else clipBubble.querySelector('.act').before(el);
 }
 // Grab one frame from an HLS camera: play muted for ~1.5s, draw to canvas, JPEG it.
 // CORS-clean streams (ACAO *) stay untainted; anything else fails quietly -> null.
@@ -2416,6 +2445,7 @@ function renderLook(look,b,foot){
     try{ await fetch(`/looks/${encodeURIComponent(look.uid)}`,{method:'DELETE'}); }catch(_){}
     removeLook(look.uid); clipReset(); };
   if(focus==='facts') loadFactsTable(b);   // streams every metric under the briefing
+  if(focus==='cameras') loadCameraSpark(b);  // 24 h camera-derived activity for the box
   if(!clipCams.length){                   // re-opened look: mark its cameras on the snippet
     const bb=[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].join(',');
     fetch(`/live/cameras?bbox=${bb}&limit=400`).then(r=>r.json()).then(rows=>{ clipCams=rows.filter(c=>c.image_url||c.stream_url);
@@ -2535,7 +2565,7 @@ function drawNotable(){
     if(!b.contains([c.lat,c.lon])) return;
     const s=6+Math.min(6,c.flags.length*1.5), at=(dx,dy)=>screenOffset(c.lat,c.lon,dx,dy,z);
     const g=L.featureGroup([[[-s,0],[0,-s],[s,0],[0,s],[-s,0]],[[-s*.45,0],[s*.45,0]],[[0,-s*.45],[0,s*.45]]].map(p=>L.polyline(p.map(q=>at(q[0],q[1])),{color:'#ffd23f',weight:1.3,opacity:.9,lineJoin:'miter',interactive:true})));
-    g.bindTooltip(`<b>notable</b> · ${esc(ago(c.ts))}<br/>${c.flags.map(esc).join('<br/>')}`,{direction:'top',className:'look-label'});
+    g.bindTooltip(`<b>notable</b> · ${esc(ago(c.ts))}${c.passes>1?` · ${esc(c.streak)}/${esc(Math.min(5,c.passes))} recent passes`:''}<br/>${c.flags.map(esc).join('<br/>')}`,{direction:'top',className:'look-label'});
     g.on('click',()=>{ const [cs,cw]=c.cell.split(',').map(Number); const bb=L.latLngBounds([cs,cw],[cs+.05,cw+.05]);
       if(clipRect){ map.removeLayer(clipRect); } clipRect=L.rectangle(bb,{color:'#ffd23f',weight:1.3,dashArray:'5 4',fillColor:'#ffd23f',fillOpacity:.05,interactive:false}).addTo(map);
       clipCams=[]; clipExplain(bb,'facts'); });
