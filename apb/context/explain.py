@@ -137,7 +137,10 @@ FOCUS_BRIEFS = {
         "(wet road, fog, snow, smoke/haze), lighting/time of day, any on-image text (timestamps, "
         "camera labels, signs) read verbatim, and anything unusual. Then a two-sentence "
         "synthesis: what the cameras together say about conditions in the box, and which "
-        "camera deserves a closer look. Say 'frame unavailable/black' if an image is blank."),
+        "camera deserves a closer look. Say 'frame unavailable/black' if an image is blank. "
+        "FINALLY append one line `OBS: ` followed by a JSON array, one object per camera still "
+        "in order: {\"i\": n, \"vehicles\": int, \"pedestrians\": int, \"road_wet\": bool, "
+        "\"visibility\": \"good|reduced|poor\", \"notable\": \"short phrase or empty\"}."),
     "incidents": (
         "Focus on the incidents (CAD/911/DOT rows) inside the rectangle. Group them by what "
         "is going on (same road, same block, same type, converging types), call out the "
@@ -158,7 +161,9 @@ FOCUS_BRIEFS = {
         "what the camera stills show about actual conditions. Explain how the weather bears "
         "on the incidents/hazards present. 100-180 words."),
     "facts": (
-        "The user asked for the FACTS of this rectangle. You are given a structured facts "
+        "The user asked for the FACTS of this rectangle. If a QUESTION is given, answer it "
+        "first and directly, using only the sections that bear on it, then add whatever "
+        "else is notable. You are given a structured facts "
         "digest (place, population, economy, terrain, water, sky, air, nature, activity — "
         "each labelled with its source). Write a tight briefing, 150-260 words, organised "
         "as short labelled lines (Place:, People:, Economy:, Safety:, Health:, Terrain & water:, "
@@ -269,8 +274,13 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
         val = ctx.get(key)
         if val:
             lines.append(f"{label}: {json.dumps(val, ensure_ascii=False)[:6000]}")
+    if ctx.get("question"):
+        lines.append("QUESTION from the user: " + ctx["question"][:300])
     if ctx.get("facts"):
-        lines.append("Facts digest for the box (JSON, by section): " + ctx["facts"])
+        lines.append("Facts digest for the box (JSON; 'notable' and 'baseline_vs_30d' compare against this "
+                     "place's own recent history — cite percentiles when present): " + ctx["facts"])
+    lines.append("Whenever two sources disagree (e.g. METAR says clear but a camera shows fog, radar shows "
+                 "echoes but the station reports dry), say so explicitly — the disagreement is information.")
     if ctx.get("prior"):
         lines.append("Earlier looks at this same area (your own previous answers; note what "
                      "changed since): " + json.dumps(ctx["prior"], ensure_ascii=False)[:2500])
@@ -341,6 +351,14 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     data = r.json()
     text = "".join(p.get("text", "") for c in data.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
+    obs = None
+    m = re.search(r"\n?OBS:\s*(\[.*\])\s*$", text, re.S)
+    if m:
+        try:
+            obs = json.loads(m.group(1))
+            text = text[:m.start()].rstrip()
+        except ValueError:
+            obs = None
     return {"model": model, "text": text.strip(), "weather": weather,
-            "focus": ctx.get("focus") or "overview", "cameras": [s[0] for s in stills],
+            "focus": ctx.get("focus") or "overview", "cameras": [s[0] for s in stills], "camera_obs": obs,
             "sky": sky_urls(ctx.get("bounds") or {}) if sky else {}}

@@ -23,6 +23,11 @@ and surge-score source-diversity.
 | OHGO (cameras) | `OHGO_API_KEY` | Ohio statewide cameras | https://publicapi.ohgo.com — free |
 | Mapillary (street level) | `MAPILLARY_TOKEN` | Crowd-sourced street-level frames sampled across a drawn box; feeds the clip's Street facet (also 3 frames on overview) | https://www.mapillary.com/dashboard/developers → register app → client token (free) |
 | Google Street View (street level) | `GOOGLE_MAPS_KEY` | Street View Static frames — Street facet only; free metadata check first, ~$0.007/image; **hard cap 1,400 images/month + 60/day (≈$10) via `STREETVIEW_MONTHLY_CAP`/`STREETVIEW_DAILY_CAP`**, metered in SQLite, shown in `/status.streetview_budget` | console.cloud.google.com → enable "Street View Static API" → key with billing |
+| Synoptic / MesoWest (facts) | `SYNOPTIC_TOKEN` | Every mesonet weather station inside a box, latest obs (hyperlocal temp/wind/RH/visibility) | https://customer.synopticdata.com → sign up (free "Open Access") → API tokens |
+| PurpleAir (facts) | `PURPLEAIR_KEY` | Street-level PM2.5 sensors inside a box (10-min median/max) | https://develop.purpleair.com → create project → **Read** API key (free) |
+| TomTom Traffic (facts) | `TOMTOM_KEY` | Current vs free-flow speed at grid points in the box | https://developer.tomtom.com → register → app → key (Traffic API; 2,500 req/day free) |
+| Transitland (facts) | `TRANSITLAND_KEY` | Transit stops and agencies inside the box | https://www.transit.land/documentation → sign up → API key (free tier) |
+| YouTube Data (cameras) | `YOUTUBE_API_KEY` | Geotagged YouTube Live streams in view (TV tower/weather cams) | console.cloud.google.com → enable YouTube Data API v3 → credentials → API key |
 | ACLED | `ACLED_EMAIL` + `ACLED_PASSWORD` | Protests, riots, political-violence events | https://acleddata.com/user/register → myACLED account (OAuth login; the old key+email API is retired) |
 | 511 Georgia | `T511_GA_KEY` | Statewide GA DOT traffic incidents | https://511ga.org → developer resources (free key) |
 | 511 Louisiana | `T511_LA_KEY` | Statewide LA DOT traffic incidents | https://511la.org → developer resources |

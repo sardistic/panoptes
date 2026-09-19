@@ -319,6 +319,11 @@
   #clipBubble .thumbs .livetile small{font:600 7px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
   #clipBubble .thumbs .livetile:hover{border-color:#ffd23f}
   #clipBubble .facts{margin-top:10px;white-space:normal}
+  #clipBubble .notable{font:500 11px/1.45 var(--font);color:#ffd23f;padding:6px 8px;border:1px solid rgba(255,210,63,.35);border-radius:2px;margin-bottom:8px}
+  #clipBubble .notable b{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;margin-right:6px}
+  #clipBubble .ask{display:flex;gap:5px;margin-top:8px}
+  #clipBubble .ask input{flex:1;height:26px;background:var(--panel-2);color:var(--txt);border:1px solid var(--line-2);border-radius:3px;padding:0 8px;font:500 11px var(--font)}
+  #clipBubble .ask button{height:26px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
   #clipBubble .facts details{border-top:1px solid var(--line);padding:5px 0}
   #clipBubble .facts summary{font:600 9px/1.6 var(--font);letter-spacing:.16em;text-transform:uppercase;color:#ffd23f;cursor:pointer}
   #clipBubble .facts table{width:100%;border-collapse:collapse;font:500 10px/1.35 var(--mono)}
@@ -2110,7 +2115,7 @@ document.getElementById('camerasBtn').onclick=async e=>{
 // cameras in the box go to /explain, which adds weather and camera stills and asks
 // Gemini Flash. Nothing sensitive leaves the browser: it is what is on screen.
 const clipEl=document.getElementById('clip'), clipBubble=document.getElementById('clipBubble');
-let clipState='idle', clipRect=null, clipStart=null, clipCtl=null, clipBox=null, clipCams=[];
+let clipState='idle', clipRect=null, clipStart=null, clipCtl=null, clipBox=null, clipCams=[], clipQuestion='';
 // ── the clip's rig: one continuous wire, animated like a character, not a widget ──
 // Poses are arm control points on the SAME path as the body. Between poses the
 // rig eases with anticipation (a small counter-move), overshoot and settle; while
@@ -2332,7 +2337,7 @@ async function loadFactsTable(b){
   const holder=document.createElement('div'); holder.className='facts';
   holder.innerHTML='<div class="prog"><i></i></div><div class="steps note">metrics arrive as each source answers…</div>';
   body.appendChild(holder);
-  const order=['place','population','economy','safety','health','terrain','water','sky','atmosphere','air','nature','activity','connectivity'];
+  const order=['baseline','place','population','economy','safety','sound','health','terrain','water','sky','atmosphere','air','nature','activity','connectivity'];
   const secEl={};
   const section=k=>{ if(secEl[k]) return secEl[k];
     const d=document.createElement('details'); d.open=true; d.innerHTML=`<summary>${esc(k)}</summary><table></table>`;
@@ -2351,6 +2356,10 @@ async function loadFactsTable(b){
         const line=buf.slice(0,nl); buf=buf.slice(nl+1); if(!line.trim()) continue;
         let ev; try{ ev=JSON.parse(line); }catch(_){ continue; }
         if(ev.data) addRows(ev.section,ev.data);
+        else if(ev.baseline){
+          if(ev.notable&&ev.notable.length){ const nb=document.createElement('div'); nb.className='notable'; nb.innerHTML='<b>Notable</b> '+ev.notable.map(esc).join(' · '); holder.prepend(nb); }
+          const bk=Object.keys(ev.baseline||{}); if(bk.length){ const t=section('baseline').querySelector('table'); bk.forEach(k=>{ const b=ev.baseline[k]; const tr=document.createElement('tr'); tr.innerHTML=`<th>${esc(k.replace(/_/g,' '))}</th><td>${esc(b.percentile)}th pct · median ${esc(b.median)} · ${esc(b.samples)} samples</td>`; t.appendChild(tr); }); }
+        }
         else if(ev.done){ holder.querySelector('.prog')?.remove();
           const note=holder.querySelector('.note');
           note.textContent=(ev.failed&&ev.failed.length?`still waiting on: ${ev.failed.map(x=>x.split(':')[0]).join(', ')} (ask again in a minute). `:'')+'every metric shown is public, keyless data.'; }
@@ -2396,6 +2405,10 @@ function renderLook(look,b,foot){
   clipSay(CLIP_TITLES[focus]||'What you are looking at',esc(look.text||'(no answer)')+sky+street+thumbs+clipFacetsHtml(ctx,focus),foot,
     '<button class="go">Draw another</button>'+(look.uid?'<button class="rm" title="delete this look and its box">Remove box</button>':''),clipSnippet(b));
   clipBox=b; clipState='result';
+  const askEl=document.createElement('div'); askEl.className='ask'; askEl.innerHTML='<input placeholder="Ask about this box… (e.g. safe to fly a drone here now?)" maxlength="300"/><button>Ask</button>';
+  clipBubble.querySelector('.act').before(askEl);
+  const askGo=()=>{ const q=askEl.querySelector('input').value.trim(); if(q){ clipQuestion=q; clipExplain(clipBox,'facts'); } };
+  askEl.querySelector('button').onclick=askGo; askEl.querySelector('input').onkeydown=e=>{ if(e.key==='Enter') askGo(); };
   const rm=clipBubble.querySelector('.rm');
   if(rm) rm.onclick=async()=>{ rm.disabled=true;
     try{ await fetch(`/looks/${encodeURIComponent(look.uid)}`,{method:'DELETE'}); }catch(_){}
@@ -2446,6 +2459,7 @@ async function clipExplain(b,focus='overview'){
   clipCtl=new AbortController(); const ctl=clipCtl;
   try{
     const ctx=clipContext(b); ctx.focus=focus; clipStep(1);
+    if(focus==='facts'&&clipQuestion){ ctx.question=clipQuestion; } clipQuestion='';
     const bbox=[ctx.bounds.west,ctx.bounds.south,ctx.bounds.east,ctx.bounds.north].join(',');
     if(focus==='overview'||!clipCams.length){
       try{ const r=await fetch(`/live/cameras?bbox=${bbox}&limit=400`,{signal:ctl.signal}); if(r.ok) clipCams=(await r.json()).filter(c=>c.image_url||c.stream_url); }catch(_){ clipCams=[]; }

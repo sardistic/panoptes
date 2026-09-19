@@ -613,6 +613,154 @@ def _ioda(geo):
     return {"internet_outages_14d": len(rows), "latest": [{"score": r.get("score"), "level": r.get("level")} for r in rows[:3]]} if rows else {"internet_outages_14d": 0}
 
 
+# ── keyed lanes (each one line to enable; see SOURCES.md) ─────────────────────
+def _synoptic(s, w, n, e, token):
+    """Synoptic/MesoWest mesonet: every station in the box, latest obs (free token)."""
+    d = _j("https://api.synopticdata.com/v2/stations/latest", params={
+        "token": token, "bbox": f"{w},{s},{e},{n}", "vars": "air_temp,wind_speed,wind_gust,relative_humidity,visibility,precip_accum_one_hour",
+        "units": "metric", "within": 90, "limit": 40})
+    sts = d.get("STATION") or []
+    rows = []
+    for st in sts[:40]:
+        o = st.get("OBSERVATIONS") or {}
+        v = lambda k: (o.get(k + "_value_1") or {}).get("value")
+        rows.append({"station": st.get("STID"), "name": (st.get("NAME") or "")[:40], "temp_c": _num(v("air_temp")),
+                     "wind_ms": _num(v("wind_speed")), "gust_ms": _num(v("wind_gust")), "rh": _num(v("relative_humidity"), 0)})
+    temps = [r["temp_c"] for r in rows if r["temp_c"] is not None]
+    return {"mesonet_stations_in_box": len(sts), "temp_spread_c": [min(temps), max(temps)] if temps else None,
+            "stations": rows[:8]} if sts else {}
+
+
+def _purpleair(s, w, n, e, key):
+    d = _j("https://api.purpleair.com/v1/sensors", params={
+        "fields": "name,pm2.5_10minute,humidity,temperature", "nwlat": n, "nwlng": w, "selat": s, "selng": e,
+        "location_type": 0, "max_age": 3600}, headers={"X-API-Key": key})
+    f = d.get("fields") or []
+    rows = d.get("data") or []
+    if not rows:
+        return {}
+    ix = {k: i for i, k in enumerate(f)}
+    pm = sorted(r[ix["pm2.5_10minute"]] for r in rows if r[ix.get("pm2.5_10minute", -1)] is not None)
+    return {"purpleair_sensors_in_box": len(rows), "pm25_10min_median": pm[len(pm) // 2] if pm else None,
+            "pm25_10min_max": pm[-1] if pm else None}
+
+
+def _tomtom(bounds, key):
+    """TomTom flow: current vs free-flow speed at the box's grid points (free tier)."""
+    rows = []
+    for lat, lon in [(float(bounds["south"]) + (float(bounds["north"]) - float(bounds["south"])) * f,
+                      float(bounds["west"]) + (float(bounds["east"]) - float(bounds["west"])) * g_)
+                     for f in (.3, .7) for g_ in (.3, .7)]:
+        try:
+            d = _j("https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json",
+                   params={"point": f"{lat:.5f},{lon:.5f}", "key": key, "unit": "KMPH"}, timeout=8.0).get("flowSegmentData") or {}
+        except (httpx.HTTPError, ValueError):
+            continue
+        if d.get("currentSpeed") is not None and d.get("freeFlowSpeed"):
+            rows.append({"road_class": d.get("frc"), "speed_kmh": d.get("currentSpeed"), "free_flow_kmh": d.get("freeFlowSpeed"),
+                         "ratio": round(d["currentSpeed"] / d["freeFlowSpeed"], 2), "confidence": d.get("confidence")})
+    if not rows:
+        return {}
+    ratios = [r["ratio"] for r in rows]
+    return {"traffic_flow_samples": rows, "flow_vs_free_flow_mean": round(sum(ratios) / len(ratios), 2)}
+
+
+def _transitland(s, w, n, e, key):
+    d = _j("https://transit.land/api/v2/rest/stops", params={"bbox": f"{w},{s},{e},{n}", "limit": 200, "apikey": key})
+    stops = d.get("stops") or []
+    agencies = {}
+    for st in stops:
+        for r in st.get("route_stops") or []:
+            a = ((r.get("route") or {}).get("agency") or {}).get("agency_name")
+            if a:
+                agencies[a] = agencies.get(a, 0) + 1
+    return {"transit_stops_in_box": len(stops), "agencies": dict(sorted(agencies.items(), key=lambda kv: -kv[1])[:6])} if stops else {}
+
+
+def _quake_history(lat, lon):
+    """USGS catalog: how seismically active this place is (keyless, 10-year window)."""
+    end = datetime.now(timezone.utc)
+    d = _j("https://earthquake.usgs.gov/fdsnws/event/1/query", params={
+        "format": "geojson", "latitude": lat, "longitude": lon, "maxradiuskm": 50, "minmagnitude": 2.5,
+        "starttime": f"{end.year - 10}-01-01", "endtime": end.strftime("%Y-%m-%d"), "orderby": "magnitude", "limit": 5})
+    f = d.get("features") or []
+    total = (d.get("metadata") or {}).get("count")
+    return {"quakes_m2_5_within_50km_10y": total, "largest": [{"mag": x["properties"].get("mag"), "place": x["properties"].get("place"),
+                                                            "when": datetime.fromtimestamp(x["properties"]["time"] / 1000, timezone.utc).strftime("%Y-%m-%d")} for x in f[:3]]}
+
+
+def noise_index(sections: dict) -> dict | None:
+    """Estimated ambient-noise index 0-100 from what we already hold: aircraft overhead,
+    major roads, 311 noise complaints, land-cover intensity. An estimate, labelled so."""
+    act, sky, saf = sections.get("activity", {}), sections.get("sky", {}), sections.get("safety", {})
+    osm = act.get("osm") or {}
+    parts = {}
+    if sky.get("count") is not None:
+        parts["aircraft"] = min(25, sky["count"] * 2.5)
+    if osm.get("major_roads") is not None:
+        parts["major_roads"] = min(30, osm["major_roads"] * 1.5)
+    nz = (saf.get("noise_complaints_311") or {})
+    if nz.get("total_7d") is not None:
+        parts["complaints_311"] = min(30, nz["total_7d"] / 20)
+    lc = (sections.get("terrain", {}).get("land_cover_nlcd_2021_pct") or {})
+    if lc:
+        parts["urban_intensity"] = min(15, lc.get("developed, high intensity", 0) * .15 + lc.get("developed, medium intensity", 0) * .08)
+    if not parts:
+        return None
+    score = round(sum(parts.values()))
+    band = "quiet" if score < 20 else "moderate" if score < 45 else "loud" if score < 70 else "very loud"
+    return {"estimated_noise_index_0_100": score, "band": band, "components": {k: round(v, 1) for k, v in parts.items()},
+            "note": "estimate from aircraft, roads, 311 complaints and land cover — no live sound sensors are public"}
+
+
+# Threshold-based "notable" flags (source-specific, plus baseline deviation).
+def notable(sections: dict, base: dict) -> list[str]:
+    out = []
+    air, atm, sky, saf, hlth, wat = (sections.get(k, {}) for k in ("air", "atmosphere", "sky", "safety", "health", "water"))
+    if (air.get("us_aqi") or 0) > 100:
+        out.append(f"AQI {air['us_aqi']} ({air.get('aqi_band')})")
+    if (atm.get("kp_now") or 0) >= 5:
+        out.append(f"geomagnetic storm: Kp {atm['kp_now']}")
+    if (atm.get("lifted_index") or 99) <= -4:
+        out.append(f"unstable atmosphere: lifted index {atm['lifted_index']}")
+    if (sky.get("now") or {}).get("wind_gusts_10m", 0) >= 60:
+        out.append(f"gusts {sky['now']['wind_gusts_10m']} km/h")
+    if (sky.get("now") or {}).get("visibility", 99999) < 2000:
+        out.append(f"visibility {sky['now']['visibility']} m")
+    if atm.get("sigmets_airmets_over_box"):
+        out.append(f"{len(atm['sigmets_airmets_over_box'])} SIGMET/AIRMET over the box")
+    dm = (hlth.get("drought_monitor") or {})
+    if dm.get("worst_class") in ("D2", "D3", "D4"):
+        out.append(f"drought {dm['worst_class']}")
+    if (wat.get("river_discharge_m3s") or 0) > 3 * (wat.get("river_discharge_longterm_mean_m3s") or 1e9):
+        out.append("river discharge 3x its long-term mean")
+    for name, b in base.items():
+        if b["samples"] >= 8 and b["percentile"] >= 95:
+            out.append(f"{name.replace('_', ' ')} at the {b['percentile']}th percentile of its 30-day history")
+    return out[:8]
+
+
+# scalars worth a history (dotted path into sections)
+_TRACKED = {"air.us_aqi": "aqi", "air.pm2_5": "pm2_5", "sky.count": "aircraft_overhead", "sky.now.wind_gusts_10m": "wind_gusts",
+            "safety.noise_complaints_311.total_7d": "noise_complaints_7d", "safety.crime.total_7d": "crime_7d",
+            "water.water_level_ft_mllw": "water_level_ft", "water.river_discharge_m3s": "river_discharge",
+            "nature.inaturalist_obs_30d": "inat_obs_30d", "atmosphere.kp_now": "kp", "atmosphere.boundary_layer_m": "boundary_layer_m",
+            "activity.camera_observations.mean_vehicles_per_frame": "camera_vehicles"}
+
+
+def tracked_values(sections: dict) -> dict[str, float]:
+    out = {}
+    for path, name in _TRACKED.items():
+        cur = sections
+        for part in path.split("."):
+            cur = cur.get(part) if isinstance(cur, dict) else None
+            if cur is None:
+                break
+        if isinstance(cur, (int, float)) and not isinstance(cur, bool):
+            out[name] = float(cur)
+    return out
+
+
 _FIPS = {"01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE",
          "11": "DC", "12": "FL", "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA",
          "20": "KS", "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
@@ -657,9 +805,19 @@ def _tasks(bounds: dict):
                   ("terrain", "land_cover", _nlcd, s, w, n, e)]
     if ebird_key:
         tasks.append(("activity", "ebird", _ebird, lat, lon, ebird_key))
+    tasks.append(("terrain", "quake_history", _quake_history, lat, lon))
+    if os.environ.get("SYNOPTIC_TOKEN", "").strip():
+        tasks.append(("atmosphere", "mesonet", _synoptic, s, w, n, e, os.environ["SYNOPTIC_TOKEN"].strip()))
+    if os.environ.get("PURPLEAIR_KEY", "").strip():
+        tasks.append(("air", "purpleair", _purpleair, s, w, n, e, os.environ["PURPLEAIR_KEY"].strip()))
+    if os.environ.get("TOMTOM_KEY", "").strip():
+        tasks.append(("activity", "traffic_flow", _tomtom, bounds, os.environ["TOMTOM_KEY"].strip()))
+    if os.environ.get("TRANSITLAND_KEY", "").strip():
+        tasks.append(("activity", "transit", _transitland, s, w, n, e, os.environ["TRANSITLAND_KEY"].strip()))
     meta = {"bounds": {"south": s, "north": n, "west": w, "east": e},
             "center": {"lat": round(lat, 4), "lon": round(lon, 4)}, "span_km": round(span_km, 1),
-            "keyed_available": {"CENSUS_API_KEY": bool(census_key), "EBIRD_API_KEY": bool(ebird_key)}}
+            "keyed_available": {k: bool(os.environ.get(k, "").strip()) for k in
+                                ("CENSUS_API_KEY", "EBIRD_API_KEY", "SYNOPTIC_TOKEN", "PURPLEAIR_KEY", "TOMTOM_KEY", "TRANSITLAND_KEY")}}
     return tasks, meta, census_key
 
 
@@ -715,6 +873,27 @@ def facts_stream(bounds: dict, timeout: float = 15.0):
     for f, t in pending.items():
         result["sources_failed"].append(f"{t[0]}.{t[1]}: timeout")
     ex.shutdown(wait=False)
+    # derived: camera observations read off stills by the explainer, noise estimate,
+    # then baselines against this cell's history and the notable flags
+    try:
+        from apb.store import metrics as mstore
+        cell = mstore.cell_for(meta["center"]["lat"], meta["center"]["lon"])
+        cam = mstore.camera_obs(cell)
+        if cam:
+            result["sections"].setdefault("activity", {})["camera_observations"] = cam
+            yield {"section": "activity", "key": "camera_observations", "data": {"camera_observations": cam}}
+        ni = noise_index(result["sections"])
+        if ni:
+            result["sections"].setdefault("sound", {}).update(ni)
+            yield {"section": "sound", "key": "noise_index", "data": ni}
+        vals = tracked_values(result["sections"])
+        base = mstore.baseline(cell, vals)
+        mstore.record(cell, vals)
+        result["baseline"] = base
+        result["notable"] = notable(result["sections"], base)
+        yield {"baseline": base, "notable": result["notable"], "cell": cell}
+    except Exception as e_:
+        log.info("facts derived metrics failed: %s", e_)
     result["generated_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with _lock:
         _cache[key] = (now, result)
@@ -732,11 +911,15 @@ def facts(bounds: dict, timeout: float = 15.0) -> dict:
             out.update(ev["meta"])
         elif "done" in ev:
             out["sources_failed"] = ev.get("failed", [])
+        elif "baseline" in ev:
+            out["baseline"], out["notable"] = ev["baseline"], ev["notable"]
         elif "data" in ev:
             out["sections"].setdefault(ev["section"], {}).update(ev["data"])
     return out
 
 
 def digest(f: dict, limit: int = 3500) -> str:
-    """Compact JSON for the model prompt (sections only)."""
-    return json.dumps(f.get("sections", {}), ensure_ascii=False, default=str)[:limit]
+    """Compact JSON for the model prompt: notable flags + baselines first, then sections."""
+    head = {"notable": f.get("notable") or [], "baseline_vs_30d": f.get("baseline") or {}}
+    return (json.dumps(head, ensure_ascii=False, default=str) + " " +
+            json.dumps(f.get("sections", {}), ensure_ascii=False, default=str))[:limit]

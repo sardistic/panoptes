@@ -80,7 +80,13 @@ register to unlock the keyed lanes.
   nearest NWS station observation, METARs/PIREPs/SIGMETs, NOAA space weather + aurora),
   safety (city open-data crime for NYC/Chicago/LA/SF/Seattle, NYC 311 noise complaints),
   health (US Drought Monitor, CDC wastewater), land cover (NLCD 2021), connectivity (IODA
-  internet outages). `stream=1` emits NDJSON as each source answers.
+  internet outages), sound (estimated noise index from aircraft/roads/311/land cover),
+  plus keyed lanes when set: Synoptic mesonet, PurpleAir, TomTom flow, Transitland.
+  Every pass records its scalars per ~5 km cell; later passes get **baselines**
+  (median, percentile vs the last 30 days) and **notable** flags, and the model is told
+  to cite them. The Cameras facet also writes structured observations (vehicles,
+  pedestrians, wet road, visibility) read off the stills into a 24 h per-cell history.
+  `stream=1` emits NDJSON as each source answers.
 - `POST /explain` — scene explainer for a drawn rectangle (abstracted layers + filters
   from the client, weather + camera stills added server-side, Gemini Flash answer;
   `focus` selects a drill-down). Throttled 6/min/IP; 503 until `GEMINI_API_KEY` is set.

@@ -867,6 +867,7 @@ class ExplainRequest(BaseModel):
     frames: list[dict] = Field(default_factory=list, max_length=4)   # {id, data} browser frame grabs
     focus: Literal["overview", "cameras", "incidents", "hazards", "social", "weather",
                    "place", "facts", "street"] = "overview"
+    question: str = Field("", max_length=300)
 
 
 _explain_hits: dict[str, deque] = defaultdict(deque)
@@ -985,6 +986,17 @@ def explain_scene(req: ExplainRequest, request: Request):
         return JSONResponse({"error": "model upstream unreachable"}, status_code=424)
     out["camera_ids"] = used_ids
     out["street"] = street_frames
+    if out.get("camera_obs") and used_ids:            # structured reads off the stills -> history
+        try:
+            from apb.store import metrics as mstore
+            rows = []
+            for o in out["camera_obs"]:
+                i = int(o.get("i", 0)) - 1
+                if 0 <= i < len(used_ids):
+                    rows.append({**o, "camera_id": used_ids[i]})
+            mstore.record_camera_obs(mstore.cell_for(float(view.get("lat", 0)), float(view.get("lon", 0))), rows)
+        except Exception as e:
+            log.info("camera obs not recorded: %s", e)
     if req.focus == "street":
         out["street_budget"] = street_mod.budget()
     try:
