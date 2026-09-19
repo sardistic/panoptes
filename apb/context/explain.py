@@ -138,7 +138,7 @@ FOCUS_BRIEFS = {
         "camera labels, signs) read verbatim, and anything unusual. Then a two-sentence "
         "synthesis: what the cameras together say about conditions in the box, and which "
         "camera deserves a closer look. Say 'frame unavailable/black' if an image is blank. "
-        "FINALLY append one line `OBS: ` followed by a JSON array, one object per camera still "
+        "FINALLY append one line starting with OBS: followed by a JSON array, one object per camera still "
         "in order: {\"i\": n, \"vehicles\": int, \"pedestrians\": int, \"road_wet\": bool, "
         "\"visibility\": \"good|reduced|poor\", \"notable\": \"short phrase or empty\"}."),
     "incidents": (
@@ -382,7 +382,7 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     text = "".join(p.get("text", "") for c in data.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
     obs = None
-    m = re.search(r"\n?OBS:\s*(\[.*\])\s*$", text, re.S)
+    m = re.search(r"`?OBS:\s*`?\s*(\[.*\])\s*`?\s*$", text, re.S)   # models echo backticks around OBS
     if m:
         try:
             obs = json.loads(m.group(1))

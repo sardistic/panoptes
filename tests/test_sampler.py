@@ -107,3 +107,22 @@ def test_camera_obs_series_bins():
 def test_watchlist_includes_metros():
     cells = sampler._cells_to_watch([(47.6, -122.3)])
     assert len(cells) >= 50 and (47.6, -122.3) in cells
+
+
+def test_cams_pass_tolerates_backticks_and_zero_index(monkeypatch):
+    from apb.context import explain
+
+    class Reg:
+        _loading = set()
+        def query(self, limit, online_only):
+            return [{"id": "y:1", "lat": 40.0, "lon": -100.0, "image_url": "http://a"},
+                    {"id": "y:2", "lat": 40.0, "lon": -100.0, "image_url": "http://b"}]
+        def snapshot(self, cam_id):
+            return b"\xff\xd8", "image/jpeg"
+
+    monkeypatch.setattr(explain, "api_key", lambda: "k")
+    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens:
+        '`OBS: `[{"i": 0, "vehicles": 3, "pedestrians": 0, "road_wet": false, "visibility": "good", "notable": ""}, '
+        '{"i": 1, "vehicles": 5, "pedestrians": 1, "road_wet": false, "visibility": "good", "notable": "x"}]')
+    assert sampler.cams_pass(Reg()) == 2
+    assert mstore.camera_obs(mstore.cell_for(40.0, -100.0))["mean_vehicles_per_frame"] == 4.0

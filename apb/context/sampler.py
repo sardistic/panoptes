@@ -100,8 +100,8 @@ def facts_pass(metro_centers: list[tuple[float, float]]) -> int:
 
 
 _OBS_PROMPT = ("You are reading live traffic/public camera stills. For EACH attached image, in order, "
-               "estimate what it shows. Reply with ONLY one line: `OBS: ` followed by a JSON array of "
-               "objects {\"i\": n, \"vehicles\": int, \"pedestrians\": int, \"road_wet\": bool, "
+               "estimate what it shows. Reply with ONLY one line starting with OBS: followed by a JSON array of "
+               "objects {\"i\": n (1-based image number), \"vehicles\": int, \"pedestrians\": int, \"road_wet\": bool, "
                "\"visibility\": \"good|reduced|poor\", \"notable\": \"short phrase or empty\"}. "
                "If a frame is black/unavailable use vehicles 0, pedestrians 0, visibility \"poor\", notable \"no image\".")
 
@@ -152,7 +152,7 @@ def cams_pass(registry) -> int:
             _state["errors"] += 1
             log.info("sampler cams gemini: %s", e)
             continue
-        m = re.search(r"OBS:\s*(\[.*\])", text, re.S)
+        m = re.search(r"OBS:\s*`?\s*(\[.*\])", text, re.S)      # models echo the prompt's backticks
         if not m:
             log.info("sampler cams: no OBS in reply: %r", text[:160])
             continue
@@ -161,8 +161,9 @@ def cams_pass(registry) -> int:
         except ValueError:
             continue
         by_cell: dict[str, list] = {}
+        zero_based = bool(obs) and any(int(o.get("i", 1)) == 0 for o in obs)   # asked for 1-based; not always honoured
         for o in obs:
-            k = int(o.get("i", 0)) - 1
+            k = int(o.get("i", 0)) - (0 if zero_based else 1)
             if 0 <= k < len(got):
                 cam = got[k]
                 by_cell.setdefault(mstore.cell_for(cam["lat"], cam["lon"]), []).append({**o, "camera_id": cam["id"]})
