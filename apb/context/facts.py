@@ -745,7 +745,9 @@ _TRACKED = {"air.us_aqi": "aqi", "air.pm2_5": "pm2_5", "sky.count": "aircraft_ov
             "safety.noise_complaints_311.total_7d": "noise_complaints_7d", "safety.crime.total_7d": "crime_7d",
             "water.water_level_ft_mllw": "water_level_ft", "water.river_discharge_m3s": "river_discharge",
             "nature.inaturalist_obs_30d": "inat_obs_30d", "atmosphere.kp_now": "kp", "atmosphere.boundary_layer_m": "boundary_layer_m",
-            "activity.camera_observations.mean_vehicles_per_frame": "camera_vehicles"}
+            "activity.camera_observations.mean_vehicles_per_frame": "camera_vehicles",
+            "activity.flow_vs_free_flow_mean": "traffic_flow_ratio", "air.pm25_10min_median": "pm25_purpleair",
+            "atmosphere.mesonet_stations_in_box": "mesonet_stations"}
 
 
 def tracked_values(sections: dict) -> dict[str, float]:
