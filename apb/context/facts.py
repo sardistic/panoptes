@@ -618,7 +618,7 @@ def _synoptic(s, w, n, e, token):
     """Synoptic/MesoWest mesonet: every station in the box, latest obs (free token)."""
     d = _j("https://api.synopticdata.com/v2/stations/latest", params={
         "token": token, "bbox": f"{w},{s},{e},{n}", "vars": "air_temp,wind_speed,wind_gust,relative_humidity,visibility,precip_accum_one_hour",
-        "units": "metric", "within": 90, "limit": 40})
+        "units": "metric", "within": 90})            # no `limit` with bbox (API rejects it)
     sts = d.get("STATION") or []
     rows = []
     for st in sts[:40]:
