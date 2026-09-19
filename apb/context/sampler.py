@@ -100,8 +100,12 @@ def cams_pass(registry) -> int:
     rows = registry.query(limit=100000, online_only=True)
     rows = [r for r in rows if r.get("image_url")]
     if not rows:
+        log.info("sampler cams: inventory has no still cameras yet")
         return 0
-    rows.sort(key=lambda r: r["id"])
+    # hash order, not id order: each batch spans vendors and time zones instead of
+    # walking one state's inventory alphabetically
+    import hashlib
+    rows.sort(key=lambda r: hashlib.md5(r["id"].encode()).hexdigest())
     start = _state["cam_cursor"] % len(rows)
     take = min(CAMS_BATCH, len(rows))
     batch = (rows + rows)[start:start + take]
@@ -120,6 +124,7 @@ def cams_pass(registry) -> int:
                 parts.append({"inline_data": {"mime_type": snap[1], "data": base64.b64encode(snap[0]).decode()}})
                 got.append(cam)
         if not got:
+            log.info("sampler cams: no stills from %d cameras in chunk", len(chunk))
             continue
         try:
             text = explain.generate(parts, max_tokens=800)
@@ -129,6 +134,7 @@ def cams_pass(registry) -> int:
             continue
         m = re.search(r"OBS:\s*(\[.*\])", text, re.S)
         if not m:
+            log.info("sampler cams: no OBS in reply: %r", text[:160])
             continue
         try:
             obs = json.loads(m.group(1))
