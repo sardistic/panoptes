@@ -54,3 +54,11 @@ def allow(provider: str, n: int, monthly_cap: int, daily_cap: int) -> bool:
                       "ON CONFLICT(provider, period) DO UPDATE SET n = n + excluded.n", (provider, period, n))
         c.commit()
     return True
+
+
+def reset(provider: str) -> None:
+    """Drop a provider's counters (tests)."""
+    with _lock:
+        c = _conn()
+        c.execute("DELETE FROM spend WHERE provider = ?", (provider,))
+        c.commit()

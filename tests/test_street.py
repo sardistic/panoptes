@@ -64,6 +64,7 @@ def test_streetview_budget_is_a_hard_ceiling(monkeypatch, tmp_path):
     from apb.store import spend, snapshots
     monkeypatch.setattr(spend, "_ready", False)
     monkeypatch.setattr(snapshots, "DB_PATH", tmp_path / "s.sqlite", raising=False)
+    spend.reset("streetview")
     monkeypatch.setattr(street, "SV_MONTHLY_CAP", 3)
     monkeypatch.setattr(street, "SV_DAILY_CAP", 2)
     assert spend.allow("streetview", 1, 3, 2) and spend.allow("streetview", 1, 3, 2)

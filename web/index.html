@@ -2315,7 +2315,11 @@ const FACT_LABEL={worldpop_2020_in_box:'population in box (WorldPop 2020)',media
   epa_tri_facilities_in_county:'EPA TRI facilities (county)',elevation_m:'elevation m (min/mean/max)',fema_flood_zone_at_center:'FEMA flood zone',
   nearest_tide_station:'tide station',water_level_ft_mllw:'water level ft (MLLW)',river_discharge_m3s:'river discharge m³/s',
   solar_irradiance_kwh_m2_day_recent_mean:'solar kWh/m²/day (recent)',aircraft_within_nm:'aircraft radius nm',us_aqi:'US AQI',pm2_5:'PM2.5',pm10:'PM10',
-  inaturalist_obs_30d:'iNaturalist obs (30d)',gbif_occurrences_this_year:'GBIF occurrences (year)',daylight_hours:'daylight h'};
+  inaturalist_obs_30d:'iNaturalist obs (30d)',gbif_occurrences_this_year:'GBIF occurrences (year)',daylight_hours:'daylight h',
+  levels:'pressure levels',boundary_layer_m:'boundary layer m',freezing_level_m:'freezing level m',lifted_index:'lifted index',cin:'CIN J/kg',
+  kp_now:'Kp (geomagnetic)',aurora_probability_pct:'aurora probability %',noaa_scales:'NOAA R/S/G scales',metars:'METARs in box',pireps_3h:'pilot reports (3h)',
+  sigmets_airmets_over_box:'SIGMET/AIRMET over box',crime:'crime (7d)',noise_complaints_311:'noise complaints 311 (7d)',drought_monitor:'US drought monitor',
+  wastewater_sarscov2:'wastewater SARS-CoV-2',land_cover_nlcd_2021_pct:'land cover % (NLCD 2021)',internet_outages_14d:'internet outages (14d)'};
 function factVal(v){
   if(v==null) return '—';
   if(Array.isArray(v)) return v.map(x=>typeof x==='object'?Object.values(x).filter(y=>y!=null).join(' '):x).slice(0,8).join(', ');
@@ -2328,7 +2332,7 @@ async function loadFactsTable(b){
   const holder=document.createElement('div'); holder.className='facts';
   holder.innerHTML='<div class="prog"><i></i></div><div class="steps note">metrics arrive as each source answers…</div>';
   body.appendChild(holder);
-  const order=['place','population','economy','terrain','water','sky','air','nature','activity'];
+  const order=['place','population','economy','safety','health','terrain','water','sky','atmosphere','air','nature','activity','connectivity'];
   const secEl={};
   const section=k=>{ if(secEl[k]) return secEl[k];
     const d=document.createElement('details'); d.open=true; d.innerHTML=`<summary>${esc(k)}</summary><table></table>`;

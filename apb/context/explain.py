@@ -161,8 +161,8 @@ FOCUS_BRIEFS = {
         "The user asked for the FACTS of this rectangle. You are given a structured facts "
         "digest (place, population, economy, terrain, water, sky, air, nature, activity — "
         "each labelled with its source). Write a tight briefing, 150-260 words, organised "
-        "as short labelled lines (Place:, People:, Economy:, Terrain & water:, Sky:, Air:, "
-        "Nature:, Activity:). Quote the numbers with units; say which are estimates "
+        "as short labelled lines (Place:, People:, Economy:, Safety:, Health:, Terrain & water:, "
+        "Sky & atmosphere:, Air:, Nature:, Activity:, Connectivity:). Quote the numbers with units; say which are estimates "
         "(WorldPop, tract-level ACS, model-derived weather). Note anything notable or "
         "contradictory. Do not invent metrics that are not in the digest."),
     "street": (

@@ -20,6 +20,15 @@ slow or dead upstream costs nothing but its own section. Sections:
               occurrences this year; OSM trees / woodland
   activity    OSM points of interest by kind (shops, food, schools, health, safety,
               fuel), major roads; eBird notable sightings when EBIRD_API_KEY is set
+  atmosphere  pressure-level winds/temps (850/700/500/250 hPa), boundary layer,
+              freezing level, lifted index/CIN, snow depth, soil; nearest NWS station's
+              latest observation; METARs in the box, PIREPs nearby, SIGMET/AIRMET
+              overlaps; NOAA space weather (Kp, R/S/G scales, aurora probability)
+  safety      city open-data crime (NYC/Chicago/LA/SF/Seattle) and 311 noise
+              complaints (NYC) in the box, last 7 days by type
+  health      US Drought Monitor (county), CDC wastewater SARS-CoV-2 trend (county)
+  connectivity IODA internet-outage detections (county, 14 d)
+  land        NLCD 2021 land cover mix sampled on the grid           [inside terrain]
 
 Results are cached 10 minutes per rounded box. Nothing here is street-grade
 truth: it is context, labelled with its source, for the explainer and the UI.
@@ -398,6 +407,212 @@ def _ebird(lat, lon, key):
                                  for x in d[:8]], "ebird_notable_count": len(d)}
 
 
+# ── atmosphere by level, aviation, space weather ─────────────────────────────
+def _levels(lat, lon):
+    """Open-Meteo pressure-level fields: the vertical structure over the box."""
+    d = _j("https://api.open-meteo.com/v1/forecast", params={
+        "latitude": lat, "longitude": lon, "timezone": "UTC", "forecast_hours": 1,
+        "hourly": ("temperature_850hPa,wind_speed_850hPa,wind_direction_850hPa,temperature_700hPa,"
+                   "wind_speed_500hPa,wind_direction_500hPa,geopotential_height_500hPa,wind_speed_250hPa,"
+                   "boundary_layer_height,freezing_level_height,lifted_index,convective_inhibition,"
+                   "shortwave_radiation,snow_depth,soil_temperature_0cm,soil_moisture_0_to_1cm")})
+    h = d.get("hourly") or {}
+    first = lambda k: (h.get(k) or [None])[0]
+    return {"levels": {
+        "850hPa": {"temp_c": first("temperature_850hPa"), "wind_kmh": first("wind_speed_850hPa"), "wind_dir": first("wind_direction_850hPa")},
+        "700hPa": {"temp_c": first("temperature_700hPa")},
+        "500hPa": {"wind_kmh": first("wind_speed_500hPa"), "wind_dir": first("wind_direction_500hPa"), "height_m": first("geopotential_height_500hPa")},
+        "250hPa_jet_kmh": first("wind_speed_250hPa")},
+        "boundary_layer_m": first("boundary_layer_height"), "freezing_level_m": first("freezing_level_height"),
+        "lifted_index": first("lifted_index"), "cin": first("convective_inhibition"),
+        "shortwave_w_m2": first("shortwave_radiation"), "snow_depth_m": first("snow_depth"),
+        "soil_temp_0cm_c": first("soil_temperature_0cm"), "soil_moisture_0_1cm": first("soil_moisture_0_to_1cm")}
+
+
+def _nws_obs(lat, lon):
+    """Nearest NWS/ASOS station's latest observation — measured, not modelled."""
+    st = _j(f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}/stations",
+            headers={"Accept": "application/geo+json"}).get("features") or []
+    if not st:
+        return {}
+    sid, name = st[0]["properties"]["stationIdentifier"], st[0]["properties"]["name"]
+    o = _j(f"https://api.weather.gov/stations/{sid}/observations/latest",
+           headers={"Accept": "application/geo+json"}).get("properties") or {}
+    v = lambda k: (o.get(k) or {}).get("value")
+    return {"station": f"{sid} {name}", "observed": o.get("timestamp"), "sky": o.get("textDescription"),
+            "temp_c": _num(v("temperature")), "dewpoint_c": _num(v("dewpoint")), "rh_pct": _num(v("relativeHumidity"), 0),
+            "wind_kmh": _num(v("windSpeed")), "wind_dir": _num(v("windDirection"), 0), "gust_kmh": _num(v("windGust")),
+            "pressure_hpa": _num((v("barometricPressure") or 0) / 100) if v("barometricPressure") else None,
+            "visibility_km": _num((v("visibility") or 0) / 1000) if v("visibility") else None,
+            "cloud_layers": [f"{c.get('amount')} {int(((c.get('base') or {}).get('value') or 0))}m" for c in (o.get("cloudLayers") or [])][:4]}
+
+
+def _aviation(s, w, n, e):
+    """METARs inside the box (flight category), PIREPs within a degree (turbulence /
+    icing reports from aircraft) and SIGMET/AIRMET polygons that overlap the box."""
+    out: dict = {}
+    rm = _client.get(f"https://aviationweather.gov/api/data/metar?bbox={s},{w},{n},{e}&format=json")
+    m = rm.json() if rm.status_code == 200 and rm.text.strip() else []      # 204 = no stations in box
+    if isinstance(m, list) and m:
+        out["metars"] = [{"station": x.get("icaoId"), "category": x.get("fltCat"), "raw": x.get("rawOb", "")[:90]} for x in m[:6]]
+    try:
+        p = _j(f"https://aviationweather.gov/api/data/pirep?bbox={s - 1},{w - 1},{n + 1},{e + 1}&format=json&age=3")
+    except (httpx.HTTPError, ValueError):
+        p = []
+    if isinstance(p, list) and p:
+        out["pireps_3h"] = len(p)
+        out["pirep_samples"] = [{"ac": x.get("acType"), "fl": x.get("fltLvl"), "turbulence": (x.get("tbInt1") or "") + " " + (x.get("tbType1") or ""),
+                                 "icing": x.get("icgInt1") or ""} for x in p[:4]]
+    try:
+        sig = _j("https://aviationweather.gov/api/data/airsigmet?format=json")
+    except (httpx.HTTPError, ValueError):
+        sig = []
+    hits = []
+    for x in sig if isinstance(sig, list) else []:
+        cs = x.get("coords") or []
+        if not cs:
+            continue
+        lats, lons = [c["lat"] for c in cs], [c["lon"] for c in cs]
+        if min(lats) <= n and max(lats) >= s and min(lons) <= e and max(lons) >= w:
+            hits.append({"type": x.get("airSigmetType"), "hazard": x.get("hazard"), "severity": x.get("severity"),
+                         "alt_hi_ft": x.get("altitudeHi1")})
+    if hits:
+        out["sigmets_airmets_over_box"] = hits[:5]
+    return out
+
+
+_aurora_cache: dict = {"at": 0.0, "grid": None}
+
+
+def _space(lat, lon):
+    kp = _j("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json")
+    sc = _j("https://services.swpc.noaa.gov/products/noaa-scales.json").get("0") or {}
+    out = {"kp_now": (kp[-1] or {}).get("Kp") if kp else None,
+           "noaa_scales": {k: f"{k}{(sc.get(k) or {}).get('Scale')} {(sc.get(k) or {}).get('Text')}" for k in ("R", "S", "G") if sc.get(k)}}
+    now = time.time()
+    if now - _aurora_cache["at"] > 1800:
+        try:
+            _aurora_cache.update(at=now, grid=_j("https://services.swpc.noaa.gov/json/ovation_aurora_latest.json").get("coordinates"))
+        except (httpx.HTTPError, ValueError):
+            pass
+    g = _aurora_cache["grid"]
+    if g:
+        glon, glat = int(round(lon)) % 360, int(round(lat))
+        prob = next((c[2] for c in g if c[0] == glon and c[1] == glat), None)
+        out["aurora_probability_pct"] = prob
+    return out
+
+
+# ── safety: city open-data crime + 311 noise, last 7 days in the box ─────────
+# (dataset, location clause builder, date column, type column, city bbox s,w,n,e)
+_CRIME = {
+    "New York City": ("data.cityofnewyork.us", "5uac-w243", lambda s, w, n, e: f"within_box(lat_lon,{n},{w},{s},{e})", "cmplnt_fr_dt", "ofns_desc", (40.49, -74.27, 40.92, -73.68)),
+    "Chicago": ("data.cityofchicago.org", "ijzp-q8t2", lambda s, w, n, e: f"within_box(location,{n},{w},{s},{e})", "date", "primary_type", (41.64, -87.94, 42.02, -87.52)),
+    "Los Angeles": ("data.lacity.org", "2nrs-mtv8", lambda s, w, n, e: f"lat between {s} and {n} AND lon between {w} and {e}", "date_occ", "crm_cd_desc", (33.70, -118.67, 34.34, -118.15)),
+    "San Francisco": ("data.sfgov.org", "wg3w-h783", lambda s, w, n, e: f"latitude between {s} and {n} AND longitude between {w} and {e}", "incident_datetime", "incident_category", (37.70, -122.52, 37.84, -122.35)),
+    "Seattle": ("data.seattle.gov", "tazs-3rd5", lambda s, w, n, e: f"latitude between {s} and {n} AND longitude between {w} and {e}", "offense_date", "offense_category", (47.49, -122.44, 47.74, -122.23)),
+}
+_NOISE = {
+    "New York City": ("data.cityofnewyork.us", "erm2-nwe9", lambda s, w, n, e: f"within_box(location,{n},{w},{s},{e}) AND complaint_type like 'Noise%'", "created_date", "descriptor", (40.49, -74.27, 40.92, -73.68)),
+}
+
+
+def _socrata_counts(spec, s, w, n, e, days=7):
+    """Counts by type over the `days` before the feed's freshest record (city feeds
+    can lag weeks), so the window is always populated and its dates are stated."""
+    host, ds, where, datecol, typecol, (cs, cw, cn, ce) = spec
+    if n < cs or s > cn or e < cw or w > ce:
+        return None
+    latest = (_j(f"https://{host}/resource/{ds}.json", params={"$select": f"max({datecol}) as latest"}, timeout=30.0) or [{}])[0].get("latest")
+    end = datetime.fromisoformat(latest[:19]) if latest else datetime.now(timezone.utc).replace(tzinfo=None)
+    since = (end.timestamp() - days * 86400)
+    since_s = datetime.utcfromtimestamp(since).strftime("%Y-%m-%dT00:00:00")
+    q = f"{where(s, w, n, e)} AND {datecol} > '{since_s}'"
+    rows = _j(f"https://{host}/resource/{ds}.json", params={
+        "$select": f"{typecol} as type, count(*) as n", "$where": q, "$group": typecol, "$order": "n DESC", "$limit": 8}, timeout=40.0)
+    total = sum(int(r["n"]) for r in rows)
+    return {f"total_{days}d": total, "through": (latest or "")[:10], "by_type": {r["type"]: int(r["n"]) for r in rows}}
+
+
+def _crime(s, w, n, e):
+    for city, spec in _CRIME.items():
+        r = _socrata_counts(spec, s, w, n, e)
+        if r is not None:
+            return {"crime": {"city_feed": city, **r}}
+    return {}
+
+
+def _noise(s, w, n, e):
+    for city, spec in _NOISE.items():
+        r = _socrata_counts(spec, s, w, n, e)
+        if r is not None:
+            return {"noise_complaints_311": {"city_feed": city, **r}}
+    return {}
+
+
+# ── health, land, connectivity ───────────────────────────────────────────────
+def _drought(geo):
+    c = geo["county"]
+    end = datetime.now(timezone.utc)
+    start = datetime.fromtimestamp(end.timestamp() - 30 * 86400, timezone.utc)
+    rows = _j("https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByAreaPercent", params={
+        "aoi": c["geoid"], "startdate": start.strftime("%m/%d/%Y"), "enddate": end.strftime("%m/%d/%Y"), "statisticsType": 1},
+        headers={"Accept": "application/json"})            # the service answers CSV unless asked for JSON
+    if not rows:
+        return {}
+    r = rows[-1]
+    worst = next((k.upper() for k in ("d4", "d3", "d2", "d1", "d0") if float(r.get(k) or 0) > 0), "none")
+    return {"drought_monitor": {"week": (r.get("mapDate") or "")[:10], "worst_class": worst,
+                                "pct_in_drought_d1_plus": round(sum(float(r.get(k) or 0) for k in ("d1", "d2", "d3", "d4")), 1)}}
+
+
+def _cdc_ww(geo):
+    name = (geo["county"]["name"] or "").replace(" County", "").replace(" Parish", "")
+    rows = _j("https://data.cdc.gov/resource/2ew6-ywp6.json", params={
+        "$where": f"county_fips='{geo['county']['geoid']}'", "$order": "date_end DESC", "$limit": 3})
+    if not rows:
+        return {}
+    r = rows[0]
+    return {"wastewater_sarscov2": {"site": r.get("wwtp_jurisdiction"), "through": r.get("date_end"),
+                                    "change_15d_pct": _num(r.get("ptc_15d"), 0), "percentile": _num(r.get("percentile"), 0),
+                                    "population_served": r.get("population_served")}}
+
+
+_NLCD = {11: "open water", 12: "perennial ice/snow", 21: "developed, open space", 22: "developed, low intensity",
+         23: "developed, medium intensity", 24: "developed, high intensity", 31: "barren land", 41: "deciduous forest",
+         42: "evergreen forest", 43: "mixed forest", 52: "shrub/scrub", 71: "grassland", 81: "pasture/hay",
+         82: "cultivated crops", 90: "woody wetlands", 95: "emergent herbaceous wetlands"}
+
+
+def _nlcd(s, w, n, e):
+    """NLCD land cover sampled on the 3x3 grid (WMS GetFeatureInfo; class = palette index)."""
+    counts: dict = {}
+    for la, lo in [(s + (n - s) * f, w + (e - w) * g_) for f in (.2, .5, .8) for g_ in (.2, .5, .8)]:
+        try:
+            r = _j("https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2021_Land_Cover_L48/wms", params={
+                "SERVICE": "WMS", "VERSION": "1.1.1", "REQUEST": "GetFeatureInfo", "LAYERS": "NLCD_2021_Land_Cover_L48",
+                "QUERY_LAYERS": "NLCD_2021_Land_Cover_L48", "SRS": "EPSG:4326", "BBOX": f"{lo - .002},{la - .002},{lo + .002},{la + .002}",
+                "WIDTH": 21, "HEIGHT": 21, "X": 10, "Y": 10, "INFO_FORMAT": "application/json"}, timeout=8.0)
+            idx = ((r.get("features") or [{}])[0].get("properties") or {}).get("PALETTE_INDEX")
+            if idx is not None:
+                k = _NLCD.get(int(idx), f"class {idx}")
+                counts[k] = counts.get(k, 0) + 1
+        except (httpx.HTTPError, ValueError):
+            continue
+    if not counts:
+        return {}
+    total = sum(counts.values())
+    return {"land_cover_nlcd_2021_pct": {k: round(100 * v / total) for k, v in sorted(counts.items(), key=lambda kv: -kv[1])}}
+
+
+def _ioda(geo):
+    now = int(time.time())
+    d = _j("https://api.ioda.inetintel.cc.gatech.edu/v2/outages/summary", params={
+        "entityType": "county", "entityCode": geo["county"]["geoid"], "from": now - 14 * 86400, "until": now})
+    rows = d.get("data") or []
+    return {"internet_outages_14d": len(rows), "latest": [{"score": r.get("score"), "level": r.get("level")} for r in rows[:3]]} if rows else {"internet_outages_14d": 0}
+
+
 _FIPS = {"01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE",
          "11": "DC", "12": "FL", "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA",
          "20": "KS", "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
@@ -430,10 +645,16 @@ def _tasks(bounds: dict):
         ("activity", "overpass", _overpass, s, w, n, e),
         ("population", "worldpop", _worldpop, s, w, n, e),
     ]
+    tasks += [("atmosphere", "levels", _levels, lat, lon),
+              ("atmosphere", "space_weather", _space, lat, lon)]
     if us:
         tasks += [("place", "nws", _nws, lat, lon), ("terrain", "fema", _fema, lat, lon),
                   ("water", "tides", _tides, lat, lon), ("water", "usgs", _usgs_water, s, w, n, e),
-                  ("place", "us_geo", _us_geo, lat, lon)]
+                  ("place", "us_geo", _us_geo, lat, lon),
+                  ("atmosphere", "station_obs", _nws_obs, lat, lon),
+                  ("atmosphere", "aviation", _aviation, s, w, n, e),
+                  ("safety", "crime", _crime, s, w, n, e), ("safety", "noise", _noise, s, w, n, e),
+                  ("terrain", "land_cover", _nlcd, s, w, n, e)]
     if ebird_key:
         tasks.append(("activity", "ebird", _ebird, lat, lon, ebird_key))
     meta = {"bounds": {"south": s, "north": n, "west": w, "east": e},
@@ -460,13 +681,16 @@ def facts_stream(bounds: dict, timeout: float = 15.0):
     tasks, meta, census_key = _tasks(bounds)
     yield {"meta": meta}
     result = {**meta, "sections": {}, "sources_failed": []}
-    ex = ThreadPoolExecutor(max_workers=16)
+    ex = ThreadPoolExecutor(max_workers=22)
     pending = {ex.submit(t[2], *t[3:]): t for t in tasks}
     deadline = now + timeout
 
     def run_us_dependents(geo):
         if "county" in geo:
             pending[ex.submit(_bls, geo)] = ("economy", "bls")
+            pending[ex.submit(_drought, geo)] = ("health", "drought")
+            pending[ex.submit(_cdc_ww, geo)] = ("health", "wastewater")
+            pending[ex.submit(_ioda, geo)] = ("connectivity", "ioda")
             if geo["county"].get("state") in _FIPS:
                 pending[ex.submit(_tri, geo, _FIPS[geo["county"]["state"]])] = ("economy", "tri")
             if census_key and "tract" in geo:
