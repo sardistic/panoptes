@@ -33,7 +33,7 @@ def test_stream_emits_fastest_first_and_isolates_failures(monkeypatch):
     def boom(*a):
         raise RuntimeError("dead upstream")
     tasks = [("a", "slow", slow), ("b", "fast", fast), ("c", "boom", boom)]
-    monkeypatch.setattr(facts, "_tasks", lambda b: (tasks, {"bounds": b, "keyed_available": {}}, ""))
+    monkeypatch.setattr(facts, "_tasks", lambda b, lite=False: (tasks, {"bounds": b, "keyed_available": {}}, ""))
     b = {"south": 1, "north": 2, "west": 3, "east": 4}
     events = list(facts.facts_stream(b, timeout=5))
     keys = [e.get("key") for e in events if "key" in e and "data" in e]
@@ -54,7 +54,7 @@ def test_stream_times_out_stragglers_without_blocking(monkeypatch):
 
     def hang(*a):
         _t.sleep(3); return {"late": 1}
-    monkeypatch.setattr(facts, "_tasks", lambda b: ([("x", "hang", hang)], {"bounds": b, "keyed_available": {}}, ""))
+    monkeypatch.setattr(facts, "_tasks", lambda b, lite=False: ([("x", "hang", hang)], {"bounds": b, "keyed_available": {}}, ""))
     t0 = _t.time()
     events = list(facts.facts_stream({"south": 5, "north": 6, "west": 7, "east": 8}, timeout=0.4))
     assert _t.time() - t0 < 2 and events[-1]["failed"] == ["x.hang: timeout"]

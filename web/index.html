@@ -240,6 +240,7 @@
   button#goesBtn.on .led{background:#7fb8e0}
   button#radarBtn.on .led{background:#62cf72;box-shadow:0 0 7px rgba(98,207,114,.65)}
   button#camerasBtn.on .led{background:#9fc4d0}
+  button#notableBtn.on .led{background:#ffd23f}
   /* ── camera popup: still or HLS player, edge to edge ── */
   .campop .leaflet-popup-content{max-width:380px;min-width:300px}
   .pop.cam .frame{margin:10px -15px 0;background:#000;min-height:150px;position:relative}
@@ -416,6 +417,7 @@
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
     <button id="goesBtn" aria-pressed="false" title="satellite: live GOES GeoColor clouds (~10 min old) zoomed out, Esri World Imagery detail zoomed in"><span class="led"></span>GOES</button>
     <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
+    <button id="notableBtn" class="on" aria-pressed="true" title="cells where the latest facts pass raised a flag: thresholds or the 95th percentile of the place's own history"><span class="led"></span>NOTABLE</button>
   </span></label>
   <span class="spacer"></span>
   <span class="pills">
@@ -2517,12 +2519,41 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&clipState!=='idle'
   setTimeout(tap,30000);
 })();
 
+// ── NOTABLE cells: where the facts sampler found something off ──
+// A small angular flare per cell; hover lists the flags, click draws the cell as a
+// box and asks the clip (user-initiated, so no model cost until clicked).
+let showNotable=true, notableRows=[]; const notableLayer=L.layerGroup().addTo(map);
+async function loadNotable(){
+  if(!showNotable){ notableLayer.clearLayers(); return; }
+  try{ notableRows=await (await fetch('/live/notable?max_age_hours=6')).json(); }catch(_){ notableRows=[]; }
+  drawNotable();
+}
+function drawNotable(){
+  notableLayer.clearLayers(); if(!showNotable) return;
+  const z=map.getZoom(), b=map.getBounds();
+  notableRows.forEach(c=>{
+    if(!b.contains([c.lat,c.lon])) return;
+    const s=6+Math.min(6,c.flags.length*1.5), at=(dx,dy)=>screenOffset(c.lat,c.lon,dx,dy,z);
+    const g=L.featureGroup([[[-s,0],[0,-s],[s,0],[0,s],[-s,0]],[[-s*.45,0],[s*.45,0]],[[0,-s*.45],[0,s*.45]]].map(p=>L.polyline(p.map(q=>at(q[0],q[1])),{color:'#ffd23f',weight:1.3,opacity:.9,lineJoin:'miter',interactive:true})));
+    g.bindTooltip(`<b>notable</b> · ${esc(ago(c.ts))}<br/>${c.flags.map(esc).join('<br/>')}`,{direction:'top',className:'look-label'});
+    g.on('click',()=>{ const [cs,cw]=c.cell.split(',').map(Number); const bb=L.latLngBounds([cs,cw],[cs+.05,cw+.05]);
+      if(clipRect){ map.removeLayer(clipRect); } clipRect=L.rectangle(bb,{color:'#ffd23f',weight:1.3,dashArray:'5 4',fillColor:'#ffd23f',fillOpacity:.05,interactive:false}).addTo(map);
+      clipCams=[]; clipExplain(bb,'facts'); });
+    g.addTo(notableLayer);
+  });
+}
+document.getElementById('notableBtn').onclick=e=>{
+  showNotable=!showNotable; e.currentTarget.classList.toggle('on',showNotable); e.currentTarget.setAttribute('aria-pressed',String(showNotable));
+  loadNotable();
+};
+map.on('moveend zoomend',()=>{ clearTimeout(window._ntT); window._ntT=setTimeout(drawNotable,150); });
+
 // ── shareable view state ──
 // The hash mirrors what is on screen (center/zoom, area, window, type, severity,
 // layer toggles) so a URL reproduces the exact view. Written with replaceState so
 // panning never floods history; read once at boot before the first load.
 const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',hazards:'hazardsBtn',
-  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn'};
+  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn'};
 let urlT=null, urlReady=false;
 function readViewState(){
   const q=new URLSearchParams(location.hash.replace(/^#/,''));
@@ -2632,6 +2663,7 @@ document.addEventListener('visibilitychange',()=>{
   restartStream();
   urlReady=true; writeViewState();
   loadLooks(); setInterval(()=>{ if(!document.hidden) loadLooks(); },300000);
+  loadNotable(); setInterval(()=>{ if(!document.hidden) loadNotable(); },300000);
 })();
 });
 </script>

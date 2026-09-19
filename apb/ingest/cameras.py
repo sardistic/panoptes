@@ -1101,6 +1101,9 @@ class CameraRegistry:
             if hit and now - hit[0] < 600:
                 return hit[1]
         rows: list[dict] = []
+        from apb.store import spend
+        if not spend.allow("windy", 1, 300000, 9500):                # 10k/day free tier
+            return []
         try:
             r = self._client.get("https://api.windy.com/webcams/api/v3/webcams",
                                  params={"nearby": f"{lat},{lon},{radius}", "limit": 50,
@@ -1141,6 +1144,9 @@ class CameraRegistry:
             if hit and now - hit[0] < 3600:
                 return hit[1]
         rows: list[dict] = []
+        from apb.store import spend
+        if not spend.allow("youtube_units", 101, 3_000_000, 9_000):     # 10k units/day; search=100, videos=1
+            return []
         try:
             r = self._client.get("https://www.googleapis.com/youtube/v3/search", params={
                 "part": "snippet", "eventType": "live", "type": "video", "maxResults": 50,

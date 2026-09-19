@@ -6,6 +6,7 @@ from apb.store import metrics
 def test_baseline_needs_history_then_ranks(tmp_path, monkeypatch):
     from apb.store import snapshots
     monkeypatch.setattr(snapshots, "DB_PATH", tmp_path / "m.sqlite", raising=False)
+    monkeypatch.setattr(snapshots, "_conn", None)
     monkeypatch.setattr(metrics, "_ready", False)
     cell = metrics.cell_for(40.755, -73.98)
     assert cell == "40.75,-74.00"

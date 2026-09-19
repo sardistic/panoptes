@@ -773,7 +773,7 @@ _FIPS = {"01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO",
 
 
 # ── collector ────────────────────────────────────────────────────────────────
-def _tasks(bounds: dict):
+def _tasks(bounds: dict, lite: bool = False):
     s, n = float(bounds["south"]), float(bounds["north"])
     w, e = float(bounds["west"]), float(bounds["east"])
     lat, lon = (s + n) / 2, (w + e) / 2
@@ -808,14 +808,17 @@ def _tasks(bounds: dict):
     if ebird_key:
         tasks.append(("activity", "ebird", _ebird, lat, lon, ebird_key))
     tasks.append(("terrain", "quake_history", _quake_history, lat, lon))
-    if os.environ.get("SYNOPTIC_TOKEN", "").strip():
-        tasks.append(("atmosphere", "mesonet", _synoptic, s, w, n, e, os.environ["SYNOPTIC_TOKEN"].strip()))
+    # quota-bearing lanes stay out of the background sampler (`lite`); PurpleAir's
+    # allowance is large enough to include everywhere
     if os.environ.get("PURPLEAIR_KEY", "").strip():
         tasks.append(("air", "purpleair", _purpleair, s, w, n, e, os.environ["PURPLEAIR_KEY"].strip()))
-    if os.environ.get("TOMTOM_KEY", "").strip():
-        tasks.append(("activity", "traffic_flow", _tomtom, bounds, os.environ["TOMTOM_KEY"].strip()))
-    if os.environ.get("TRANSITLAND_KEY", "").strip():
-        tasks.append(("activity", "transit", _transitland, s, w, n, e, os.environ["TRANSITLAND_KEY"].strip()))
+    if not lite:
+        if os.environ.get("SYNOPTIC_TOKEN", "").strip():
+            tasks.append(("atmosphere", "mesonet", _synoptic, s, w, n, e, os.environ["SYNOPTIC_TOKEN"].strip()))
+        if os.environ.get("TOMTOM_KEY", "").strip():
+            tasks.append(("activity", "traffic_flow", _tomtom, bounds, os.environ["TOMTOM_KEY"].strip()))
+        if os.environ.get("TRANSITLAND_KEY", "").strip():
+            tasks.append(("activity", "transit", _transitland, s, w, n, e, os.environ["TRANSITLAND_KEY"].strip()))
     meta = {"bounds": {"south": s, "north": n, "west": w, "east": e},
             "center": {"lat": round(lat, 4), "lon": round(lon, 4)}, "span_km": round(span_km, 1),
             "keyed_available": {k: bool(os.environ.get(k, "").strip()) for k in
@@ -823,22 +826,22 @@ def _tasks(bounds: dict):
     return tasks, meta, census_key
 
 
-def facts_stream(bounds: dict, timeout: float = 15.0):
+def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
     """Yield events as each source answers — fastest first. Events:
     {"meta":...} once, then {"section","key","data"} per source, then {"done":true,
     "failed":[...]} . US Census-dependent metrics (BLS, TRI, ACS) start once the
     geocoder returns. A finished result is cached whole for 10 minutes."""
-    key = tuple(round(float(bounds[k]), 3) for k in ("south", "north", "west", "east"))
+    key = tuple(round(float(bounds[k]), 3) for k in ("south", "north", "west", "east")) + (lite,)
     now = time.time()
     with _lock:
         hit = _cache.get(key)
-    if hit and now - hit[0] < _TTL:                 # replay a cached result instantly
+    if hit and now - hit[0] < _TTL and not lite:    # replay a cached result instantly (sampler always refreshes)
         yield {"meta": {k: v for k, v in hit[1].items() if k not in ("sections", "sources_failed")}}
         for section, data in hit[1]["sections"].items():
             yield {"section": section, "key": "cached", "data": data}
         yield {"done": True, "failed": hit[1].get("sources_failed", []), "cached": True}
         return
-    tasks, meta, census_key = _tasks(bounds)
+    tasks, meta, census_key = _tasks(bounds, lite)
     yield {"meta": meta}
     result = {**meta, "sections": {}, "sources_failed": []}
     ex = ThreadPoolExecutor(max_workers=22)
@@ -893,6 +896,7 @@ def facts_stream(bounds: dict, timeout: float = 15.0):
         mstore.record(cell, vals)
         result["baseline"] = base
         result["notable"] = notable(result["sections"], base)
+        mstore.record_notable(cell, meta["center"]["lat"], meta["center"]["lon"], result["notable"], lite)
         yield {"baseline": base, "notable": result["notable"], "cell": cell}
     except Exception as e_:
         log.info("facts derived metrics failed: %s", e_)
@@ -905,10 +909,10 @@ def facts_stream(bounds: dict, timeout: float = 15.0):
     yield {"done": True, "failed": result["sources_failed"]}
 
 
-def facts(bounds: dict, timeout: float = 15.0) -> dict:
+def facts(bounds: dict, timeout: float = 15.0, lite: bool = False) -> dict:
     """Collected form of facts_stream (what the explainer and the JSON endpoint use)."""
     out: dict = {"sections": {}, "sources_failed": []}
-    for ev in facts_stream(bounds, timeout):
+    for ev in facts_stream(bounds, timeout, lite):
         if "meta" in ev:
             out.update(ev["meta"])
         elif "done" in ev:

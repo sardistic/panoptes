@@ -33,6 +33,8 @@ def _conn() -> sqlite3.Connection:
             cell TEXT NOT NULL, camera_id TEXT, ts REAL NOT NULL, vehicles INTEGER, pedestrians INTEGER,
             road_wet INTEGER, visibility TEXT, notable TEXT);
         CREATE INDEX IF NOT EXISTS idx_co ON camera_obs(cell, ts);
+        CREATE TABLE IF NOT EXISTS cell_notable (
+            cell TEXT PRIMARY KEY, lat REAL, lon REAL, ts REAL NOT NULL, flags TEXT NOT NULL, lite INTEGER);
         """)
         c.commit()
         _ready = True
@@ -112,3 +114,22 @@ def camera_obs(cell: str, hours: float = 24.0) -> dict:
             "mean_pedestrians_per_frame": round(sum(ped) / len(ped), 1) if ped else None,
             "wet_road_share": round(sum(wet) / len(wet), 2) if wet else None, "visibility": vis,
             "notable": [r[4] for r in rows if r[4]][:5]}
+
+
+def record_notable(cell: str, lat: float, lon: float, flags: list[str], lite: bool = False) -> None:
+    with _lock:
+        c = _conn()
+        if flags:
+            c.execute("INSERT INTO cell_notable (cell, lat, lon, ts, flags, lite) VALUES (?,?,?,?,?,?) "
+                      "ON CONFLICT(cell) DO UPDATE SET lat=excluded.lat, lon=excluded.lon, ts=excluded.ts, "
+                      "flags=excluded.flags, lite=excluded.lite", (cell, lat, lon, time.time(), json.dumps(flags), 1 if lite else 0))
+        else:
+            c.execute("DELETE FROM cell_notable WHERE cell = ?", (cell,))
+        c.commit()
+
+
+def notable_cells(max_age_hours: float = 6.0) -> list[dict]:
+    with _lock:
+        rows = _conn().execute("SELECT cell, lat, lon, ts, flags FROM cell_notable WHERE ts >= ? ORDER BY ts DESC",
+                               (time.time() - max_age_hours * 3600,)).fetchall()
+    return [{"cell": r[0], "lat": r[1], "lon": r[2], "ts": r[3], "flags": json.loads(r[4])} for r in rows]

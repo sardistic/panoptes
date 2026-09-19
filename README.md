@@ -86,7 +86,14 @@ register to unlock the keyed lanes.
   (median, percentile vs the last 30 days) and **notable** flags, and the model is told
   to cite them. The Cameras facet also writes structured observations (vehicles,
   pedestrians, wet road, visibility) read off the stills into a 24 h per-cell history.
-  `stream=1` emits NDJSON as each source answers.
+  `stream=1` emits NDJSON as each source answers. A background **sampler** (leader
+  only; `APB_SAMPLER_OFF` disables) re-runs a lite facts pass — keyless lanes plus
+  PurpleAir, never the quota lanes — over cells with recent looks and the metro
+  centers every 45 min, and reads ~50 camera stills an hour through the model, so
+  baselines and camera activity exist before anyone asks.
+- `/live/notable?max_age_hours=` — cells whose latest facts pass raised a flag (the
+  NOTABLE map layer; click one to run a look). `/live/camera_activity?bbox=&hours=`
+  — per-cell camera-derived activity (vehicles / pedestrians / wet road / visibility).
 - `POST /explain` — scene explainer for a drawn rectangle (abstracted layers + filters
   from the client, weather + camera stills added server-side, Gemini Flash answer;
   `focus` selects a drill-down). Throttled 6/min/IP; 503 until `GEMINI_API_KEY` is set.
@@ -97,7 +104,8 @@ register to unlock the keyed lanes.
 - `/events` — persisted fused events with lifecycle (stable uid, first_seen, age,
   peak vs latest score, growing flag). New events over `APB_ALERT_SCORE` POST to
   `APB_WEBHOOK_URL` exactly once (Discord webhooks supported).
-- `/status` — per-lane operational health (rows, freshness, backoff, buffers).
+- `/status` — per-lane operational health (rows, freshness, backoff, buffers), plus
+  sampler state, the Street View budget and YouTube / Windy daily quota counters.
 - `/correlate`, `/feeds` — keyless news/context correlation (GDELT, BigDataCloud).
 - `/incidents`, `/activity` — stored, **PII-redacted** records.
 - `/health` (liveness), `/health/ready` (database/worker readiness), `/db/stats`,

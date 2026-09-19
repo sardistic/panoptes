@@ -223,6 +223,13 @@ def _startup() -> None:
     if not _off("APB_CAMERAS_OFF"):
         _cameras.ensure_loaded()
 
+    # Background samplers (leader only): facts over watched cells for baselines, and
+    # structured camera reads. APB_SAMPLER_OFF disables (tests, CI, extra workers).
+    if _poller_leader and not _off("APB_SAMPLER_OFF") and not _off("APB_CAMERAS_OFF"):
+        from apb.context import sampler
+        centers = [tuple(f.center) for f in CAD_FEEDS.values() if f.center and not f.hidden]
+        sampler.start(centers, _cameras)
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
@@ -1068,6 +1075,39 @@ def delete_look(uid: str):
     return JSONResponse({"deleted": look_store.delete(uid)}, headers={"Cache-Control": "no-store"})
 
 
+@app.get("/live/notable")
+def live_notable(max_age_hours: Hours = 6.0):
+    """Cells whose latest facts pass raised notable flags (thresholds or >=95th
+    percentile of the cell's own 30-day history). Drawn as the NOTABLE layer."""
+    from apb.store import metrics as mstore
+    return JSONResponse(mstore.notable_cells(max_age_hours), headers={"Cache-Control": "public, max-age=120"})
+
+
+@app.get("/live/camera_activity")
+def live_camera_activity(bbox: str = Query(..., max_length=80), hours: float = Query(24.0, gt=0, le=168)):
+    """Camera-derived activity (vehicles / pedestrians / wet road / visibility) read off
+    stills by the sampler and the Cameras facet, aggregated per ~5 km cell in the box."""
+    from apb.store import metrics as mstore
+    try:
+        w, s, e, n = (float(x) for x in bbox.split(","))
+    except ValueError:
+        return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+    out = []
+    lat = s
+    while lat < n:
+        lon = w
+        while lon < e:
+            cell = mstore.cell_for(lat, lon)
+            agg = mstore.camera_obs(cell, hours)
+            if agg:
+                out.append({"cell": cell, **agg})
+            lon += mstore.CELL_DEG
+        lat += mstore.CELL_DEG
+        if len(out) > 400:
+            break
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=300"})
+
+
 @app.get("/looks")
 def looks(max_age_hours: Hours = 24.0, limit: int = Query(200, ge=1, le=500),
           bbox: str | None = Query(None, max_length=80)):
@@ -1139,6 +1179,9 @@ def status():
         "response_cache": len(_resp_cache),
         "cameras": _cameras.stats(),
         "streetview_budget": __import__("apb.context.street", fromlist=["budget"]).budget(),
+        "quotas": {"youtube_units": __import__("apb.store.spend", fromlist=["used"]).used("youtube_units"),
+                   "windy_requests": __import__("apb.store.spend", fromlist=["used"]).used("windy")},
+        "sampler": __import__("apb.context.sampler", fromlist=["status"]).status(),
     }
 
 

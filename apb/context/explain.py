@@ -303,6 +303,36 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
     return "\n".join(lines)
 
 
+def generate(parts: list[dict], max_tokens: int = 800) -> str:
+    """One model call with the same model fallback as explain(); returns the text."""
+    key = api_key()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+    body = {"contents": [{"role": "user", "parts": parts}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": max_tokens,
+                                 "thinkingConfig": {"thinkingBudget": 0}}}
+    r = None
+    for model in healthy_models(key)[:3]:
+        try:
+            r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body, timeout=25.0)
+            if r.status_code == 400 and "thinking" in r.text.lower():
+                slim = {**body, "generationConfig": {k: v for k, v in body["generationConfig"].items() if k != "thinkingConfig"}}
+                r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=slim, timeout=25.0)
+        except httpx.TimeoutException:
+            _benched[model] = time.time() + _BENCH_SEC
+            continue
+        if r.status_code == 200:
+            break
+        if r.status_code in (429, 503):
+            _benched[model] = time.time() + _BENCH_SEC
+            continue
+        break
+    if r is None or r.status_code != 200:
+        raise RuntimeError(f"gemini {r.status_code if r else '?'}")
+    return "".join(p.get("text", "") for c in r.json().get("candidates", [])[:1]
+                   for p in (c.get("content") or {}).get("parts", []))
+
+
 def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
     """stills: (camera name, image bytes, content-type). Returns {model, text}."""
     key = api_key()

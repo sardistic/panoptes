@@ -90,3 +90,28 @@ short-lived token→URL map. Street View is only requested for the Street facet
 place get up to 3 free frames. Frames are cached 6 h per rounded box and saved with
 the look. Consequence: cost is bounded to ≤6 billed images per Street-facet look
 (~4¢), zero otherwise.
+
+### 2026-09-19 — Background sampler fills baselines; NOTABLE is a stored layer
+
+Context: per-cell baselines and "notable" flags only got samples when someone drew a
+box, so they were empty in practice.
+
+Decision: `apb/context/sampler.py` runs on the poller leader only. Every 45 min it
+runs `facts.facts(..., lite=True)` over a rotating batch of 30 cells (cells of looks
+from the last 7 days first, then the CAD metro centers); `lite` drops the quota lanes
+(Synoptic, TomTom, Transitland) and bypasses the 10-min cache. Every hour it reads 50
+rotating camera stills, 10 per Gemini call, with the structured `OBS:` prompt only.
+Each facts pass upserts its flags into `cell_notable`; `/live/notable` serves the
+last 6 h and the UI draws them as a NOTABLE layer (on by default) whose click runs a
+Facts look on the cell. YouTube (units) and Windy (requests) go through the spend
+store with daily caps so `/status.quotas` shows usage and a runaway view loop cannot
+exhaust a day's quota. Consequence: ~1.4k lite facts cells/day and ~1.2k camera
+reads/day of load, all keyless or free-tier; baselines mature after ~5 passes per
+cell (a few days for watched cells).
+
+### 2026-09-19 — Weekly re-sniff in CI
+
+Session-bound camera maps (511NJ, GoAkamai HI, OKtraffic, TDOT) ship as static
+inventories in `data/camera_discoveries.json`. `.github/workflows/resniff.yml` runs
+the Playwright sniffer weekly and commits the file when it changes, so they do not
+silently rot; prod picks it up on the next deploy.
