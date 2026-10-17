@@ -299,7 +299,7 @@ _SECURITY_HEADERS = {
         # tracker (script-src) and receives the beacon (connect-src). Naming the
         # one origin keeps this narrower than the 'unsafe-inline' the map stack
         # already forces.
-        "script-src 'self' 'unsafe-inline' https://unpkg.com"
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://sardistic.com"
         " https://analytics.sardistic.com;",
         "worker-src 'self' blob:;", "child-src 'self' blob:;",
         "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com;",
