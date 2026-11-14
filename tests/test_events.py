@@ -16,6 +16,7 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setattr(snapshots, "DB_PATH", tmp_path / "t.sqlite")
     monkeypatch.setattr(snapshots, "_conn", None)
     monkeypatch.setattr(events, "_ready", False)
+    monkeypatch.setattr(events, "_hist_ready", False)
     monkeypatch.setattr(sigbuf, "_ready", False)
     yield events, sigbuf
     if snapshots._conn is not None:

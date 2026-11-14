@@ -84,7 +84,7 @@ def _rows_to_signals(rows: list[dict], keep_unplaced: bool) -> list[EventSignal]
             continue
         if place:
             r = {**r, "lat": place.lat, "lon": place.lon, "metro": place.metro,
-                 "location": place.name, "confidence": place.confidence}
+                 "location": place.name, "confidence": place.confidence, "coarse": True}
         placed.append(r)
     return social_text_signals(placed)
 

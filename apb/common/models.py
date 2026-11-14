@@ -96,6 +96,8 @@ class SignalKind(str, Enum):
     weather = "weather"
     aircraft = "aircraft"      # ADS-B loiter / airspace-activity signal
     context = "context"        # authority declarations (FEMA, FAA TFR)
+    camera = "camera"          # a public camera read that supports an event (tasked check)
+    sensor = "sensor"          # a place's own metrics leaving their baseline (NOTABLE cell)
 
 
 class Incident(BaseModel):

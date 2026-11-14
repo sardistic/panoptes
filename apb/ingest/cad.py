@@ -634,6 +634,17 @@ def load_gdacs() -> int:
     return 1
 
 
+def load_radar() -> int:
+    """Register the Cloudflare Radar outage lane (apb.ingest.radar). Needs a token
+    with "Radar: Read" in CLOUDFLARE_RADAR_TOKEN (or CLOUDFLARE_API_TOKEN)."""
+    from apb.ingest.radar import api_token
+    if "radar" in FEEDS or not api_token():
+        return 0
+    FEEDS["radar"] = CadFeed(metro="radar", name="Cloudflare Radar Outages",
+                             url="radar", kind="radar", hidden=True)
+    return 1
+
+
 def load_chp() -> int:
     """Register the CHP statewide live-CAD feed (apb.ingest.chp). Keyless."""
     if "chp" in FEEDS:
@@ -732,6 +743,7 @@ class CadIngest:
         "airnow": "_fetch_airnow", "acled": "_fetch_acled",
         "emsc": "_fetch_emsc", "gdacs": "_fetch_gdacs", "sigmet": "_fetch_sigmet",
         "chp": "_fetch_chp", "amtrak": "_fetch_amtrak", "squawk": "_fetch_squawk",
+        "radar": "_fetch_radar",
     }
 
     def _backing_off(self, metro: str) -> bool:
@@ -980,6 +992,13 @@ class CadIngest:
             from apb.ingest.gdacs import GdacsIngest
             self._gdacs = GdacsIngest()
         return self._gdacs.fetch()
+
+    def _fetch_radar(self, feed: CadFeed) -> list[dict]:
+        """Fetch Cloudflare Radar outages/anomalies (rows already normalized)."""
+        if getattr(self, "_radar", None) is None:
+            from apb.ingest.radar import RadarIngest
+            self._radar = RadarIngest()
+        return self._radar.fetch()
 
     def _fetch_sigmet(self, feed: CadFeed) -> list[dict]:
         """Fetch currently-valid SIGMETs (rows already normalized)."""

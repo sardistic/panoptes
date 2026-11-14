@@ -151,6 +151,34 @@
   #fieldKey i{width:9px;height:2px;background:var(--fc);box-shadow:0 0 4px var(--fc);display:block}
   #feed{margin:0;padding:4px 16px 14px;overflow:auto;display:flex;flex-direction:column}
   #feed::-webkit-scrollbar{width:0}
+  /* side tabs: the incident feed, or the ranked "right now" board */
+  #sideTabs{display:flex;border-bottom:1px solid var(--line)}
+  #sideTabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);cursor:pointer;
+    font:600 9px/1 var(--font);letter-spacing:.18em;padding:11px 0 9px;text-transform:uppercase}
+  #sideTabs button.on{color:var(--txt);border-bottom-color:var(--amber)}
+  #sideTabs button .n{font-family:var(--mono);color:var(--amber);margin-left:5px;letter-spacing:0}
+  #side.board > #sideTitle,#side.board > #count,#side.board > #fieldKey,#side.board > #feed{display:none}
+  #board{display:none;overflow:auto;padding:0 16px 14px;flex-direction:column}
+  #board::-webkit-scrollbar{width:0}
+  #side.board > #board{display:flex}
+  #board h4{margin:14px 0 2px;font:600 8.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+  #board .sitrep{margin-top:12px;padding:8px 10px;border:1px solid var(--line);font:400 11px/1.5 var(--font);color:var(--txt);white-space:pre-line}
+  #board .sitrep small{display:block;color:var(--dimmer);font:500 8.5px/1 var(--font);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+  #board .health{margin-top:10px;font:500 10px/1.5 var(--font);color:var(--dim);cursor:pointer}
+  #board .health b{font-family:var(--mono);color:var(--txt);font-weight:600}
+  #board .health.bad b{color:var(--amber)}
+  #board .health ul{margin:6px 0 0;padding:0;list-style:none;display:none}
+  #board .health.open ul{display:block}
+  #board .health li{font-size:9.5px;line-height:1.5;color:var(--dim)}
+  #board .health li em{font-style:normal;color:var(--amber);margin-right:5px;text-transform:uppercase;letter-spacing:.08em;font-size:8.5px}
+  #board .brow .rk{font-family:var(--mono);color:var(--dimmer);margin-right:7px}
+  #board .brow .why{color:var(--dim);font-size:9.5px;margin-top:4px;line-height:1.45}
+  #board .brow .why i{font-style:normal;border:1px solid var(--line);padding:0 4px;margin-right:4px;white-space:nowrap}
+  #board .brow .why i.cam{border-color:#3a8f6a;color:#6fd3a5}
+  #board .brow .why i.std{color:var(--dimmer)}
+  #board .brow .up{color:var(--red)} #board .brow .dn{color:var(--steel)}
+  #board .brow svg{vertical-align:middle;margin-left:6px}
+  #board .empty{color:var(--dim);font-size:10px;padding:10px 0}
   .row{padding:10px 0;border-top:1px solid var(--line);cursor:pointer;transition:background .12s}
   #feed .row:first-child{border-top:0}
   .row:hover{background:rgba(120,140,165,.045)}
@@ -443,6 +471,11 @@
 <div id="hazFilter" class="hud hazfilter" style="display:none"></div>
 
 <div id="side" class="hud">
+  <div id="sideTabs" role="tablist">
+    <button id="tabFeed" class="on" role="tab" aria-selected="true">Incidents</button>
+    <button id="tabBoard" role="tab" aria-selected="false" title="what most deserves a look right now: new, rising, corroborated">Right now<span class="n" id="boardN"></span></button>
+  </div>
+  <div id="board" role="tabpanel" aria-label="Right now"></div>
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
   <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
   <div id="fieldKey" aria-label="Incident light colors">
@@ -1508,6 +1541,7 @@ const HAZ_STYLE = {
   declaration:{c:'#e04c6e', g:'D', label:'FEMA DECLARATION'},
   tfr:        {c:'#e08a2c', g:'R', label:'FLIGHT RESTRICTION'},
   outage:     {c:'#f0c020', g:'O', label:'POWER OUTAGE'},
+  internet:   {c:'#5fb0ff', g:'N', label:'INTERNET OUTAGE'},
   flood:      {c:'#3a7bd5', g:'L', label:'FLOOD'},
   airquality: {c:'#8a9a3a', g:'Q', label:'AIR QUALITY'},
   maritime:   {c:'#2c9ea0', g:'V', label:'VESSEL'},
@@ -1572,6 +1606,7 @@ function hazCat(d){
     case 'sigmet': return d.hazard==='ASH'?'volcano':'severe';
     case 'amtrak': return 'rail';
     case 'squawk': return 'aircraft';
+    case 'radar': return 'internet';
     default: return d.type==='traffic'?'traffic':'weather';
   }
 }
@@ -2586,6 +2621,98 @@ document.getElementById('notableBtn').onclick=e=>{
 };
 map.on('moveend zoomend',()=>{ clearTimeout(window._ntT); window._ntT=setTimeout(drawNotable,150); });
 
+// ── "right now" board ──
+// One ranked list instead of thirty layers: fused events ordered by novelty x trend x
+// corroboration, tasked camera verdicts, rate surges, internet outages, and the feeds
+// that have gone dark (a quiet map is only reassuring if the feeds are alive).
+let boardOn=false, boardData=null, boardTimer=null;
+function sparkSvg(v){
+  if(!v||v.length<2) return '';
+  const lo=Math.min(...v), hi=Math.max(...v), w=46, h=12, span=(hi-lo)||1;
+  const pts=v.map((y,i)=>`${(i*(w/(v.length-1))).toFixed(1)},${(h-1-((y-lo)/span)*(h-2)).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1" opacity=".7"/></svg>`;
+}
+function boardRow(e,i){
+  const arrow=e.trend==='rising'?'<span class="up">▲</span>':e.trend==='falling'?'<span class="dn">▼</span>':'';
+  const chips=(e.why||[]).map(w=>`<i class="${/camera/.test(w)?'cam':''}">${esc(w)}</i>`).join('')
+    +(e.standing?'<i class="std">standing</i>':'');
+  const hrs=(e.age_min||0)/60;
+  return `<div class="row brow" data-i="${i}"><div class="t"><span class="ty"><span class="rk">${i+1}</span>${esc((e.type||'activity').replace(/_/g,' '))} ${arrow}</span>`
+    +`<span class="sev ${e.rank>=12?'hi':e.rank>=6?'mid':'lo'}">${esc(Number(e.score||0).toFixed(1))}${sparkSvg(e.spark)}</span></div>`
+    +`<div class="loc">${esc(e.place||(Number(e.lat).toFixed(2)+', '+Number(e.lon).toFixed(2)))} · x${esc(e.count)} · ${hrs<1?Math.round(e.age_min||0)+' min':hrs.toFixed(1)+' h'}</div>`
+    +(chips?`<div class="why">${chips}</div>`:'')
+    +(e.camera&&e.camera.verdict&&e.camera.cameras?`<div class="why">📷 ${esc(e.camera.verdict)}</div>`:'')+`</div>`;
+}
+function drawBoard(){
+  const el=document.getElementById('board'); const b=boardData;
+  if(!b){ el.innerHTML='<div class="empty">loading…</div>'; return; }
+  const h=b.health||{}, bad=h.problems_total||0;
+  let html=`<div class="sitrep" id="sitrep"><small>Situation report</small><span>…</span></div>`;
+  if(h.feeds){
+    html+=`<div class="health${bad?' bad':''}" id="boardHealth"><b>${esc(h.feeds-bad)}/${esc(h.feeds)}</b> feeds healthy${bad?` · <b>${esc(bad)}</b> dark ▾`:''}`
+      +`<ul>${(h.problems||[]).map(p=>`<li><em>${esc(p.state)}</em>${esc(p.name||p.slug)} — ${esc(p.reason)}</li>`).join('')}`
+      +`${(h.components||[]).map(c=>`<li><em>down</em>${esc(c.name)} — ${esc(c.detail)}</li>`).join('')}</ul></div>`;
+  }
+  html+=`<h4>Events · ${esc(b.active)} active</h4>`+((b.events||[]).map(boardRow).join('')||'<div class="empty">nothing above the noise floor</div>');
+  if((b.anomalies||[]).length) html+='<h4>Rate surges</h4>'+b.anomalies.map((a,i)=>
+    `<div class="row brow" data-a="${i}"><div class="t"><span class="ty">${esc(surgeName(a))}</span><span class="sev mid">${esc(a.zscore)}σ</span></div>`
+    +`<div class="loc">${esc(a.current)} this hour vs ${esc(a.baseline_mean)} normal · p ${esc(a.p_value)}</div></div>`).join('');
+  if((b.internet||[]).length) html+='<h4>Internet</h4>'+b.internet.map((d,i)=>
+    `<div class="row brow" data-n="${i}"><div class="loc" style="margin-top:0;color:var(--txt)">${esc(d.summary)}</div></div>`).join('');
+  el.innerHTML=html;
+  const hb=document.getElementById('boardHealth'); if(hb) hb.onclick=()=>hb.classList.toggle('open');
+  el.querySelectorAll('[data-i]').forEach(r=>r.onclick=()=>openBoardEvent(b.events[+r.dataset.i]));
+  el.querySelectorAll('[data-a]').forEach(r=>r.onclick=()=>{ const a=b.anomalies[+r.dataset.a]; if(a.lat!=null) focusSurge({...a,_c:[a.lat,a.lon]}); });
+  el.querySelectorAll('[data-n]').forEach(r=>r.onclick=()=>{ const d=b.internet[+r.dataset.n]; map.flyTo([d.lat,d.lon],4); });
+  loadSitrep();
+}
+let sitrepAt=0, sitrepText='';
+async function loadSitrep(){
+  const el=document.querySelector('#sitrep span'); if(!el) return;
+  if(sitrepText&&Date.now()-sitrepAt<600000){ el.textContent=sitrepText; return; }
+  try{
+    const r=await fetch('/live/sitrep');
+    if(!r.ok){ const box=document.getElementById('sitrep'); if(box) box.remove(); return; }
+    const j=await r.json(); sitrepText=j.text||''; sitrepAt=Date.now();
+    const now=document.querySelector('#sitrep span'); if(now) now.textContent=sitrepText;
+  }catch(_){ const box=document.getElementById('sitrep'); if(box) box.remove(); }
+}
+async function openBoardEvent(e){
+  map.flyTo([e.lat,e.lon],Math.max(map.getZoom(),12));
+  const pop=L.popup({maxWidth:340}).setLatLng([e.lat,e.lon])
+    .setContent('<div class="pop"><div class="kick">Event</div><div class="meta">loading…</div></div>').openOn(map);
+  let d=null; try{ const r=await fetch('/events/'+encodeURIComponent(e.uid)); if(r.ok) d=await r.json(); }catch(_){}
+  if(!map.hasLayer(pop)) return;
+  const hist=d&&d.history?d.history.map(x=>x.score):e.spark;
+  const src=Object.entries(e.sources||{}).map(([k,v])=>`${esc(k)} ${esc(v)}`).join(' · ');
+  const checks=(d&&d.camera_checks||[]).filter(c=>c.cameras).slice(0,2).map(c=>
+    `<div class="meta">📷 ${esc(ago(c.ts))} · ${esc(c.supports)}/${esc(c.cameras)} frames support — ${esc(c.verdict||'')}</div>`).join('');
+  const oc=d&&d.outcome;
+  const scored=oc&&oc.status&&oc.status!=='pending'
+    ?`<div class="meta">alert ${esc(oc.status)}${oc.lead_min!=null?` · ${oc.lead_min>0?esc(Math.round(oc.lead_min))+' min ahead of':esc(Math.round(-oc.lead_min))+' min behind'} news`:''}</div>`:'';
+  pop.setContent(`<div class="pop"><div class="kick">Event · ${esc(e.trend||'')}</div><div class="ttl">${esc(e.place||'')} ${esc((e.type||'').replace(/_/g,' '))}</div>`
+    +`<div class="meta">score ${esc(e.score)} (peak ${esc(e.peak)}) · x${esc(e.count)} · ${esc(e.source_count)} source kinds ${sparkSvg(hist)}</div>`
+    +`<div class="meta">${src}</div>`+(e.headline?`<div class="meta">“${esc(e.headline)}”</div>`:'')+checks+scored
+    +`<div class="meta"><a href="#" id="evNews">find news near here</a></div></div>`);
+  const a=document.getElementById('evNews');
+  if(a) a.onclick=ev=>{ ev.preventDefault(); showCorrelation(e.lat,e.lon,Object.keys(e.types||{}).filter(t=>t!=='other').slice(0,3).join(','),''); };
+}
+async function loadBoard(){
+  try{ boardData=await (await fetch('/live/board?limit=12')).json(); }catch(_){ return; }
+  const n=document.getElementById('boardN');
+  const hot=(boardData.events||[]).filter(e=>!e.standing&&e.rank>=6).length;
+  n.textContent=hot?String(hot):'';
+  if(boardOn) drawBoard();
+}
+function setSideTab(board){
+  boardOn=board;
+  document.getElementById('side').classList.toggle('board',board);
+  [['tabFeed',!board],['tabBoard',board]].forEach(([id,on])=>{ const b=document.getElementById(id); b.classList.toggle('on',on); b.setAttribute('aria-selected',String(on)); });
+  if(board){ drawBoard(); loadBoard(); }
+}
+document.getElementById('tabFeed').onclick=()=>setSideTab(false);
+document.getElementById('tabBoard').onclick=()=>setSideTab(true);
+
 // ── shareable view state ──
 // The hash mirrors what is on screen (center/zoom, area, window, type, severity,
 // layer toggles) so a URL reproduces the exact view. Written with replaceState so
@@ -2702,6 +2829,7 @@ document.addEventListener('visibilitychange',()=>{
   urlReady=true; writeViewState();
   loadLooks(); setInterval(()=>{ if(!document.hidden) loadLooks(); },300000);
   loadNotable(); setInterval(()=>{ if(!document.hidden) loadNotable(); },300000);
+  loadBoard(); boardTimer=setInterval(()=>{ if(!document.hidden) loadBoard(); },60000);
 })();
 });
 </script>

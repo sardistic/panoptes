@@ -12,6 +12,8 @@ _FLAGS = ("APB_POLLER_OFF", "APB_BLUESKY_OFF", "APB_NEWS_OFF",
 def client():
     for f in _FLAGS:
         os.environ[f] = "1"
+    for key in ("CLOUDFLARE_RADAR_TOKEN", "CLOUDFLARE_API_TOKEN"):   # keep the suite offline
+        os.environ.pop(key, None)
     from fastapi.testclient import TestClient
     main = importlib.import_module("apb.api.main")
     with TestClient(main.app) as c:
@@ -170,3 +172,19 @@ def test_looks_can_be_deleted(client):
     assert client.delete(f"/looks/{uid}").json()["deleted"] is True
     assert client.delete(f"/looks/{uid}").json()["deleted"] is False
     assert client.delete("/looks/not-alnum!").status_code == 400
+
+
+def test_overwatch_endpoints_shape(client):
+    board = client.get("/live/board").json()
+    assert {"events", "anomalies", "internet", "health", "active"} <= set(board)
+    health = client.get("/status/health").json()
+    assert {"feeds", "by_state", "problems", "components"} <= set(health)
+    assert {c["name"] for c in health["components"]} == {"poller", "sampler", "camera tasking"}
+    card = client.get("/scorecard").json()
+    assert card["alerts"] >= 0 and "by_rule" in card
+    rules = client.get("/alerts/rules").json()
+    assert rules and "webhook" not in rules[0]                # URLs never leave the server
+    assert client.get("/events/not-a-uid").status_code == 400
+    assert client.get("/events/fev:1.0:2.0:1700000000").status_code == 404
+    assert client.get("/live/internet").json() == []          # no Radar token in tests
+    assert "feed_health" in client.get("/status").json()

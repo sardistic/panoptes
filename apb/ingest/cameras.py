@@ -1178,16 +1178,17 @@ class CameraRegistry:
 
     def query(self, bbox: tuple[float, float, float, float] | None = None,
               limit: int = 2000, source: str | None = None,
-              online_only: bool = True) -> list[dict]:
+              online_only: bool = True, extras: bool = True) -> list[dict]:
         """Rows inside bbox=(w,s,e,n), evenly sampled by id hash when over `limit` so a
         zoomed-out view shows the spread of coverage rather than one vendor's block."""
         self.ensure_loaded()
         with self._lock:
             rows = [r for k, rs in self._rows.items() if not source or k == source
                     for r in rs]
-        if bbox and (not source or source == "windy") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 6:
+        # extras=False keeps background callers off the metered per-view lanes
+        if extras and bbox and (not source or source == "windy") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 6:
             rows = rows + self.windy(bbox)
-        if bbox and (not source or source == "youtube") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 25:
+        if extras and bbox and (not source or source == "youtube") and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < 25:
             rows = rows + self.youtube_live(bbox)
         if online_only:
             rows = [r for r in rows if r["online"]]

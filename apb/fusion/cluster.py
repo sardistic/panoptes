@@ -30,6 +30,33 @@ class FusedEvent:
     score_components: dict[str, float] = field(default_factory=dict)
 
 
+_FUTURE_SLACK_SEC = 900.0     # tolerate clock skew, nothing more
+_COARSE_WEIGHT = 0.25         # a centroid-placed mention is a quarter of a located one
+_OBSERVER_KINDS = {"camera", "sensor"}   # corroborate on severity alone (no text type)
+_TEXT_KINDS = {"social", "news"}
+
+
+def is_coarse(p: EventSignal) -> bool:
+    """True for text signals placed by name ("...in Seattle") rather than by position."""
+    if p.source_kind.value not in _TEXT_KINDS:
+        return False
+    return bool(p.metadata.get("coarse")) or p.confidence < 0.5
+
+
+def _drop_repeats(pts: list[EventSignal]) -> list[EventSignal]:
+    """One headline syndicated five times is one observation, not five."""
+    seen: set[tuple[str, str]] = set()
+    out: list[EventSignal] = []
+    for p in pts:
+        if p.source_kind.value in _TEXT_KINDS:
+            key = (p.source_kind.value, " ".join(p.summary.lower().split())[:120])
+            if key in seen:
+                continue
+            seen.add(key)
+        out.append(p)
+    return out
+
+
 def detect(
     signals: list[EventSignal],
     *,
@@ -47,22 +74,40 @@ def detect(
     """
     now = time.time()
     cutoff = now - max_age_hours * 3600
-    cells = bucket((s for s in signals if s.observed_at.timestamp() >= cutoff),
+    # Future-dated rows (scheduled 511 closures, concerts, bad feed clocks) are not
+    # "happening now": left in, `now - latest` goes negative and recency explodes.
+    horizon = now + _FUTURE_SLACK_SEC
+    cells = bucket((s for s in signals if cutoff <= s.observed_at.timestamp() <= horizon),
                    lambda s: (s.lat, s.lon))
 
     events: list[FusedEvent] = []
     for key, pts in neighborhoods(cells, min_count=min_count):
-        latest = max(p.observed_at.timestamp() for p in pts)
+        pts = _drop_repeats(pts)
+        if len(pts) < min_count:
+            continue
+        latest = min(now, max(p.observed_at.timestamp() for p in pts))
         sources: dict[str, int] = defaultdict(int)
         corroborating_sources: dict[str, int] = defaultdict(int)
         types: dict[str, int] = defaultdict(int)
+        # Types seen by a sensor that knows where it is (dispatch, cameras, feeds with
+        # coordinates). A post placed on a metro centroid only corroborates when one
+        # of these agrees with it — otherwise every city mention "confirms" downtown.
+        precise_types = {p.normalized_type.value for p in pts if not is_coarse(p)}
+        weight = 0.0
         for p in pts:
-            sources[p.source_kind.value] += 1
+            kind = p.source_kind.value
+            sources[kind] += 1
             types[p.normalized_type.value] += 1
-            if p.source_kind.value == "cad" or (
-                p.normalized_type.value != "other" and p.severity >= 0.35
-            ):
-                corroborating_sources[p.source_kind.value] += 1
+            coarse = is_coarse(p)
+            weight += _COARSE_WEIGHT if coarse else 1.0
+            if kind == "cad":
+                corroborating_sources[kind] += 1
+            elif kind in _OBSERVER_KINDS:
+                if p.severity >= 0.35:
+                    corroborating_sources[kind] += 1
+            elif p.normalized_type.value != "other" and p.severity >= 0.35:
+                if not coarse or p.normalized_type.value in precise_types:
+                    corroborating_sources[kind] += 1
         source_count = len(corroborating_sources)
         if source_count < min_sources:
             continue
@@ -70,9 +115,9 @@ def detect(
         confidences = [max(0.0, min(1.0, p.confidence)) for p in pts]
         mean_sev = sum(severities) / len(severities)
         mean_conf = sum(confidences) / len(confidences)
-        recency = max(0.25, 1.0 - ((now - latest) / max(1.0, max_age_hours * 3600)))
-        diversity = 1.0 + math.log2(source_count)
-        volume = math.sqrt(len(pts))
+        recency = min(1.0, max(0.25, 1.0 - ((now - latest) / max(1.0, max_age_hours * 3600))))
+        diversity = 1.0 + math.log2(max(1, source_count))
+        volume = math.sqrt(max(1.0, weight))
         score = round(volume * (0.35 + mean_sev) * (0.5 + mean_conf) * diversity * recency, 2)
         if score < min_score:
             continue

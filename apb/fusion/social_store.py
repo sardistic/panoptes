@@ -84,7 +84,7 @@ def _row(post, place) -> dict:
            "created_at": post.created_at.isoformat(), "url": post.url,
            "confidence": place.confidence if place else 0.25}
     if place:
-        row.update(lat=place.lat, lon=place.lon, metro=place.metro, location=place.name)
+        row.update(lat=place.lat, lon=place.lon, metro=place.metro, location=place.name, coarse=True)
     return row
 
 
@@ -115,7 +115,7 @@ def _rss_poll_once(keep_unplaced: bool) -> int:
             continue
         if place:
             r = {**r, "lat": place.lat, "lon": place.lon, "metro": place.metro,
-                 "location": place.name, "confidence": place.confidence}
+                 "location": place.name, "confidence": place.confidence, "coarse": True}
         placed.append(r)
     before = len(_buf)
     add(social_text_signals(placed))

@@ -156,3 +156,59 @@ Decision: lite passes drop the marine, solar and pressure-level lanes (only sky,
 and flood feed tracked scalars) and the facts cadence is hourly (~120 Open-Meteo calls
 per pass, ~3k/day). If the layer still starves, the next step is an Open-Meteo API key
 (commercial tier) or self-hosting.
+
+### 2026-11-14 — Overwatch layer: one ranked board over three detectors
+
+Context: production showed the fused-event layer was not trustworthy. A far-future
+timestamp drove the recency term to ~29,000 (scores near 500,000); the registry
+matched each cluster to the first open row the index returned — the stalest — so
+duplicate rows refreshed each other and lived for weeks; name-placed posts stacked on
+metro centroids and "corroborated" whatever dispatch was there; and nothing said
+whether a quiet area was calm or its feed was dead (five camera inventories were
+failing unnoticed).
+
+Decision:
+- `fusion/cluster.detect` drops signals dated more than 15 min ahead, clamps recency
+  to 1, counts a syndicated headline once, weights a centroid-placed mention at 0.25,
+  and lets it corroborate only when a located signal of the same kind is in the
+  cluster. New source kinds `camera` and `sensor` corroborate on severity alone.
+- `store/events` pairs clusters with the nearest unclaimed open row (strongest cluster
+  first) and logs one history point per event per cycle (`fused_event_history`, SQLite
+  on the leader); `trend`/`spark`/`vs_median` come from it. Legacy peaks over 1000 are
+  reset to the latest score at init.
+- `store/feedhealth` learns rows-per-fetch and the usual peak record age per feed and
+  names feeds `failing` / `silent` / `stale`; baselines freeze during a problem state.
+  The peak lag is learned only when freshness advances, otherwise the baseline chases
+  a frozen feed. Lanes where empty is ordinary (`BURSTY`) are exempt from `silent`.
+- `context/tasking` reads the nearest cameras when an event crosses `APB_TASK_SCORE`.
+  The model's own yes/no/unclear bottom line gates the `camera` signal: per-frame
+  "supports" alone was too lenient (one car on the shoulder "supported" a scene the
+  same reply called normal).
+- `/live/board` ranks by score x novelty x trend x corroboration x incident kind.
+  Single-source clusters are multiplied by 0.6 and standing clusters by their own
+  history, because raw volume makes every busy downtown the top item forever.
+- Alerts are rule-based (`alerts/rules.py`), judged on the current score, escalate at
+  1.5x, and are logged with no webhook so `/scorecard` can grade a dry run. The global
+  default now needs 2 source kinds — at the old default (any event >= 6.0) the median
+  production event would have alerted.
+- `infer/baseline` uses a Poisson tail and a MAD-based z, takes the smaller, uses local
+  solar time for day-parts, and caps the z of fewer than three calls at 1.5.
+
+Consequences: three detectors (fused events, NOTABLE cells, camera reads) vote in one
+place. Vision spend rises by at most `APB_TASK_DAILY` small calls a day plus six
+sitreps an hour. NOTABLE cells are context unless the flag is an activity kind on a
+cell that is not flagged all the time — weather leaving its range must not corroborate
+a medical call. History, feed health, camera checks and the alert log are leader-local
+SQLite even when shared Postgres state is on (same precedent as the box-metric store).
+
+### 2026-11-14 — Cloudflare Radar lane; Shodan is discovery only
+
+Radar's outage annotations and verified traffic anomalies are a hidden lane
+(`ingest/radar.py`, kind `radar`, country coordinates from Radar's own entity list).
+Unlike the other singleton lanes it raises on upstream failure so the ingest layer
+backs off and feed health can tell a bad token from a quiet internet. The desktop
+`CLOUDFLARE_API_TOKEN` already reads Radar, but it can also edit zone rulesets — the
+deployed service gets its own Radar-read-only token (`CLOUDFLARE_RADAR_TOKEN`).
+Shodan is used only by `discover/shodan_sweep.py` to find intentionally public
+services for the existing discoverers; it is not a live lane and is not used to find
+cameras or devices exposed by accident.

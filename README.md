@@ -111,10 +111,46 @@ register to unlock the keyed lanes.
 - `/live/emerging`, `/emerging`, `/baseline/anomalies` — surge / anomaly detection
   against rolling, seasonally-bucketed baselines.
 - `/events` — persisted fused events with lifecycle (stable uid, first_seen, age,
-  peak vs latest score, growing flag). New events over `APB_ALERT_SCORE` POST to
-  `APB_WEBHOOK_URL` exactly once (Discord webhooks supported).
+  peak vs latest score, `trend` rising/steady/falling from the per-cycle history,
+  `spark`). `/events/{uid}` adds the full growth curve, tasked camera checks, alerts
+  raised and how the alert scored against the news.
+- `/live/board` — the "right now" board: active events ranked by novelty x trend x
+  corroboration x incident kind (a standing downtown cluster is scored against its own
+  normal), with rate surges, internet outages and dark feeds. `/live/sitrep` is a
+  five-line situation report over it (Gemini, cached 10 min). The map shows both in
+  the side panel's **Right now** tab.
 - `/status` — per-lane operational health (rows, freshness, backoff, buffers), plus
   sampler state, the Street View budget and YouTube / Windy daily quota counters.
+- `/status/health` — feed-silence report: every lane, buffer and camera inventory is
+  judged against its own normal and named when it is `failing` (fetch errors),
+  `silent` (zero rows where rows are normal) or `stale` (freshest record far older
+  than usual). A calm map is only reassuring if the feeds are alive.
+- `/scorecard` — were the alerts right: share matched by a placed headline within
+  30 km, how often the alert came first, median lead time over news; per rule.
+  `/alerts/rules` lists the active rules (never the webhook URLs).
+- `/live/internet` — Cloudflare Radar outages / traffic anomalies by country and
+  network (needs a Radar-read token).
+
+### Alerting
+
+Rules live in `config/alert_rules.json` (copy `config/alert_rules.example.json`;
+`APB_ALERT_RULES` overrides the path): each has an optional area (`bbox` or `center` +
+`radius_km`), `types`, `min_score`, `min_sources`, `escalate` and its own `webhook`.
+With no file there is one global rule: score >= `APB_ALERT_SCORE` (6.0) from
+>= `APB_ALERT_SOURCES` (2) independent source kinds. A rule alerts an event once, then
+again each time the score reaches `escalate` x the last alerted score. Every alert is
+logged even with no webhook configured, so the scorecard can grade a dry run.
+`APB_WEBHOOK_URL` is the default destination (Discord supported), `APB_OPS_WEBHOOK_URL`
+receives feed-health changes, `APB_DIGEST_HOUR_UTC` turns on a daily digest.
+
+### Camera tasking
+
+When a fused event reaches `APB_TASK_SCORE` (5.0) the nearest public cameras (within
+`APB_TASK_KM`, 4) are read by the vision model with the event described. The check is
+stored against the event, and when the model's bottom line is "yes" it becomes a
+`camera` signal in fusion — an independent source kind. Bounded: three events a
+minute, one check per event per 45 min, `APB_TASK_DAILY` (150) model calls a day.
+`APB_TASKING_OFF=1` disables.
 - `/correlate`, `/feeds` — keyless news/context correlation (GDELT, BigDataCloud).
 - `/incidents`, `/activity` — stored, **PII-redacted** records.
 - `/health` (liveness), `/health/ready` (database/worker readiness), `/db/stats`,
@@ -141,6 +177,12 @@ to prevent concurrent duplicate delivery.
 pipeline. A deployment may point both variables at the same PostgreSQL service.
 
 ## Source discovery (build-time)
+
+`python -m apb.discover.shodan_sweep` (needs `SHODAN_API_KEY`) searches Shodan for
+software that publishes on purpose — Rdio Scanner / trunk-recorder instances, P2C and
+Southern Software portals, TravelIQ 511 sites, ArcGIS servers — and writes a candidate
+list to `data/shodan_candidates.json` for review. Counts are free; `--search` needs
+query credits. It never connects to a result and is not used to find cameras.
 
 `apb/discover/*` finds new CAD/open-data sources via web search and vendor "dork"
 registries (Socrata, ArcGIS hubs, PulsePoint, P2C, Southern Software). This runs

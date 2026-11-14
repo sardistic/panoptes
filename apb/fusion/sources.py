@@ -47,11 +47,72 @@ def gather_signals(
         signals.extend(seed_recent(max_age_hours))
     signals.extend(social_store.recent(max_age_hours))   # live Bluesky + social RSS
     signals.extend(news_store.recent(max_age_hours))     # live news RSS
+    if include_live:
+        signals.extend(derived_signals(max_age_hours))   # camera checks + NOTABLE cells
     from apb.fusion.dedupe import dedupe_signals
     signals = dedupe_signals(signals)   # one phenomenon != multi-source corroboration
     if kinds is not None:
         signals = [s for s in signals if s.source_kind.value in kinds]
     return signals
+
+
+# NOTABLE flags that describe human activity at a place (as opposed to weather or
+# climate leaving its range): only these can corroborate an incident cluster.
+_ACTIVITY_FLAGS = ("attention", "outage", "connectivity", "crime", "noise", "traffic",
+                   "vehicles", "pedestrians", "delay")
+
+
+def derived_signals(max_age_hours: float = 6.0) -> list[EventSignal]:
+    """The other two detectors, as signals, so all three vote in one place:
+
+    camera checks   a tasked look whose frames support the event -> `camera` kind,
+                    which corroborates on its own (a different sensor saw it)
+    NOTABLE cells   a place's metrics leaving their baseline -> `sensor` kind; it
+                    corroborates only for activity-type flags on a cell that is not
+                    flagged all the time, and is context otherwise
+    """
+    from apb.common.models import IncidentType
+    out: list[EventSignal] = []
+    try:
+        from apb.context import tasking
+        for c in tasking.recent_checks(min(max_age_hours, 6.0)):
+            if c.get("overall") != "yes" or c.get("lat") is None:
+                continue
+            kind = c.get("top_type") or "other"
+            out.append(EventSignal(
+                signal_id=f"camera_check:{c['uid']}:{int(c['ts'])}",
+                source="camera_check", source_kind=SignalKind.camera,
+                observed_at=datetime.fromtimestamp(c["ts"], tz=timezone.utc),
+                lat=c["lat"], lon=c["lon"],
+                normalized_type=IncidentType(kind if kind in IncidentType._value2member_map_ else "other"),
+                summary=f"Cameras confirm: {c.get('verdict') or 'frames show the reported incident'}"[:280],
+                confidence=min(0.9, 0.55 + 0.1 * (c.get("supports") or 1)),
+                severity=0.6, dedupe_key=f"camera_check:{c['uid']}:{int(c['ts'])}",
+                metadata={"cameras": c.get("cameras"), "supports": c.get("supports"),
+                          "event_uid": c["uid"]}))
+    except Exception:
+        pass                                    # stores are optional in tests / followers
+    try:
+        from apb.store import metrics as mstore
+        for cell in mstore.notable_cells(min(max_age_hours, 6.0)):
+            if cell.get("lat") is None:
+                continue
+            flags = [str(f) for f in cell.get("flags") or []]
+            text = "; ".join(flags)
+            activity = any(k in text.lower() for k in _ACTIVITY_FLAGS)
+            fresh = (cell.get("streak") or 0) <= 2          # not this cell's usual state
+            out.append(EventSignal(
+                signal_id=f"notable:{cell['cell']}:{int(cell['ts'])}",
+                source="notable", source_kind=SignalKind.sensor,
+                observed_at=datetime.fromtimestamp(cell["ts"], tz=timezone.utc),
+                lat=cell["lat"], lon=cell["lon"],
+                summary=f"Notable: {text}"[:280],
+                confidence=0.6, severity=0.45 if (activity and fresh) else 0.25,
+                dedupe_key=f"notable:{cell['cell']}",
+                metadata={"flags": flags, "streak": cell.get("streak")}))
+    except Exception:
+        pass
+    return out
 
 
 def seed_recent(max_age_hours: float) -> list[EventSignal]:

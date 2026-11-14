@@ -196,6 +196,14 @@ def _loop(metro_centers, registry):
             except Exception as e:
                 _state["errors"] += 1
                 log.warning("sampler cams pass failed: %s", e)
+        try:                                              # tasked looks at live events
+            from apb.context import tasking
+            n = tasking.run(registry)
+            if n:
+                log.info("sampler: %d tasked camera check(s)", n)
+        except Exception as e:
+            _state["errors"] += 1
+            log.warning("sampler tasking failed: %s", e)
         _stop.wait(60)
 
 
@@ -212,4 +220,5 @@ def stop() -> None:
 
 
 def status() -> dict:
-    return {**_state, "running": bool(_thread and _thread.is_alive())}
+    from apb.context import tasking
+    return {**_state, "running": bool(_thread and _thread.is_alive()), "tasking": tasking.status()}

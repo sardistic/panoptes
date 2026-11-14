@@ -88,6 +88,7 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("chp", cad_mod.load_chp),
     ("amtrak", cad_mod.load_amtrak),
     ("squawk", cad_mod.load_squawk),
+    ("radar", cad_mod.load_radar),       # Cloudflare Radar; needs a Radar-read token
 ]
 
 
@@ -124,6 +125,16 @@ def _poller(interval: float = 120.0):
             log.info("snapshot %d: +%d rows, db=%s", n, wrote, snapshots.stats())
         except Exception as e:
             log.warning("poller error: %s", e)
+        try:                    # which feeds went quiet, stale or dead this cycle?
+            from apb.alerts.notify import send_ops
+            from apb.store import feedhealth
+            changes = feedhealth.observe(_feed_observations())
+            if changes:
+                log.info("feed health: %s", ", ".join(
+                    f"{c['slug']} {c['from']}->{c['to']}" for c in changes[:20]))
+                send_ops(changes)
+        except Exception as e:
+            log.warning("feed-health error: %s", e)
         try:
             from apb.alerts.notify import send_pending
             from apb.fusion.cluster import detect
@@ -136,11 +147,59 @@ def _poller(interval: float = 120.0):
                 event_store.prune()
             if new:
                 log.info("event registry: +%d new (of %d active)", new, len(fused))
+            if not _off("APB_CAMERAS_OFF"):
+                from apb.context import tasking          # go and look at the strongest
+                tasking.enqueue(event_store.query(max_age_hours=1.0, limit=300))
             send_pending()
+            from apb.alerts.notify import send_digest_if_due
+            from apb.fusion import news_store
+            from apb.store import alertlog
+            alertlog.score_pending(news_store.recent(30.0))   # were the alerts right?
+            send_digest_if_due()
             _poller_beat.update(n=n, at=_time.time())
         except Exception as e:
             log.warning("event-registry error: %s", e)
         _poller_stop.wait(interval)
+
+
+def _feed_observations() -> list[dict]:
+    """This cycle's per-feed facts for the feed-health store: every registered lane
+    (from the ingest cache — a fetch time that moved means a new successful fetch),
+    the social/news buffers, and the camera inventories."""
+    now = _time.time()
+    obs: list[dict] = []
+    for slug, feed in list(CAD_FEEDS.items()):
+        hit = _cad._cache.get(slug)
+        rows = hit[1] if hit else None
+        fresh = max((d["ts"] for d in rows
+                     if isinstance(d.get("ts"), (int, float)) and d["ts"] <= now + 900),
+                    default=0) if rows else 0
+        obs.append({"slug": slug, "kind": feed.kind, "name": feed.name,
+                    "fetched_at": hit[0] if hit else 0.0,
+                    "rows": len(rows) if rows is not None else 0,
+                    "freshest": fresh or None,
+                    "fails": _cad._fail.get(slug, (0, 0.0))[0]})
+    try:
+        from apb.fusion import news_store, social_store
+        for slug, name, store in (("buf_news", "News buffer", news_store),
+                                  ("buf_social", "Social buffer", social_store)):
+            if not store.stats().get("running"):
+                continue
+            sigs = store.recent(1.0)
+            obs.append({"slug": slug, "kind": "buffer", "name": name, "fetched_at": now,
+                        "rows": len(sigs), "fails": 0,
+                        "freshest": max((s.observed_at.timestamp() for s in sigs), default=None)})
+    except Exception as e:
+        log.info("feed observations: buffers unavailable: %s", e)
+    if not _off("APB_CAMERAS_OFF"):
+        with _cameras._lock:
+            cams = [(k, _cameras._at.get(k), len(_cameras._rows.get(k, [])), _cameras._err.get(k))
+                    for k in list(_cameras._at)]
+        for key, at, n_rows, err in cams:
+            obs.append({"slug": f"cam_{key}", "kind": "camera", "name": f"Cameras: {key}",
+                        "fetched_at": at or 0.0, "rows": n_rows, "freshest": None,
+                        "fails": 3 if err else 0})
+    return obs
 
 
 _started = False
@@ -791,7 +850,8 @@ def live_hazards_all(request: Request, max_age_hours: Hours = 24.0):
                    live_maritime, live_volcano, live_smoke, live_marine,
                    live_storm_reports, live_cyclones, live_airport_delays,
                    live_wildfires, live_airnow, live_unrest, live_quakes_global,
-                   live_disasters, live_sigmets, live_rail, live_squawks):
+                   live_disasters, live_sigmets, live_rail, live_squawks,
+                   live_internet):
             rows.extend(fn(max_age_hours=max_age_hours))
         rows.sort(key=lambda d: d.get("ts") or 0, reverse=True)
         return rows[:10_000]
@@ -1135,6 +1195,227 @@ def events(max_age_hours: Hours = 24.0,
     return event_store.query(max_age_hours, limit)
 
 
+_UID_RE = __import__("re").compile(r"^fev:-?\d{1,3}(\.\d+)?:-?\d{1,3}(\.\d+)?:\d{6,12}$")
+
+
+@app.get("/events/{uid:path}")
+def event_detail(uid: str):
+    """One event's whole story: growth curve, tasked camera checks, alerts raised,
+    and how it scored against the news."""
+    if len(uid) > 80 or not _UID_RE.match(uid):
+        return JSONResponse({"error": "bad uid"}, status_code=400)
+    from apb.context import tasking
+    from apb.store import alertlog
+    from apb.store import events as event_store
+    e = event_store.get(uid)
+    if not e:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    e["place"] = _place_name(e["lat"], e["lon"])
+    e["camera_checks"] = tasking.checks_for(uid)
+    e["alerts"] = alertlog.for_event(uid)
+    e["outcome"] = alertlog.outcome(uid)
+    return JSONResponse(json.loads(json.dumps(e, default=str)),
+                        headers={"Cache-Control": "public, max-age=30"})
+
+
+_place_grid: dict[tuple[int, int], list[tuple[float, float, str, int]]] | None = None
+
+
+def _place_name(lat: float, lon: float) -> str | None:
+    """A name for a point — the board says "Seattle", not 47.61,-122.33: the most
+    populous gazetteer city within ~25 km (so a suburb reads as its metro)."""
+    import math
+    global _place_grid
+    if _place_grid is None:
+        from apb.fusion.places import _gaz
+        grid: dict[tuple[int, int], list[tuple[float, float, str, int]]] = {}
+        for name, (plat, plon, pop) in _gaz().items():
+            grid.setdefault((math.floor(plat), math.floor(plon)), []).append(
+                (plat, plon, name.title(), pop))
+        _place_grid = grid
+    coslat = max(0.2, math.cos(math.radians(lat)))
+    best, best_pop, nearest, nearest_km = None, -1, None, 60.0
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            for plat, plon, name, pop in _place_grid.get((math.floor(lat) + dy, math.floor(lon) + dx), ()):
+                km = math.hypot(lat - plat, (lon - plon) * coslat) * 111.0
+                if km <= 25.0 and pop > best_pop:
+                    best, best_pop = name, pop
+                if km < nearest_km:
+                    nearest, nearest_km = name, km
+    return best or (f"near {nearest}" if nearest else None)
+
+
+# How much an incident kind matters on the board, independent of how many rows a busy
+# city produces: forty traffic stops are a normal evening, four shots-fired calls are not.
+_CONCERN = {"shots_fired": 1.6, "pursuit": 1.4, "assault": 1.3, "robbery": 1.25, "fire": 1.2,
+            "quake": 1.2, "weather": 1.0, "domestic": 1.0, "medical": 0.9, "suspicious": 0.85,
+            "welfare": 0.75, "traffic": 0.7, "other": 0.7, "noise": 0.5}
+
+
+def _concern(types) -> float:
+    if not isinstance(types, dict) or not types:
+        return 1.0
+    total = sum(types.values()) or 1
+    return round(sum(_CONCERN.get(k, 1.0) * v for k, v in types.items()) / total, 2)
+
+
+def _top_type(types) -> str:
+    if not isinstance(types, dict) or not types:
+        return "activity"
+    ranked = sorted(types.items(), key=lambda kv: -kv[1])
+    return next((k for k, _ in ranked if k != "other"), ranked[0][0])
+
+
+def _board(limit: int) -> dict:
+    """Rank what is active right now by how much it deserves attention, not by raw
+    size: new beats standing, rising beats flat, corroborated and camera-supported
+    beat a single feed's say-so, and a cluster that is always there is scored against
+    its own normal."""
+    from apb.context import tasking
+    from apb.infer.baseline import detect_rate_anomalies
+    from apb.store import events as event_store, feedhealth
+    from apb.store import metrics as mstore
+    now = _time.time()
+    rows = [r for r in event_store.query(max_age_hours=2.0, limit=800)
+            if now - (r.get("last_seen") or 0) <= 2700]
+    checks = tasking.latest_by_uid(6.0)
+    items = []
+    for r in rows:
+        age_h = (r.get("age_min") or 0) / 60.0
+        trend = r.get("trend")
+        why: list[str] = []
+        novelty = 1.3 if age_h < 1 else 1.0 if age_h < 6 else 0.6 if age_h < 24 else 0.4
+        if age_h < 1:
+            why.append("new")
+        if age_h >= 6 and r.get("vs_median"):
+            vs = max(0.5, min(2.0, r["vs_median"]))
+            novelty *= vs
+            if vs >= 1.3:
+                why.append(f"{r['vs_median']}x its own normal")
+        factor = {"rising": 1.3, "falling": 0.75}.get(trend, 1.0)
+        if trend == "rising":
+            why.append(f"rising x{r.get('ratio')}")
+        kinds = r.get("source_count") or 0
+        if kinds >= 2:
+            why.append(f"{kinds} source kinds")
+        # one feed's say-so is the weakest evidence there is, however long its list
+        factor *= 0.6 if kinds <= 1 else 1.0 if kinds == 2 else 1.2
+        concern = _concern(r.get("types"))
+        factor *= concern
+        if concern >= 1.15:
+            why.append("serious kind")
+        cam = checks.get(r["uid"])
+        cam_out = None
+        if cam:
+            cam_out = {"ts": cam["ts"], "cameras": cam["cameras"], "supports": cam["supports"],
+                       "contradicts": cam["contradicts"], "verdict": cam["verdict"],
+                       "overall": cam.get("overall")}
+            if cam.get("overall") == "yes":
+                factor *= 1.3
+                why.append("cameras confirm")
+            elif cam.get("overall") == "no" and cam["cameras"] >= 3:
+                factor *= 0.8
+                why.append("cameras look normal")
+        heads = r.get("summaries") or []
+        items.append({
+            "uid": r["uid"], "lat": r["lat"], "lon": r["lon"],
+            "place": _place_name(r["lat"], r["lon"]),
+            "type": _top_type(r.get("types")), "types": r.get("types"),
+            "score": r.get("latest_score"), "peak": r.get("peak_score"),
+            "count": r.get("latest_count"), "source_count": r.get("source_count"),
+            "sources": r.get("sources"), "trend": trend, "ratio": r.get("ratio"),
+            "spark": r.get("spark"), "age_min": r.get("age_min"),
+            "standing": age_h >= 6 and trend != "rising",
+            "headline": str(heads[0])[:200] if isinstance(heads, list) and heads else None,
+            "camera": cam_out, "why": why,
+            "rank": round((r.get("latest_score") or 0) * novelty * factor, 2),
+        })
+    items.sort(key=lambda x: -x["rank"])
+    anomalies = []
+    try:
+        for a in detect_rate_anomalies(snapshots.query(72.0, limit=20000), z_threshold=2.5)[:6]:
+            feed = CAD_FEEDS.get(a["metro"])
+            anomalies.append({**a, "name": feed.name if feed else a["metro"],
+                              "lat": feed.center[0] if feed and feed.center else None,
+                              "lon": feed.center[1] if feed and feed.center else None})
+    except Exception as e:
+        log.info("board: anomalies unavailable: %s", e)
+    health = feedhealth.summary(limit=6)
+    try:
+        notable = len(mstore.notable_cells(6.0))
+    except Exception:
+        notable = 0
+    return {
+        "generated_at": now, "active": len(items), "events": items[:limit],
+        "anomalies": anomalies, "notable_cells": notable,
+        "internet": [d for d in _live_feed("radar", 0.0) if d.get("ongoing")][:8],
+        "health": {"feeds": health["feeds"], "by_state": health["by_state"],
+                   "healthy_share": health["healthy_share"],
+                   "problems_total": health["problems_total"],
+                   "problems": health["problems"],
+                   "components": [c for c in _components() if not c["ok"]]},
+    }
+
+
+@app.get("/live/board")
+def live_board(limit: int = Query(12, ge=1, le=50)):
+    """The "right now" board: the handful of things most worth a look, ranked by
+    novelty x trend x corroboration, with rate surges, internet outages and the
+    feeds that have gone dark alongside."""
+    return _cached(("board", limit), 30.0, lambda: _board(limit))
+
+
+def _sitrep() -> dict:
+    from apb.context import explain
+    board = _board(8)
+    lines = []
+    for i, e in enumerate(board["events"], 1):
+        where = e["place"] or f"{round(e['lat'], 2)},{round(e['lon'], 2)}"
+        line = (f"{i}. {where}: {e['type']} x{e['count']}, score {e['score']}, {e['trend']}, "
+                f"{e['source_count']} source kinds, {round((e['age_min'] or 0) / 60, 1)} h old")
+        if e.get("camera") and e["camera"].get("verdict"):
+            line += f"; cameras: {e['camera']['verdict']}"
+        if e.get("headline"):
+            line += f"; e.g. \"{e['headline'][:140]}\""
+        lines.append(line)
+    for a in board["anomalies"]:
+        lines.append(f"Rate surge: {a['name']} {a['current']} calls this hour vs "
+                     f"{a['baseline_mean']} normal (z {a['zscore']})")
+    for d in board["internet"]:
+        lines.append(f"Internet: {d['summary'][:160]}")
+    h = board["health"]
+    if h["problems_total"]:
+        lines.append(f"Blind spots: {h['problems_total']} of {h['feeds']} feeds dark, e.g. "
+                     + ", ".join(f"{p['name'] or p['slug']} ({p['state']})" for p in h["problems"][:4]))
+    if not lines:
+        return {"text": "Nothing above the noise floor right now.",
+                "generated_at": _time.time(), "items": 0}
+    prompt = ("You are the duty officer for a public-safety situational map. Below is the ranked "
+              "board of live multi-source event clusters (dispatch, traffic, social, news, cameras), "
+              "rate surges, internet outages and feed blind spots. Write a situation report of at most "
+              "five short lines: lead with the one or two things that most deserve attention and why, "
+              "say plainly when the example text looks unrelated to a real incident (keyword noise), "
+              "and end with any blind spot that limits confidence. No preamble, no markdown headings.\n\n"
+              + "\n".join(lines))
+    return {"text": explain.generate([{"text": prompt}], max_tokens=350).strip(),
+            "generated_at": _time.time(), "items": len(lines)}
+
+
+@app.get("/live/sitrep")
+def live_sitrep():
+    """A five-line situation report over the board, written by the text model.
+    Cached 10 minutes for everyone, so it costs at most six calls an hour."""
+    from apb.context import explain
+    if not explain.api_key():
+        return JSONResponse({"error": "GEMINI_API_KEY is not configured"}, status_code=503)
+    try:
+        return _cached(("sitrep",), 600.0, _sitrep)
+    except Exception as e:
+        log.warning("sitrep failed: %s", e)
+        return JSONResponse({"error": "sitrep unavailable"}, status_code=424)
+
+
 @app.get("/db/stats")
 def db_stats():
     """How much history the snapshot poller has accumulated."""
@@ -1182,7 +1463,69 @@ def status():
         "quotas": {"youtube_units": __import__("apb.store.spend", fromlist=["used"]).used("youtube_units"),
                    "windy_requests": __import__("apb.store.spend", fromlist=["used"]).used("windy")},
         "sampler": __import__("apb.context.sampler", fromlist=["status"]).status(),
+        "feed_health": {k: v for k, v in __import__(
+            "apb.store.feedhealth", fromlist=["summary"]).summary(limit=0).items()
+            if k in ("feeds", "by_state", "learning", "healthy_share", "problems_total")},
     }
+
+
+def _components() -> list[dict]:
+    """The moving parts that are not feeds: are the loops themselves alive?"""
+    from apb.context import sampler
+    now = _time.time()
+    beat = round(now - _poller_beat["at"]) if _poller_beat["at"] else None
+    samp = sampler.status()
+    return [{
+        "name": "poller", "ok": bool(_poller_leader and beat is not None
+                                     and beat <= _POLLER_STALE_AFTER_S),
+        "detail": (f"cycle {_poller_beat['n']}, last beat {beat}s ago" if beat is not None
+                   else "no beat yet" if _poller_leader else "follower (another instance polls)"),
+    }, {
+        "name": "sampler", "ok": bool(samp.get("running")),
+        "detail": f"{samp.get('facts_runs', 0)} facts passes, {samp.get('cams_frames', 0)} frames read, "
+                  f"{samp.get('errors', 0)} errors",
+    }, {
+        "name": "camera tasking", "ok": not samp["tasking"]["off"],
+        "detail": f"{samp['tasking']['checks']} checks ({samp['tasking']['supported']} supported), "
+                  f"{samp['tasking']['queued']} queued",
+    }]
+
+
+@app.get("/status/health")
+def status_health(limit: int = Query(80, ge=0, le=1000)):
+    """Feed-silence report: which lanes are failing (fetch errors), silent (zero rows
+    where rows are normal) or stale (freshest record far older than usual) — the
+    difference between a calm map and a blind one."""
+    from apb.store import feedhealth
+    out = feedhealth.summary(limit=limit)
+    out["components"] = _components()
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=30"})
+
+
+@app.get("/scorecard")
+def scorecard(days: float = Query(30.0, gt=0.0, le=90.0)):
+    """Were the alerts right? Share matched by news, how often we were first, and the
+    median lead time over the first headline — per rule and overall."""
+    from apb.store import alertlog
+    return JSONResponse(alertlog.scorecard(days), headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/alerts/rules")
+def alert_rules():
+    """The active alert rules (webhook URLs are never returned)."""
+    from apb.alerts.rules import load_rules
+    return [{"name": r.name, "min_score": r.min_score, "min_sources": r.min_sources,
+             "types": sorted(r.types) if r.types else None, "bbox": r.bbox,
+             "center": r.center, "radius_km": r.radius_km if r.center else None,
+             "max_age_hours": r.max_age_hours, "escalate": r.escalate,
+             "own_webhook": bool(r.webhook)} for r in load_rules()]
+
+
+@app.get("/live/internet")
+def live_internet(max_age_hours: Hours = 0.0):
+    """Cloudflare Radar internet outages / traffic anomalies by country and network.
+    Empty unless a Radar-read token is configured."""
+    return _live_feed("radar", max_age_hours)
 
 
 @app.get("/baseline/anomalies")

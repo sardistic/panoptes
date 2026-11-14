@@ -16,6 +16,7 @@ and surge-score source-diversity.
 | OpenAQ | `OPENAQ_KEY` | PM2.5 air-quality spikes (v3 API) | https://openaq.org/ → account → API key (https://docs.openaq.org/) |
 | aisstream.io | `AISSTREAM_KEY` | Live maritime AIS vessel positions (websocket) | https://aisstream.io/ → free signup → API key |
 | Gemini (scene explainer) | `GEMINI_API_KEY` (or an unrestricted `GOOGLE_API_KEY`) | "What am I looking at?" — the clip's box summaries, camera image analysis, drill-downs. `GEMINI_MODEL` pins a model; otherwise the newest Flash is auto-picked | https://aistudio.google.com/apikey — the key must allow the Generative Language API (the Custom-Search-restricted key returns 403) |
+| Cloudflare Radar | `CLOUDFLARE_RADAR_TOKEN` (falls back to `CLOUDFLARE_API_TOKEN`) | Internet outages and verified traffic anomalies by country / network — `/live/internet`, the board, and the HAZARDS layer | Cloudflare dashboard → My Profile → API Tokens → Create Custom Token → Account · **Radar · Read** only. Use a dedicated read-only token for the deployed service, not a zone-editing one |
 | Census ACS (facts) | `CENSUS_API_KEY` | Tract/county population, median income, income bands, age, home value, poverty, education, renters | https://api.census.gov/data/key_signup.html — instant |
 | eBird (facts) | `EBIRD_API_KEY` | Notable bird sightings near the box (7 days) | https://ebird.org/api/keygen — instant |
 | Windy Webcams (cameras) | `WINDY_WEBCAMS_KEY` | World's largest public webcam index, looked up per map view | https://api.windy.com/keys — free tier |
