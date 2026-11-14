@@ -450,3 +450,16 @@ def test_shodan_sweep_counts_without_credits_and_reports_search_refusal(monkeypa
     row = ss.slim({"ip_str": "203.0.113.5", "port": 3000, "hostnames": ["scanner.example.org"],
                    "http": {"title": "Rdio Scanner"}, "location": {"city": "Raleigh", "region_code": "NC"}})
     assert (row["ip"], row["port"], row["title"], row["region"]) == ("203.0.113.5", 3000, "Rdio Scanner", "NC")
+
+
+def test_legacy_inflated_scores_are_reset_at_init(db, monkeypatch):
+    from apb.store import events
+    events.record([_evt(score=3.0)])
+    c = events._conn()
+    c.execute("UPDATE fused_events SET latest_score = 544733.5, peak_score = 629533.2")
+    c.commit()
+    monkeypatch.setattr(events, "_ready", False)             # next boot
+    row = events.query()[0]
+    assert (row["latest_score"], row["peak_score"]) == (0, 0)
+    events.record([_evt(score=4.0)])
+    assert events.query()[0]["peak_score"] == 4.0

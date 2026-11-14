@@ -53,6 +53,8 @@ def _conn() -> sqlite3.Connection:
         """)
         # rows written while far-future timestamps could inflate recency carry peaks in
         # the hundreds of thousands; a real score tops out well under 100
+        c.execute("UPDATE fused_events SET latest_score = 0 WHERE latest_score > ?",
+                  (_SANE_SCORE,))
         c.execute("UPDATE fused_events SET peak_score = latest_score WHERE peak_score > ?",
                   (_SANE_SCORE,))
         c.commit()
@@ -198,6 +200,8 @@ def _init_postgres() -> None:
             c.execute("ALTER TABLE panoptes_fused_events "
                       "ADD COLUMN IF NOT EXISTS claim_at DOUBLE PRECISION")
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_fev_seen ON panoptes_fused_events(last_seen)")
+            c.execute("UPDATE panoptes_fused_events SET latest_score = 0 "
+                      "WHERE latest_score > %s", (_SANE_SCORE,))
             c.execute("UPDATE panoptes_fused_events SET peak_score = latest_score "
                       "WHERE peak_score > %s", (_SANE_SCORE,))
         _pg_ready = True
