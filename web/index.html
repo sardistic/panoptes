@@ -270,6 +270,14 @@
   button#radarBtn.on .led{background:#62cf72;box-shadow:0 0 7px rgba(98,207,114,.65)}
   button#camerasBtn.on .led{background:#9fc4d0}
   button#notableBtn.on .led{background:#ffd23f}
+  button#radioBtn.on .led{background:#4fd1c5}
+  .radio-tip{background:rgba(13,16,21,.92);border:1px solid #2c7a73;color:#bfeee9;font:500 9.5px/1.45 var(--font);padding:5px 7px;border-radius:0;box-shadow:none}
+  .radio-tip::before{display:none}
+  .radio-tip b{color:#4fd1c5;font-weight:600;letter-spacing:.04em}
+  #board .rall{cursor:pointer;color:var(--dim);font:500 9.5px/1 var(--font);letter-spacing:.08em;padding:9px 0 3px;text-transform:uppercase}
+  #board .rall:hover{color:var(--txt)}
+  #board .brow .hot{color:var(--red)}
+  #board .brow .noloc{color:var(--dimmer)}
   /* ── camera popup: still or HLS player, edge to edge ── */
   .campop .leaflet-popup-content{max-width:380px;min-width:300px}
   .pop.cam .frame{margin:10px -15px 0;background:#000;min-height:150px;position:relative}
@@ -451,6 +459,7 @@
     <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
     <button id="goesBtn" aria-pressed="false" title="satellite: live GOES GeoColor clouds (~10 min old) zoomed out, Esri World Imagery detail zoomed in"><span class="led"></span>GOES</button>
     <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
+    <button id="radioBtn" class="on" aria-pressed="true" title="public-safety radio systems heard by volunteer scanners: call counts only, sized by how busy each system is right now"><span class="led"></span>RADIO</button>
     <button id="notableBtn" class="on" aria-pressed="true" title="cells where the latest facts pass raised a flag: thresholds or the 95th percentile of the place's own history"><span class="led"></span>NOTABLE</button>
   </span></label>
   <span class="spacer"></span>
@@ -2621,6 +2630,76 @@ document.getElementById('notableBtn').onclick=e=>{
 };
 map.on('moveend zoomend',()=>{ clearTimeout(window._ntT); window._ntT=setTimeout(drawNotable,150); });
 
+// ── radio activity layer ──
+// One marker per public-safety radio system that a volunteer scanner publishes: size =
+// calls per 10 minutes right now, a red ring when the system is far above its own normal.
+// Counts only. A dashed outline means the place is approximate (the listener's town,
+// not the system's footprint); systems with no place at all are listed in the panel.
+let showRadio=true, radioRows=[], radioAllOpen=false; const radioLayer=L.layerGroup().addTo(map);
+const radioRate = r => `${esc(r.per10)} calls / 10 min`+(r.normal!=null?` · normal ${esc(r.normal)}`:' · still learning its normal')+(r.z!=null?` · ${esc(r.z)}σ`:'');
+async function loadRadio(){
+  try{ const r=await fetch('/live/radio?max_age_minutes=45'); radioRows=r.ok?await r.json():[]; }catch(_){ radioRows=[]; }
+  drawRadio(); if(boardOn) drawRadioList();
+}
+function radioPoints(){
+  // systems that share one place (the same listener) fan out so each can be picked
+  const groups=new Map();
+  radioRows.filter(r=>r.lat!=null).forEach(r=>{ const k=r.lat.toFixed(3)+','+r.lon.toFixed(3); (groups.get(k)||groups.set(k,[]).get(k)).push(r); });
+  const z=map.getZoom(), out=[];
+  groups.forEach(g=>g.forEach((r,i)=>{
+    const n=g.length, ring=n>1?10+Math.min(26,n*2.2):0, a=(i/n)*Math.PI*2;
+    out.push([r, n>1?screenOffset(r.lat,r.lon,Math.cos(a)*ring,Math.sin(a)*ring,z):[r.lat,r.lon]]);
+  }));
+  return out;
+}
+function drawRadio(){
+  radioLayer.clearLayers(); if(!showRadio) return;
+  const b=map.getBounds().pad(.1);
+  radioPoints().forEach(([r,at])=>{
+    if(!b.contains(at)) return;
+    const hot=r.z!=null&&r.z>=3&&r.calls>=8;
+    // antenna glyph: a mast, with one to three pairs of signal arcs by how busy it is
+    const rate=r.per10||0, s=9+Math.min(7,Math.sqrt(rate)*.6), col=hot?'#e0412c':'#4fd1c5', zz=map.getZoom();
+    const o=(dx,dy)=>screenOffset(at[0],at[1],dx,dy,zz);
+    const lines=[[[0,s],[0,-s*.25]],[[-s*.28,s],[s*.28,s]]];
+    const waves=rate>=40?3:rate>=8?2:rate>0?1:0;
+    for(let w=1;w<=waves;w++){ const x=s*(.3+.3*w), y=s*(.25+.2*w);
+      lines.push([[-x*.75,-s*.25-y],[-x,-s*.25],[-x*.75,-s*.25+y]],[[x*.75,-s*.25-y],[x,-s*.25],[x*.75,-s*.25+y]]); }
+    const m=L.featureGroup(lines.map(l=>L.polyline(l.map(q=>o(q[0],q[1])),{color:col,weight:hot?2.1:1.5,
+      opacity:rate>0?.95:.5,lineJoin:'miter',dashArray:r.approx?'3 3':null,interactive:true})));
+    m.bindTooltip(`<b>${esc(r.system)}</b><br/>${radioRate(r)}`,{direction:'top',className:'radio-tip'});
+    m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
+  });
+}
+async function openRadio(r,at){
+  const where=at||(r.lat!=null?[r.lat,r.lon]:null); if(!where) return;
+  const tags=Object.entries(r.tags||{}).map(([k,v])=>`${esc(k)} ${esc(v)}`).join(' · ');
+  const body=spark=>`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
+    +`<div class="meta">${radioRate(r)} ${spark}</div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
+    +`<div class="meta">${r.approx?'place approximate'+(r.area?' — heard from '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
+    +`<div class="meta">call counts only — no audio is collected</div></div>`;
+  const pop=L.popup({maxWidth:320}).setLatLng(where).setContent(body('')).openOn(map);
+  try{ const s=await (await fetch('/live/radio/'+encodeURIComponent(r.id)+'?hours=24')).json();
+    if(map.hasLayer(pop)&&s.length>1) pop.setContent(body(sparkSvg(s.map(p=>p.per10)))); }catch(_){}
+}
+function drawRadioList(){
+  const el=document.getElementById('radioAll'); if(!el) return;
+  const rows=[...radioRows].sort((a,b)=>(b.per10||0)-(a.per10||0));
+  el.innerHTML=`<div class="rall" id="radioAllHead">${radioAllOpen?'▾':'▸'} all ${esc(rows.length)} systems reporting</div>`
+    +(radioAllOpen?rows.map((r,i)=>{ const hot=r.z!=null&&r.z>=3&&r.calls>=8;
+      return `<div class="row brow" data-ra="${i}"><div class="t"><span class="ty${r.lat==null?' noloc':''}">${esc(r.system)}</span>`
+        +`<span class="sev ${hot?'hot':'lo'}">${esc(Math.round(r.per10))}</span></div>`
+        +`<div class="loc">${r.normal!=null?'normal '+esc(r.normal)+(r.z!=null?' · '+esc(r.z)+'σ':''):'learning'} · ${esc(Object.keys(r.tags||{}).slice(0,2).join(', ')||'quiet')}${r.lat==null?' · no location':''}</div></div>`; }).join(''):'');
+  document.getElementById('radioAllHead').onclick=()=>{ radioAllOpen=!radioAllOpen; drawRadioList(); };
+  el.querySelectorAll('[data-ra]').forEach(n=>n.onclick=()=>{ const r=rows[+n.dataset.ra]; if(r.lat==null) return;
+    map.flyTo([r.lat,r.lon],Math.max(map.getZoom(),r.approx?8:10)); openRadio(r); });
+}
+document.getElementById('radioBtn').onclick=e=>{
+  showRadio=!showRadio; e.currentTarget.classList.toggle('on',showRadio); e.currentTarget.setAttribute('aria-pressed',String(showRadio));
+  if(showRadio) loadRadio(); else drawRadio();
+};
+map.on('moveend zoomend',()=>{ clearTimeout(window._rdT); window._rdT=setTimeout(drawRadio,150); });
+
 // ── "right now" board ──
 // One ranked list instead of thirty layers: fused events ordered by novelty x trend x
 // corroboration, tasked camera verdicts, rate surges, internet outages, and the feeds
@@ -2657,10 +2736,10 @@ function drawBoard(){
   if((b.anomalies||[]).length) html+='<h4>Rate surges</h4>'+b.anomalies.map((a,i)=>
     `<div class="row brow" data-a="${i}"><div class="t"><span class="ty">${esc(surgeName(a))}</span><span class="sev mid">${esc(a.zscore)}σ</span></div>`
     +`<div class="loc">${esc(a.current)} this hour vs ${esc(a.baseline_mean)} normal · p ${esc(a.p_value)}</div></div>`).join('');
-  if(b.radio_systems) html+=`<h4>Radio · ${esc(b.radio_systems)} systems watched</h4>`+((b.radio||[]).map((r,i)=>
+  if(b.radio_systems||radioRows.length) html+=`<h4>Radio · ${esc(Math.max(b.radio_systems||0,radioRows.length))} systems watched</h4>`+((b.radio||[]).map((r,i)=>
     `<div class="row brow" data-r="${i}"><div class="t"><span class="ty">${esc(r.system)}</span><span class="sev mid">${esc(r.z)}σ</span></div>`
     +`<div class="loc">${esc(r.per10)} calls / 10 min vs ${esc(r.normal)} normal · ${esc(Object.keys(r.tags||{}).join(', '))}${r.approx?' · place approximate':''}</div></div>`).join('')
-    ||'<div class="empty">no system above its normal</div>');
+    ||'<div class="empty">no system above its normal</div>')+'<div id="radioAll"></div>';
   if((b.internet||[]).length) html+='<h4>Internet</h4>'+b.internet.map((d,i)=>
     `<div class="row brow" data-n="${i}"><div class="loc" style="margin-top:0;color:var(--txt)">${esc(d.summary)}</div></div>`).join('');
   el.innerHTML=html;
@@ -2669,6 +2748,7 @@ function drawBoard(){
   el.querySelectorAll('[data-a]').forEach(r=>r.onclick=()=>{ const a=b.anomalies[+r.dataset.a]; if(a.lat!=null) focusSurge({...a,_c:[a.lat,a.lon]}); });
   el.querySelectorAll('[data-r]').forEach(r=>r.onclick=()=>{ const d=b.radio[+r.dataset.r]; if(d.lat!=null) map.flyTo([d.lat,d.lon],d.approx?8:10); });
   el.querySelectorAll('[data-n]').forEach(r=>r.onclick=()=>{ const d=b.internet[+r.dataset.n]; map.flyTo([d.lat,d.lon],4); });
+  drawRadioList();
   loadSitrep();
 }
 let sitrepAt=0, sitrepText='';
@@ -2723,7 +2803,7 @@ document.getElementById('tabBoard').onclick=()=>setSideTab(true);
 // layer toggles) so a URL reproduces the exact view. Written with replaceState so
 // panning never floods history; read once at boot before the first load.
 const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',hazards:'hazardsBtn',
-  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn'};
+  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn',radio:'radioBtn'};
 let urlT=null, urlReady=false;
 function readViewState(){
   const q=new URLSearchParams(location.hash.replace(/^#/,''));
@@ -2835,6 +2915,7 @@ document.addEventListener('visibilitychange',()=>{
   loadLooks(); setInterval(()=>{ if(!document.hidden) loadLooks(); },300000);
   loadNotable(); setInterval(()=>{ if(!document.hidden) loadNotable(); },300000);
   loadBoard(); boardTimer=setInterval(()=>{ if(!document.hidden) loadBoard(); },60000);
+  loadRadio(); setInterval(()=>{ if(!document.hidden&&(showRadio||boardOn)) loadRadio(); },120000);
 })();
 });
 </script>

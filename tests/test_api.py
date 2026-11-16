@@ -189,4 +189,8 @@ def test_overwatch_endpoints_shape(client):
     assert client.get("/events/not-a-uid").status_code == 400
     assert client.get("/events/fev:1.0:2.0:1700000000").status_code == 404
     assert client.get("/live/internet").json() == []          # no Radar token in tests
+    assert client.get("/live/radio").json() == []             # no instance list in tests
+    assert client.get("/live/radio/0123456789:7").json() == []
+    assert client.get("/live/radio/..%2Fetc:1").status_code in (400, 404)
+    assert client.get("/live/radio/nothex:1").status_code == 400
     assert "feed_health" in client.get("/status").json()

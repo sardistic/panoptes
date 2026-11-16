@@ -1620,6 +1620,20 @@ def live_radio(max_age_minutes: float = Query(30.0, gt=0.0, le=720.0),
     return JSONResponse(rows[:500], headers={"Cache-Control": "public, max-age=60"})
 
 
+_RADIO_ID_RE = __import__("re").compile(r"^[0-9a-f]{10}:-?\d{1,9}$")
+
+
+@app.get("/live/radio/{rid}")
+def live_radio_series(rid: str, hours: float = Query(24.0, gt=0.0, le=168.0)):
+    """One system's call-rate history (calls per 10 minutes, with each point's z)."""
+    if not _RADIO_ID_RE.match(rid):
+        return JSONResponse({"error": "bad id"}, status_code=400)
+    from apb.store import radio as radio_store
+    key, _, system = rid.partition(":")
+    return JSONResponse(radio_store.series(key, int(system), hours),
+                        headers={"Cache-Control": "public, max-age=120"})
+
+
 @app.get("/live/internet")
 def live_internet(max_age_hours: Hours = 0.0):
     """Cloudflare Radar internet outages / traffic anomalies by country and network.
