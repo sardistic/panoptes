@@ -2657,12 +2657,17 @@ function drawBoard(){
   if((b.anomalies||[]).length) html+='<h4>Rate surges</h4>'+b.anomalies.map((a,i)=>
     `<div class="row brow" data-a="${i}"><div class="t"><span class="ty">${esc(surgeName(a))}</span><span class="sev mid">${esc(a.zscore)}σ</span></div>`
     +`<div class="loc">${esc(a.current)} this hour vs ${esc(a.baseline_mean)} normal · p ${esc(a.p_value)}</div></div>`).join('');
+  if(b.radio_systems) html+=`<h4>Radio · ${esc(b.radio_systems)} systems watched</h4>`+((b.radio||[]).map((r,i)=>
+    `<div class="row brow" data-r="${i}"><div class="t"><span class="ty">${esc(r.system)}</span><span class="sev mid">${esc(r.z)}σ</span></div>`
+    +`<div class="loc">${esc(r.per10)} calls / 10 min vs ${esc(r.normal)} normal · ${esc(Object.keys(r.tags||{}).join(', '))}${r.approx?' · place approximate':''}</div></div>`).join('')
+    ||'<div class="empty">no system above its normal</div>');
   if((b.internet||[]).length) html+='<h4>Internet</h4>'+b.internet.map((d,i)=>
     `<div class="row brow" data-n="${i}"><div class="loc" style="margin-top:0;color:var(--txt)">${esc(d.summary)}</div></div>`).join('');
   el.innerHTML=html;
   const hb=document.getElementById('boardHealth'); if(hb) hb.onclick=()=>hb.classList.toggle('open');
   el.querySelectorAll('[data-i]').forEach(r=>r.onclick=()=>openBoardEvent(b.events[+r.dataset.i]));
   el.querySelectorAll('[data-a]').forEach(r=>r.onclick=()=>{ const a=b.anomalies[+r.dataset.a]; if(a.lat!=null) focusSurge({...a,_c:[a.lat,a.lon]}); });
+  el.querySelectorAll('[data-r]').forEach(r=>r.onclick=()=>{ const d=b.radio[+r.dataset.r]; if(d.lat!=null) map.flyTo([d.lat,d.lon],d.approx?8:10); });
   el.querySelectorAll('[data-n]').forEach(r=>r.onclick=()=>{ const d=b.internet[+r.dataset.n]; map.flyTo([d.lat,d.lon],4); });
   loadSitrep();
 }

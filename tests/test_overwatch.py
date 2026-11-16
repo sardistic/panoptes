@@ -531,3 +531,103 @@ def test_in_flight_failures_do_not_escalate_a_pause():
         ing._note_kind("pulsepoint", False)
     assert ing.kind_status()["pulsepoint"]["level"] == 1
     assert 25 <= ing.kind_status()["pulsepoint"]["paused_min"] <= 30
+
+
+# ── Rdio Scanner activity lane ───────────────────────────────────────────────
+
+def test_rdio_counts_calls_from_the_id_gap():
+    from apb.ingest.rdio import count_calls
+    rows = [{"id": 110 - i, "system": 1 if i % 4 else 2, "talkgroup": 7} for i in range(10)]
+    assert count_calls(rows, None) == (0, {})                 # first visit: nothing to compare
+    total, per = count_calls(rows, 104)                        # six new calls, all in the sample
+    assert total == 6 and sum(s["n"] for s in per.values()) == 6
+    total, per = count_calls(rows, 60)                         # 50 new, only 10 sampled: scale shares
+    assert total == 50 and per[1]["n"] == 35 and per[2]["n"] == 15
+    assert count_calls(rows, 110) == (0, {}) and count_calls(rows, 500) == (0, {})
+
+
+def _rdio_inst(tmp_path):
+    import json
+    from apb.ingest import rdio
+    p = tmp_path / "rdio_instances.json"
+    p.write_text(json.dumps({"instances": [
+        {"host": "198.51.100.7", "port": 3000, "scheme": "ws", "state": "open", "dc": False,
+         "place": "Essex, MD", "talkgroups": 2, "systems": [{"id": 1, "label": "Baltimore County"}]},
+        {"host": "scan.example.org", "port": None, "scheme": "wss", "state": "open", "dc": True,
+         "place": "Ashburn, VA", "talkgroups": 2, "systems": [{"id": 1, "label": "Baltimore County"}]},
+        {"host": "203.0.113.9", "port": 3000, "state": "access_code", "systems": []},
+    ]}), encoding="utf-8")
+    return rdio.load_instances(p)
+
+
+def test_rdio_instances_dedupe_and_keep_the_home_location(tmp_path):
+    ins = _rdio_inst(tmp_path)
+    assert len(ins) == 1                                       # one system set, closed one dropped
+    assert ins[0]["host"] == "scan.example.org"                # connect by name...
+    assert ins[0]["place"] == "Essex, MD" and ins[0]["loc"]    # ...located by the home line
+    assert len(ins[0]["key"]) == 10 and "198" not in ins[0]["key"]
+
+
+def test_rdio_poll_scores_a_surge_and_feeds_fusion(db, tmp_path, monkeypatch):
+    from apb.fusion.sources import derived_signals
+    from apb.ingest import rdio
+    from apb.store import radio
+    monkeypatch.setattr(radio, "_ready", False)
+    inst = _rdio_inst(tmp_path)[0]
+    monkeypatch.setattr(rdio, "_instances", [inst])
+    rdio._cfg.clear()
+    cfg = {"systems": [{"id": 1, "label": "Baltimore County",
+                        "talkgroups": [{"id": 7, "tag": "Fire Dispatch"}, {"id": 8, "tag": "Law Dispatch"}]}]}
+    top = {"id": 1000}
+    asked = []
+
+    def ask(i, want_cfg):
+        asked.append(want_cfg)
+        return {"cfg": cfg if want_cfg else None,
+                "results": [{"id": top["id"] - k, "system": 1, "talkgroup": 7 if k % 5 else 8}
+                            for k in range(200)]}
+    t0 = time.time() - 12 * 600
+    assert rdio.poll_instance(inst, now=t0, ask=ask) == 0      # first visit only sets the mark
+    for n in range(1, 11):                                     # ten quiet windows: 20 calls each
+        top["id"] += 20
+        assert rdio.poll_instance(inst, now=t0 + n * 600, ask=ask) == 20
+    assert asked == [True] + [False] * 10                      # config fetched once
+    top["id"] += 150                                           # then 150 calls in ten minutes
+    assert rdio.poll_instance(inst, now=t0 + 11 * 600, ask=ask) == 150
+    row = rdio.activity()[0]
+    assert row["system"] == "Baltimore County" and row["calls"] == 150 and row["normal"] == 20.0
+    assert row["z"] >= 5 and set(row["tags"]) == {"Fire Dispatch", "Law Dispatch"}
+    assert row["lat"] is not None and "198.51" not in str(row) and "example.org" not in str(row)
+    sig = [s for s in derived_signals() if s.source_kind == SignalKind.radio_metadata]
+    assert len(sig) == 1 and sig[0].normalized_type.value == "fire"
+    fused = detect([_cad(1, lat=sig[0].lat, lon=sig[0].lon)] + sig, min_count=2, min_score=0.1)
+    assert fused[0].source_count == 2                          # dispatch + radio: two sensor kinds
+
+
+def test_rdio_never_retries_an_access_code_and_backs_off_failures(db, tmp_path, monkeypatch):
+    from apb.ingest import rdio
+    from apb.store import radio
+    monkeypatch.setattr(radio, "_ready", False)
+    inst = _rdio_inst(tmp_path)[0]
+    monkeypatch.setattr(rdio, "_instances", [inst])
+    now = time.time()
+
+    def boom(i, w):
+        raise OSError("proxy down")
+    rdio.poll_instance(inst, now=now, ask=boom)
+    st = radio.state(inst["key"])
+    assert st["fails"] == 1 and st["next_at"] >= now + 2 * rdio.EVERY
+    assert rdio._due(now + 60) == []                           # not asked again until then
+    rdio.poll_instance(inst, now=now, ask=lambda i, w: {"pin": True})
+    assert radio.state(inst["key"])["state"] == "closed"
+    assert rdio._due(now + 10 * 86400) == []
+
+
+def test_rdio_does_not_start_without_a_proxy(tmp_path, monkeypatch):
+    from apb.ingest import rdio
+    _rdio_inst(tmp_path)
+    monkeypatch.setenv("APB_RDIO_INSTANCES", str(tmp_path / "rdio_instances.json"))
+    monkeypatch.delenv("APB_RDIO_PROXY", raising=False)
+    monkeypatch.delenv("APB_RDIO_DIRECT", raising=False)
+    monkeypatch.setattr(rdio, "_thread", None)
+    assert rdio.start() is False and rdio._thread is None

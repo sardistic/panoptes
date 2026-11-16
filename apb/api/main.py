@@ -194,6 +194,25 @@ def _feed_observations() -> list[dict]:
                         "freshest": max((s.observed_at.timestamp() for s in sigs), default=None)})
     except Exception as e:
         log.info("feed observations: buffers unavailable: %s", e)
+    try:                                        # one pseudo-feed per radio instance
+        from apb.ingest import rdio
+        from apb.store import radio as radio_store
+        if rdio._instances:
+            known = radio_store.states()
+            calls: dict[str, int] = {}
+            for r in radio_store.latest(3 * rdio.EVERY):
+                calls[r["key"]] = calls.get(r["key"], 0) + (r["calls"] or 0)
+            for inst in rdio._instances:
+                st = known.get(inst["key"]) or {}
+                if st.get("state") == "closed":
+                    continue
+                obs.append({"slug": f"rdio_{inst['key']}", "kind": "rdio",
+                            "name": "Radio: " + "; ".join(list(inst["labels"].values())[:2])[:60],
+                            "fetched_at": st.get("last_poll") or 0.0,
+                            "rows": calls.get(inst["key"], 0), "freshest": None,
+                            "fails": st.get("fails") or 0})
+    except Exception as e:
+        log.info("feed observations: radio unavailable: %s", e)
     if not _off("APB_CAMERAS_OFF"):
         with _cameras._lock:
             cams = [(k, _cameras._at.get(k), len(_cameras._rows.get(k, [])), _cameras._err.get(k))
@@ -280,6 +299,15 @@ def _startup() -> None:
         from apb.fusion import maritime_store
         maritime_store.start()
 
+    # Radio activity from open Rdio Scanner instances (call metadata only, through
+    # the egress proxy). Starts only when an instance list and APB_RDIO_PROXY exist.
+    if _poller_leader and not _off("APB_RDIO_OFF"):
+        try:
+            from apb.ingest import rdio
+            rdio.start()
+        except Exception as e:
+            log.warning("rdio lane disabled: %s", e)
+
     # Warm the public-camera inventories (background threads, ~20s for all vendors)
     # so the first CAMERAS toggle after a deploy is not an empty layer.
     if not _off("APB_CAMERAS_OFF"):
@@ -309,6 +337,7 @@ async def _lifespan(app: FastAPI):
         from apb.fusion import maritime_store, news_store, social_store
         social_store.stop()
         news_store.stop()
+        __import__("apb.ingest.rdio", fromlist=["stop"]).stop()
         maritime_store.stop()
         if _poller_thread and _poller_thread.is_alive():
             _poller_thread.join(timeout=5.0)
@@ -1353,9 +1382,19 @@ def _board(limit: int) -> dict:
         notable = len(mstore.notable_cells(6.0))
     except Exception:
         notable = 0
+    radio_rows: list[dict] = []
+    radio_live = 0
+    try:
+        from apb.ingest import rdio
+        act = rdio.activity(3 * rdio.EVERY)
+        radio_live = len(act)
+        radio_rows = [r for r in act if r["z"] is not None and r["z"] >= 3.0 and r["calls"] >= 8][:6]
+    except Exception as e:
+        log.info("board: radio unavailable: %s", e)
     return {
         "generated_at": now, "active": len(items), "events": items[:limit],
         "anomalies": anomalies, "notable_cells": notable,
+        "radio": radio_rows, "radio_systems": radio_live,
         "internet": [d for d in _live_feed("radar", 0.0) if d.get("ongoing")][:8],
         "health": {"feeds": health["feeds"], "by_state": health["by_state"],
                    "healthy_share": health["healthy_share"],
@@ -1391,6 +1430,10 @@ def _sitrep() -> dict:
                      f"{a['baseline_mean']} normal (z {a['zscore']})")
     for d in board["internet"]:
         lines.append(f"Internet: {d['summary'][:160]}")
+    for r in board.get("radio", []):
+        lines.append(f"Radio surge: {r['system']} {r['calls']} calls in the last window, "
+                     f"{r['per10']}/10min vs {r['normal']} normal (z {r['z']}); busiest: "
+                     + ", ".join(r["tags"]))
     h = board["health"]
     if h["problems_total"]:
         lines.append(f"Blind spots: {h['problems_total']} of {h['feeds']} feeds dark, e.g. "
@@ -1458,6 +1501,7 @@ def status():
         "feeds_by_kind": dict(kinds),
         "backing_off": {"count": len(backing_off), "feeds": backing_off[:40]},
         "lanes_paused": _cad.kind_status(),
+        "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
         "memory": _memory(),
         "lanes": lanes,
         "buffers": {"social": social_store.stats(), "news": news_store.stats()},
@@ -1562,6 +1606,18 @@ def alert_rules():
              "center": r.center, "radius_km": r.radius_km if r.center else None,
              "max_age_hours": r.max_age_hours, "escalate": r.escalate,
              "own_webhook": bool(r.webhook)} for r in load_rules()]
+
+
+@app.get("/live/radio")
+def live_radio(max_age_minutes: float = Query(30.0, gt=0.0, le=720.0),
+               min_z: float = Query(-99.0, ge=-99.0, le=20.0)):
+    """Radio activity per public scanner system: calls in the last poll window, the
+    system's own normal for this time of day, and how surprising the count is (z).
+    Call counts and talkgroup tags only — no audio, and no operator addresses."""
+    from apb.ingest import rdio
+    rows = [r for r in rdio.activity(max_age_minutes * 60.0)
+            if min_z <= -99.0 or (r["z"] is not None and r["z"] >= min_z)]
+    return JSONResponse(rows[:500], headers={"Cache-Control": "public, max-age=60"})
 
 
 @app.get("/live/internet")

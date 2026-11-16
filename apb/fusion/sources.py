@@ -92,6 +92,29 @@ def derived_signals(max_age_hours: float = 6.0) -> list[EventSignal]:
                           "event_uid": c["uid"]}))
     except Exception:
         pass                                    # stores are optional in tests / followers
+    try:                                        # radio systems far above their own normal
+        from apb.ingest import rdio
+        for r in rdio.activity(min(max_age_hours * 3600.0, 3 * rdio.EVERY)):
+            if r["z"] is None or r["z"] < 3.0 or r["calls"] < 8 or r["lat"] is None:
+                continue
+            tags = " ".join(r["tags"]).lower()
+            kind = ("fire" if "fire" in tags else "medical" if "ems" in tags or "medic" in tags
+                    else "other")
+            out.append(EventSignal(
+                signal_id=f"radio:{r['id']}:{int(r['ts'])}",
+                source="rdio", source_kind=SignalKind.radio_metadata,
+                observed_at=datetime.fromtimestamp(r["ts"], tz=timezone.utc),
+                lat=r["lat"], lon=r["lon"], location_text=r["system"],
+                normalized_type=IncidentType(kind),
+                summary=(f"Radio surge: {r['system']} — {r['per10']} calls/10 min vs "
+                         f"{r['normal']} normal ({', '.join(r['tags'])})")[:280],
+                # a system placed only by its operator's town is weaker evidence of WHERE
+                confidence=0.45 if r["approx"] else 0.65,
+                severity=min(0.85, 0.4 + 0.05 * r["z"]),
+                dedupe_key=f"radio:{r['id']}",
+                metadata={"z": r["z"], "calls": r["calls"], "approx": r["approx"]}))
+    except Exception:
+        pass
     try:
         from apb.store import metrics as mstore
         for cell in mstore.notable_cells(min(max_age_hours, 6.0)):

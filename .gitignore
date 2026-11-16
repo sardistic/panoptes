@@ -42,3 +42,7 @@ docs/agent/HANDOFF.md
 .agent/runtime/
 data/apb.sqlite*
 data/sniff_captures/
+
+# Rdio Scanner instance lists hold operators home addresses — never commit them
+data/rdio_candidates.json
+data/rdio_instances.json

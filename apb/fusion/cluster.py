@@ -32,7 +32,8 @@ class FusedEvent:
 
 _FUTURE_SLACK_SEC = 900.0     # tolerate clock skew, nothing more
 _COARSE_WEIGHT = 0.25         # a centroid-placed mention is a quarter of a located one
-_OBSERVER_KINDS = {"camera", "sensor"}   # corroborate on severity alone (no text type)
+# corroborate on severity alone: these sensors observe a place, they do not describe it
+_OBSERVER_KINDS = {"camera", "sensor", "radio_metadata"}
 _TEXT_KINDS = {"social", "news"}
 
 

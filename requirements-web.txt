@@ -12,5 +12,5 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 psycopg[binary]==3.2.9      # optional shared runtime state (APB_STATE_DATABASE_URL)
 
-# Optional: install only on a collector worker that runs scripts/run_bluesky.py.
-# websockets>=12.0
+websockets==15.0.1           # Bluesky firehose; rdio lane (needs >=15 for proxy support)
+python-socks[asyncio]==2.7.1 # rdio lane: websocket connections through the egress SOCKS proxy
