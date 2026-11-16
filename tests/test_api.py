@@ -179,7 +179,9 @@ def test_overwatch_endpoints_shape(client):
     assert {"events", "anomalies", "internet", "health", "active"} <= set(board)
     health = client.get("/status/health").json()
     assert {"feeds", "by_state", "problems", "components"} <= set(health)
-    assert {c["name"] for c in health["components"]} == {"poller", "sampler", "camera tasking"}
+    assert {c["name"] for c in health["components"]} == {
+        "memory", "shared lanes", "poller", "sampler", "camera tasking"}
+    assert {"rss_mb", "limit_mb", "uptime_min"} <= set(client.get("/status").json()["memory"])
     card = client.get("/scorecard").json()
     assert card["alerts"] >= 0 and "by_rule" in card
     rules = client.get("/alerts/rules").json()

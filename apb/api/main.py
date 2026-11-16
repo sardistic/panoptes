@@ -1332,13 +1332,17 @@ def _board(limit: int) -> dict:
             "rank": round((r.get("latest_score") or 0) * novelty * factor, 2),
         })
     items.sort(key=lambda x: -x["rank"])
-    anomalies = []
-    try:
+    def _anomalies() -> list[dict]:
+        out = []
         for a in detect_rate_anomalies(snapshots.query(72.0, limit=20000), z_threshold=2.5)[:6]:
             feed = CAD_FEEDS.get(a["metro"])
-            anomalies.append({**a, "name": feed.name if feed else a["metro"],
-                              "lat": feed.center[0] if feed and feed.center else None,
-                              "lon": feed.center[1] if feed and feed.center else None})
+            out.append({**a, "name": feed.name if feed else a["metro"],
+                        "lat": feed.center[0] if feed and feed.center else None,
+                        "lon": feed.center[1] if feed and feed.center else None})
+        return out
+    anomalies = []
+    try:        # 20k rows materialised per call: once every five minutes is plenty
+        anomalies = _cached(("board-anomalies",), 300.0, _anomalies)
     except Exception as e:
         log.info("board: anomalies unavailable: %s", e)
     health = feedhealth.summary(limit=6)
@@ -1450,6 +1454,8 @@ def status():
         "feeds_total": len(CAD_FEEDS),
         "feeds_by_kind": dict(kinds),
         "backing_off": {"count": len(backing_off), "feeds": backing_off[:40]},
+        "lanes_paused": _cad.kind_status(),
+        "memory": _memory(),
         "lanes": lanes,
         "buffers": {"social": social_store.stats(), "news": news_store.stats()},
         "db": snapshots.stats(),
@@ -1469,13 +1475,47 @@ def status():
     }
 
 
+_BOOT_AT = _time.time()
+
+
+def _memory() -> dict:
+    """Resident memory against the container's limit. The service was being killed
+    at its limit every ~70 minutes with nothing but a bare "Killed" in the log."""
+    rss = limit = None
+    try:
+        with open("/proc/self/status", encoding="ascii") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    rss = int(line.split()[1]) / 1024.0
+                    break
+        with open("/sys/fs/cgroup/memory.max", encoding="ascii") as f:
+            raw = f.read().strip()
+            limit = int(raw) / 1048576.0 if raw.isdigit() else None
+    except (OSError, ValueError):
+        pass
+    return {"rss_mb": round(rss) if rss is not None else None,
+            "limit_mb": round(limit) if limit else None,
+            "used_share": round(rss / limit, 2) if rss and limit else None,
+            "uptime_min": round((_time.time() - _BOOT_AT) / 60)}
+
+
 def _components() -> list[dict]:
     """The moving parts that are not feeds: are the loops themselves alive?"""
     from apb.context import sampler
     now = _time.time()
     beat = round(now - _poller_beat["at"]) if _poller_beat["at"] else None
     samp = sampler.status()
+    mem = _memory()
+    paused = _cad.kind_status()
     return [{
+        "name": "memory", "ok": not (mem["used_share"] and mem["used_share"] >= 0.85),
+        "detail": (f"{mem['rss_mb']} MB of {mem['limit_mb']} MB, up {mem['uptime_min']} min"
+                   if mem["rss_mb"] is not None else "not measurable on this host"),
+    }, {
+        "name": "shared lanes", "ok": not paused,
+        "detail": (", ".join(f"{k} paused {v['paused_min']} min" for k, v in paused.items())
+                   or "none paused"),
+    }, {
         "name": "poller", "ok": bool(_poller_leader and beat is not None
                                      and beat <= _POLLER_STALE_AFTER_S),
         "detail": (f"cycle {_poller_beat['n']}, last beat {beat}s ago" if beat is not None

@@ -23,6 +23,9 @@ USER panoptes
 
 # Railway injects $PORT; bind to it (fall back to 8000 for local `docker run`).
 ENV PORT=8000
+# Sixteen fetch threads each get their own glibc malloc arena by default; freed memory
+# stays parked in them and resident size creeps up to the container limit.
+ENV MALLOC_ARENA_MAX=2
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:' + __import__('os').environ.get('PORT', '8000') + '/health/ready', timeout=3)"

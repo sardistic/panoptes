@@ -95,7 +95,22 @@ class PulsePoint:
         """Active + recent incidents for one agency, decrypted and flattened."""
         r = self._client.get(INCIDENTS_URL + agency_id)
         r.raise_for_status()
-        data = decrypt(r.json())
+        # Say WHICH step failed: "Expecting value: line 1 column 1" is what both a block
+        # page and a changed cipher look like once json has swallowed the detail.
+        try:
+            payload = r.json()
+        except ValueError:
+            ctype = r.headers.get("content-type", "?").split(";")[0]
+            raise ValueError(f"non-JSON reply (HTTP {r.status_code}, {ctype}, "
+                             f"{len(r.content)} bytes): {r.text[:60]!r}") from None
+        if not isinstance(payload, dict) or not {"ct", "iv", "s"} <= set(payload):
+            keys = sorted(payload)[:6] if isinstance(payload, dict) else type(payload).__name__
+            raise ValueError(f"unexpected reply shape (HTTP {r.status_code}): {keys}")
+        try:
+            data = decrypt(payload)
+        except Exception as e:
+            raise ValueError(f"decrypt failed ({type(e).__name__}: {str(e)[:60]}) — "
+                             "the payload arrived but the cipher/key no longer fits") from None
         inc = data.get("incidents", {}) if isinstance(data, dict) else {}
         rows = (inc.get("active") or []) + (inc.get("recent") or [])
         out = []

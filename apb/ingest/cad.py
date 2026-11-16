@@ -728,6 +728,8 @@ class CadIngest:
         self._acled = None
         self._rot = 0           # rotating cursor for bounded overview polling
         self._fail: dict[str, tuple[int, float]] = {}  # metro -> (fail count, retry-after ts)
+        # kind -> [consecutive failures across ALL its feeds, pause level, paused-until ts]
+        self._kind: dict[str, list] = {}
 
     # Feed kinds whose fetcher returns already-normalized incident dicts.
     _FETCHERS = {
@@ -746,6 +748,36 @@ class CadIngest:
         "radar": "_fetch_radar",
     }
 
+    # Kinds whose feeds all hit ONE upstream: when it is down or refusing us, hundreds
+    # of per-feed backoffs still add up to hundreds of requests an hour (and reset to
+    # full speed on every restart). Trip once for the whole kind instead.
+    _SHARED_UPSTREAM = {"pulsepoint"}
+    _TRIP_AFTER = 25
+
+    def kind_paused(self, kind: str) -> bool:
+        st = self._kind.get(kind)
+        return bool(st) and time.time() < st[2]
+
+    def _note_kind(self, kind: str, ok: bool) -> None:
+        if kind not in self._SHARED_UPSTREAM:
+            return
+        st = self._kind.setdefault(kind, [0, 0, 0.0])
+        if ok:
+            st[0], st[1], st[2] = 0, 0, 0.0
+            return
+        st[0] += 1
+        if st[0] >= self._TRIP_AFTER:
+            st[1] = min(st[1] + 1, 5)
+            st[2] = time.time() + min(6 * 3600.0, 1800.0 * 2 ** (st[1] - 1))
+            st[0] = self._TRIP_AFTER - 1          # half-open: one more failure re-trips
+            log.warning("%s: %d consecutive failures across feeds — pausing the whole lane "
+                        "for %d min", kind, self._TRIP_AFTER, round((st[2] - time.time()) / 60))
+
+    def kind_status(self) -> dict:
+        now = time.time()
+        return {k: {"paused_min": round((st[2] - now) / 60), "level": st[1]}
+                for k, st in self._kind.items() if st[2] > now}
+
     def _backing_off(self, metro: str) -> bool:
         fail = self._fail.get(metro)
         return bool(fail) and time.time() < fail[1]
@@ -763,7 +795,7 @@ class CadIngest:
         hit = self._cache.get(metro)
         if hit and time.time() - hit[0] < self.ttl_sec:
             return hit[1]
-        if self._backing_off(metro):
+        if self._backing_off(metro) or self.kind_paused(feed.kind):
             return hit[1] if hit else []
 
         try:
@@ -783,10 +815,12 @@ class CadIngest:
                 out = self._normalize(rows, feed)
         except (httpx.HTTPError, ValueError) as e:
             self._note_failure(metro)
+            self._note_kind(feed.kind, False)
             log.warning("%s fetch failed: %s", metro, e)
             return hit[1] if hit else []
 
         self._fail.pop(metro, None)
+        self._note_kind(feed.kind, True)
         self._cache[metro] = (time.time(), out)
         return out
 

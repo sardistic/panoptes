@@ -463,3 +463,60 @@ def test_legacy_inflated_scores_are_reset_at_init(db, monkeypatch):
     assert (row["latest_score"], row["peak_score"]) == (0, 0)
     events.record([_evt(score=4.0)])
     assert events.query()[0]["peak_score"] == 4.0
+
+
+# ── shared-upstream circuit breaker + PulsePoint error detail ────────────────
+
+def test_shared_upstream_lane_pauses_as_a_whole(monkeypatch):
+    import httpx
+    from apb.ingest import cad
+    ing = cad.CadIngest()
+    calls = []
+    for i in range(40):
+        monkeypatch.setitem(cad.FEEDS, f"pp_t{i}", cad.CadFeed(
+            metro=f"pp_t{i}", name=f"Agency {i}", url=f"T{i}", kind="pulsepoint", hidden=True))
+
+    def boom(feed):
+        calls.append(feed.url)
+        raise ValueError("non-JSON reply (HTTP 200, text/html, 512 bytes)")
+    monkeypatch.setattr(ing, "_fetch_pulsepoint", boom)
+    for i in range(40):
+        assert ing.fetch(f"pp_t{i}") == []
+    assert len(calls) == 25                      # the other 15 agencies were never asked
+    assert ing.kind_paused("pulsepoint") and ing.kind_status()["pulsepoint"]["level"] == 1
+    # after the pause one trial is allowed; a success clears everything
+    ing._kind["pulsepoint"][2] = 0.0
+    monkeypatch.setattr(ing, "_fetch_pulsepoint", lambda feed: [])
+    ing.fetch("pp_t39")
+    assert not ing.kind_paused("pulsepoint") and ing._kind["pulsepoint"][:2] == [0, 0]
+    # one feed failing on its own host never pauses anything
+    monkeypatch.setitem(cad.FEEDS, "soc_x", cad.CadFeed(metro="soc_x", name="x", url="http://x.invalid"))
+    monkeypatch.setattr(ing._client, "get", lambda *a, **k: (_ for _ in ()).throw(httpx.ConnectError("no")))
+    ing.fetch("soc_x")
+    assert ing.kind_status() == {}
+
+
+def test_pulsepoint_errors_name_the_failing_step(monkeypatch):
+    from apb.ingest import pulsepoint
+
+    class R:
+        status_code = 200
+        headers = {"content-type": "text/html; charset=utf-8"}
+        content = b"<html>Access denied</html>"
+        text = "<html>Access denied</html>"
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+    pp = pulsepoint.PulsePoint()
+    monkeypatch.setattr(pp._client, "get", lambda url: R())
+    with pytest.raises(ValueError, match=r"non-JSON reply \(HTTP 200, text/html"):
+        pp.incidents("EMS1")
+    R.json = lambda self: {"ct": "AAAAAAAAAAAAAAAAAAAAAA==", "iv": "00" * 16, "s": "00" * 8}
+    with pytest.raises(ValueError, match="decrypt failed"):
+        pp.incidents("EMS1")
+    R.json = lambda self: {"error": "rate limited"}
+    with pytest.raises(ValueError, match="unexpected reply shape"):
+        pp.incidents("EMS1")
