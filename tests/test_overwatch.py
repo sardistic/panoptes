@@ -520,3 +520,14 @@ def test_pulsepoint_errors_name_the_failing_step(monkeypatch):
     R.json = lambda self: {"error": "rate limited"}
     with pytest.raises(ValueError, match="unexpected reply shape"):
         pp.incidents("EMS1")
+
+
+def test_in_flight_failures_do_not_escalate_a_pause():
+    # seen in prod: 16 fetch threads were mid-request when the lane tripped and each
+    # late failure bumped the level, so the first trip went straight to 6 hours
+    from apb.ingest import cad
+    ing = cad.CadIngest()
+    for _ in range(60):
+        ing._note_kind("pulsepoint", False)
+    assert ing.kind_status()["pulsepoint"]["level"] == 1
+    assert 25 <= ing.kind_status()["pulsepoint"]["paused_min"] <= 30

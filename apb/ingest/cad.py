@@ -765,6 +765,8 @@ class CadIngest:
         if ok:
             st[0], st[1], st[2] = 0, 0, 0.0
             return
+        if time.time() < st[2]:
+            return        # already paused: requests still in flight must not escalate it
         st[0] += 1
         if st[0] >= self._TRIP_AFTER:
             st[1] = min(st[1] + 1, 5)
