@@ -178,7 +178,10 @@ def _feed_observations() -> list[dict]:
                     "fetched_at": hit[0] if hit else 0.0,
                     "rows": len(rows) if rows is not None else 0,
                     "freshest": fresh or None,
-                    "fails": _cad._fail.get(slug, (0, 0.0))[0]})
+                    # a lane paused as a whole is failing, even though its feeds are no
+                    # longer being asked (and so stop accumulating failures of their own)
+                    "fails": (3 if _cad.kind_paused(feed.kind)
+                              else _cad._fail.get(slug, (0, 0.0))[0])})
     try:
         from apb.fusion import news_store, social_store
         for slug, name, store in (("buf_news", "News buffer", news_store),
