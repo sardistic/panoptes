@@ -59,7 +59,7 @@ def test_block_addresses_and_mp3_length():
     assert block_address("[REDACTED] Elm St") is None
     assert block_address("the mall") is None
     assert est_seconds(MP3, "audio/mpeg") == 1.0
-    assert est_seconds(b"x" * 4000, "audio/mp4") == 2.0          # unknown container: 16 kbit/s
+    assert est_seconds(b"x" * 10000, "audio/mp4") == 2.0         # unknown container: 40 kbit/s
 
 
 def test_capture_and_pick_only_what_matters(db, monkeypatch):
@@ -102,10 +102,10 @@ def test_run_once_transcribes_geocodes_and_maps_a_dispatch(db, monkeypatch):
 
     def fetch(inst, ids):
         fetched.append(list(ids))
-        return {i: (MP3 * 3, "audio/mpeg") for i in ids}          # 3 s each
+        return {i: (MP3 * 3, "audio/mpeg") for i in ids}          # 3 s each (estimated)
     located = []
 
-    def locate(loc, muni, area, near, approx):
+    def locate(loc, muni, area, near, approx, state=None):
         located.append((loc, muni, area))
         return (39.30, -76.49)
     n = radio_stt.run_once(now, fetch=fetch, gen=_gen_ok, locate=locate)
@@ -116,7 +116,8 @@ def test_run_once_transcribes_geocodes_and_maps_a_dispatch(db, monkeypatch):
     assert done[501]["kind"] == "dispatch" and "[REDACTED]" in done[501]["text"]   # clip 1 = newest
     assert done[501]["lat"] == 39.30 and done[500]["kind"] == "noise"
     st = radio_stt.status()
-    assert st["audio_tokens"] == 64 and st["incidents"] == 1 and st["used_sec"]["day"] == 6
+    assert st["audio_tokens"] == 64 and st["incidents"] == 1
+    assert st["used_sec"]["day"] == 2                            # trued up to what Gemini heard
     rows = snapshots.query(1.0)
     assert len(rows) == 1 and rows[0]["metro"] == f"radio_{db['key']}" and rows[0]["type"] == "fire"
     sig = [s for s in cad_signals(None, include_live=False) if s.source == "radio_stt"]
@@ -145,7 +146,7 @@ def test_unsupported_mime_switches_label(db):
 
     def gen(parts, max_tokens):
         raise explain.GenerateError(400, "Unsupported MIME type: audio/aac")
-    radio_stt.run_once(now, fetch=lambda inst, ids: {i: (b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 6000, "audio/mp4") for i in ids},
+    radio_stt.run_once(now, fetch=lambda inst, ids: {i: (b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 20000, "audio/mp4") for i in ids},
                        gen=gen, locate=lambda *a: None)
     assert radio_stt.gemini_mime("audio/mp4") == "audio/mp4"     # next label tried next time
     assert radio_stt.pick(now)                                   # the call is still eligible
@@ -229,3 +230,42 @@ def test_probe_merge_replaces_reprobed_and_keeps_the_rest():
     out = merge(old, [{"host": "1.2.3.4", "port": 3000, "state": "open"},
                       {"host": "b.org", "port": 443, "state": "access_code"}])
     assert out["states"] == {"open": 2, "access_code": 1}
+
+
+def test_redaction_backstop_turns_house_numbers_into_blocks():
+    from apb.context.radio_stt import blockify
+    assert blockify("505 Mill Road, 2-story dwelling") == "500 block of Mill Road, 2-story dwelling"
+    assert blockify("respond 1234 N Elm St for a fall") == "respond 1200 block of N Elm St for a fall"
+    assert blockify("the 1200 block of Oak Ave") == "the 1200 block of Oak Ave"   # untouched
+    assert blockify("Engine 39, Medic 4, 2 patients") == "Engine 39, Medic 4, 2 patients"
+    assert blockify("time out 21:20") == "time out 21:20"
+
+
+def test_geocode_trusts_the_model_state_over_a_guessed_place(monkeypatch):
+    from apb.context import radio_stt
+    asked = []
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"result": {"addressMatches": [{"coordinates": {"x": -74.79, "y": 39.98}}]}}
+    monkeypatch.setattr(radio_stt._http, "get", lambda url, params: asked.append(params) or R())
+    # system placed (wrongly) in Burlington NC; the model says NJ -> trusted, no distance test
+    pt = radio_stt.geocode("500 block of Mill Road", "Lumberton", None, (36.09, -79.44), True, "nj")
+    assert pt == (39.98, -74.79) and asked[0]["address"] == "500 Mill Road, Lumberton, NJ"
+    # a known listener town wins over the model, and the distance test applies
+    assert radio_stt.geocode("500 block of Mill Road", None, "Essex, MD", (39.31, -76.47), False, "NJ") is None
+    assert radio_stt.geocode("100 Grey Crescent", None, None, (43.86, -79.43), True, "ON") is None
+
+
+def test_scrub_existing_blockifies_stored_transcripts(db):
+    from apb.context import radio_stt
+    from apb.store import radio
+    radio.add_transcript(db["key"], 1, time.time(), 1, 7, "done", text="respond 505 Mill Road",
+                         location_text="505 Mill Road", summary="smoke at 505 Mill Road")
+    assert radio_stt.scrub_existing() == 1
+    row = radio.transcripts(3600)[0]
+    assert row["location_text"] == "500 block of Mill Road" and "505" not in row["text"]
+    assert radio_stt.scrub_existing() == 0

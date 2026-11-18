@@ -44,7 +44,7 @@ PER_RUN = int(os.environ.get("APB_RADIO_STT_PER_RUN", "16"))
 PER_INSTANCE = 5
 BATCH = 8
 MAX_AGE = 480.0                  # a call older than eight minutes is no longer news
-MIN_SEC, MAX_SEC = 1.5, 90.0     # key-ups and long patches are not worth the budget
+MIN_SEC, MAX_SEC = 2.5, 90.0     # "copy" / "10-4" and long patches are not worth the budget
 TOK_PER_SEC = 32.0
 
 _CENSUS = "https://geocoding.geo.census.gov/geocoder"
@@ -180,8 +180,9 @@ _MP3_KBPS = {1: (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 32
 
 
 def est_seconds(data: bytes, mime: str) -> float:
-    """Clip length from the first MP3 frame's bitrate, else assume 16 kbit/s."""
-    kbps = 16
+    """Clip length from the first MP3 frame's bitrate, else assume 40 kbit/s (measured
+    against Gemini's own audio token counts on the first production batches)."""
+    kbps = 40
     if mime == "audio/mpeg":
         i = 0
         if data[:3] == b"ID3" and len(data) > 10:
@@ -216,6 +217,7 @@ and talkgroup. Return ONLY a JSON array with one object per clip, in order:
  "incident_type": one of [""" + ", ".join(TYPES) + """],
  "location_text": the incident location at block or intersection level (e.g. "100 block of Main St", "5th Ave and Elm St"), or null,
  "municipality": the city or town named, or null,
+ "state": two-letter US state (or Canadian province) code if the system or talkgroup names or the call make it clear, else null,
  "units": [unit names such as "Engine 5", "Medic 12"],
  "priority": 0.0 (routine) to 1.0 (active threat to life),
  "summary": one line, at most 140 characters}
@@ -223,6 +225,28 @@ Redaction (apply to transcript, location_text and summary): replace people's nam
 numbers beyond block level (write "1200 block of", not "1234"), phone numbers, licence \
 plates, dates of birth, and medical or victim details beyond the call type with \
 [REDACTED]. Do not invent anything not said; use null when unclear."""
+
+
+_STREET = (r"(?:[NSEW]\.?\s+)?(?:[A-Z0-9][\w'.-]*\s+){0,4}?"
+           r"(?:Road|Rd|Street|St|Avenue|Ave|Drive|Dr|Lane|Ln|Court|Ct|Boulevard|Blvd|Way|Place|"
+           r"Pl|Crescent|Cres|Circle|Cir|Highway|Hwy|Pike|Parkway|Pkwy|Terrace|Ter|Trail|Trl|"
+           r"Loop|Run|Row|Square|Sq|Alley|Path|Turnpike|Tpke)\b\.?")
+_HOUSE = re.compile(r"\b(\d{1,6})(\s*-?\s*)(" + _STREET + ")")
+
+
+def blockify(text: str | None) -> str | None:
+    """'505 Mill Road' -> '500 block of Mill Road', everywhere in a string. The model is
+    asked to do this; this makes it true even when it does not (seen in production)."""
+    if not text:
+        return text
+
+    def sub(m):
+        before = text[max(0, m.start() - 9):m.start()].lower()
+        if "block of" in before or "blk" in before:
+            return m.group(0)                          # already block level
+        n = int(m.group(1))
+        return f"{n // 100 * 100} block of {m.group(3)}"
+    return _HOUSE.sub(sub, text)
 
 
 def build_parts(clips: list[dict]) -> list[dict]:
@@ -309,19 +333,37 @@ def state_at(lat: float, lon: float) -> str | None:
     return st
 
 
+_US = {"AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
+       "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+       "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
+       "VA", "WA", "WV", "WI", "WY", "DC", "PR"}
+
+
 def geocode(loc: str | None, municipality: str | None, area: str | None,
-            near: tuple | None, approx: bool) -> tuple[float, float] | None:
-    """A block-level address in the system's own area, or None."""
+            near: tuple | None, approx: bool, state_hint: str | None = None) -> tuple[float, float] | None:
+    """A block-level address in the system's own area, or None.
+
+    The state comes from the listener's town when known, else from the model (it reads
+    "Burlington County Public Safety" as New Jersey; the gazetteer picks the biggest
+    Burlington, in North Carolina), else from the system's place when that is not a
+    guess. Census only answers inside the state asked, so a model-given state needs no
+    distance check against an approximate place."""
     addr = block_address(loc)
-    if not addr or not near:
+    if not addr:
         return None
     city, state = None, None
     if area:
         bits = [b.strip() for b in area.split(",")]
         if len(bits) >= 2 and len(bits[1]) == 2 and bits[1].isupper():
             city, state = bits[0], bits[1]
-    state = state or state_at(near[0], near[1])
-    if not state:
+    hint = (state_hint or "").strip().upper()
+    hint = hint if hint in _US else None
+    from_hint = False
+    if not state and hint:
+        state, from_hint = hint, True
+    if not state and near and not approx:
+        state = state_at(near[0], near[1])
+    if not state or state not in _US:
         return None
     city = (municipality or city or "").strip()
     q = ", ".join(x for x in (addr, city, state) if x)
@@ -339,6 +381,10 @@ def geocode(loc: str | None, municipality: str | None, area: str | None,
     if c.get("x") is None or c.get("y") is None:
         return None
     pt = (float(c["y"]), float(c["x"]))
+    if from_hint and approx:
+        return pt
+    if not near:
+        return None
     return pt if _km(pt, near) <= (150.0 if approx else 80.0) else None
 
 
@@ -419,8 +465,15 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
             log.info("radio stt: model: %s", str(e)[:160])
             continue                                   # these calls are retried while still fresh
         _stats["batches"] += 1
-        _stats["audio_tokens"] += audio_tokens(usage)
+        tok = audio_tokens(usage)
+        _stats["audio_tokens"] += tok
+        if tok:                                        # charge what Gemini actually heard
+            spend.refund("radio_stt_sec", need - math.ceil(tok / TOK_PER_SEC))
         results = parse_reply(text, len(batch))
+        for res in results.values():
+            for f in ("transcript", "location_text", "summary"):
+                if isinstance(res.get(f), str):
+                    res[f] = blockify(res[f])
         incidents = []
         for k, c in enumerate(batch):
             res = results.get(k)
@@ -432,7 +485,8 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
             pt = None
             if kind == "dispatch" and res.get("incident_type") not in (None, "noise"):
                 loc, approx = rdio.system_place(c["inst"], c["system_label"])
-                pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), loc, approx)
+                pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), loc, approx,
+                            res.get("state"))
             radio.add_transcript(
                 c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "done",
                 weight=c["weight"], tg_label=c["tg"]["label"], tag=c["tg"]["tag"], kind=kind,
@@ -467,9 +521,33 @@ def _loop() -> None:
         _stop.wait(EVERY)
 
 
+def scrub_existing() -> int:
+    """Apply the block-level backstop to transcripts stored before it existed."""
+    from apb.store import radio
+    changed = 0
+    with radio._lock:
+        c = radio._conn()
+        rows = c.execute("SELECT key, id, text, summary, location_text FROM radio_transcripts "
+                         "WHERE status = 'done'").fetchall()
+        for r in rows:
+            new = [blockify(r[2]), blockify(r[3]), blockify(r[4])]
+            if new != [r[2], r[3], r[4]]:
+                c.execute("UPDATE radio_transcripts SET text = ?, summary = ?, location_text = ? "
+                          "WHERE key = ? AND id = ?", (*new, r[0], r[1]))
+                changed += 1
+        c.commit()
+    return changed
+
+
 def start() -> bool:
     global _thread
     from apb.context import explain
+    try:
+        n = scrub_existing()
+        if n:
+            log.info("radio stt: scrubbed house numbers from %d stored transcripts", n)
+    except Exception as e:
+        log.warning("radio stt: scrub failed: %s", e)
     if _thread or off() or not explain.api_key() or daily_sec() <= 0:
         return False
     _stop.clear()

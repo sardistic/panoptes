@@ -56,6 +56,19 @@ def allow(provider: str, n: int, monthly_cap: int, daily_cap: int) -> bool:
     return True
 
 
+def refund(provider: str, n: int) -> None:
+    """Give back units reserved by allow() that turned out not to be used."""
+    if n <= 0:
+        return
+    month, day = _periods()
+    with _lock:
+        c = _conn()
+        for period in (month, day):
+            c.execute("UPDATE spend SET n = MAX(0, n - ?) WHERE provider = ? AND period = ?",
+                      (n, provider, period))
+        c.commit()
+
+
 def reset(provider: str) -> None:
     """Drop a provider's counters (tests)."""
     with _lock:
