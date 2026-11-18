@@ -95,7 +95,7 @@ register to unlock the keyed lanes.
   `stream=1` emits NDJSON as each source answers. A background **sampler** (leader
   only; `APB_SAMPLER_OFF` disables) re-runs a lite facts pass — keyless lanes plus
   PurpleAir, never the quota lanes — over cells with recent looks and the metro
-  centers plus the 50 largest US metros every 45 min, and reads ~50 camera stills an
+  centers plus the 50 largest US metros every 45 min, and reads ~20 camera stills an
   hour through the model, so baselines and camera activity exist before anyone asks.
   Every pass is logged per cell, so Facts can say "flagged 3 of the last 5 passes" and
   name recurring flags; the Cameras facet draws a 24 h sparkline of camera-derived

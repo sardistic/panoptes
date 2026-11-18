@@ -262,3 +262,11 @@ dispatch over >= 3 calls) or demote (< 10 % over >= 8) a talkgroup.
 Consequences: audio playback is unchanged (the owner asked to hear the radio; it still
 carries what the transcripts redact). Profiling costs one small text call per system
 (capped 300 a day). Placement improves as dispatches accumulate.
+
+### 2026-11-18 — Camera sampler cut from 50 to 20 stills an hour
+
+The new cost meter showed the background camera reads at about $0.0044 per call of ten
+stills (each still is ~1,100 image tokens, not the ~260 assumed), about $0.53 a day and
+the second-largest Gemini line. The owner asked to reduce it. Default
+`APB_SAMPLER_CAMS_BATCH` is now 20 (two full calls an hour, ~$0.21 a day). Camera
+baselines fill more slowly; tasked checks on live events are unaffected.

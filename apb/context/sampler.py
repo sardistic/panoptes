@@ -12,7 +12,7 @@ Two loops, one thread, leader-only (same election as the poller):
                   vehicle / pedestrian / wet-road / visibility reads per cell — a
                   traffic-and-crowd index derived from the cameras themselves.
 
-Both are cheap by construction: cell batches are small, camera reads are ~50 stills
+Both are cheap by construction: cell batches are small, camera reads are ~20 stills
 an hour, and everything keyed-with-quota is excluded. APB_SAMPLER_OFF disables.
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 FACTS_EVERY = float(os.environ.get("APB_SAMPLER_FACTS_SEC", "3600"))     # hourly: ~120 Open-Meteo calls per pass
 FACTS_BATCH = int(os.environ.get("APB_SAMPLER_FACTS_BATCH", "40"))
 CAMS_EVERY = float(os.environ.get("APB_SAMPLER_CAMS_SEC", "3600"))
-CAMS_BATCH = int(os.environ.get("APB_SAMPLER_CAMS_BATCH", "50"))
+CAMS_BATCH = int(os.environ.get("APB_SAMPLER_CAMS_BATCH", "20"))     # two full model calls an hour
 _stop = threading.Event()
 _thread: threading.Thread | None = None
 _state = {"facts_runs": 0, "facts_cells": 0, "cams_runs": 0, "cams_frames": 0, "last_facts": 0.0, "last_cams": 0.0,
