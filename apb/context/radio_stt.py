@@ -109,6 +109,39 @@ def importance(tg: dict) -> tuple[float, str]:
     return 0.2, "other"
 
 
+_weights = {"at": 0.0, "profiles": {}, "tg": {}}
+
+
+def _weight_tables() -> tuple[dict, dict]:
+    if time.time() - _weights["at"] > 60.0:
+        from apb.store import radio
+        try:
+            _weights.update(at=time.time(), profiles=radio.profiles(), tg=radio.talkgroup_stats())
+        except Exception as e:
+            log.info("radio stt: weight tables unavailable: %s", e)
+            _weights["at"] = time.time()
+    return _weights["profiles"], _weights["tg"]
+
+
+def weight_for(key: str, system, tg_id, tg: dict) -> tuple[float, str]:
+    """importance(), corrected by what we have learned about this talkgroup: the system
+    profile names its dispatch talkgroups (many systems tag nothing), and transcripts
+    show whether it really carries dispatches (a "dispatch" tag full of chatter is
+    demoted after enough samples)."""
+    w, fam = importance(tg)
+    profiles, stats = _weight_tables()
+    pf = profiles.get((key, system))
+    if pf and tg_id in pf.get("dispatch_tgs", ()):
+        w = max(w, 0.9)
+        fam = fam if fam != "other" else "dispatch"
+    n, d = stats.get((key, system, tg_id), (0, 0))
+    if n >= 3 and d / n >= 0.4:
+        w = max(w, 0.95)
+    elif n >= 8 and d / n < 0.1:
+        w = min(w, 0.5)
+    return w, fam
+
+
 def _km(a: tuple, b: tuple) -> float:
     coslat = max(0.2, math.cos(math.radians(a[0])))
     return math.hypot(a[0] - b[0], (a[1] - b[1]) * coslat) * 111.0
@@ -144,7 +177,7 @@ def pick(now: float | None = None) -> list[dict]:
         if not inst or r["key"] in closed:
             continue
         tg = rdio.talkgroup(r["key"], r["system"], r["talkgroup"])
-        w, family = importance(tg)
+        w, family = weight_for(r["key"], r["system"], r["talkgroup"], tg)
         if w < 0.3:
             continue                                   # never worth a boost
         boost = 1.0
@@ -153,7 +186,7 @@ def pick(now: float | None = None) -> list[dict]:
         if events:
             pk = (r["key"], r["system"])
             if pk not in places:
-                places[pk] = rdio.system_place(inst, rdio._label(inst, r["system"]))
+                places[pk] = rdio.system_place(inst, rdio._label(inst, r["system"]), r["system"])
             loc, approx = places[pk]
             if loc and not approx and any(_km(loc, ev) <= 20.0 for ev in events):
                 boost *= 1.4
@@ -234,11 +267,16 @@ _STREET = (r"(?:[NSEW]\.?\s+)?(?:[A-Z0-9][\w'.-]*\s+){0,4}?"
 _HOUSE = re.compile(r"\b(\d{1,6})(\s*-?\s*)(" + _STREET + ")")
 
 
+_APT = re.compile(r",?\s*\b(?:apartment|apt\.?|unit|suite|ste\.?|room|rm\.?|lot)\s*#?\s*[\w-]+", re.I)
+
+
 def blockify(text: str | None) -> str | None:
-    """'505 Mill Road' -> '500 block of Mill Road', everywhere in a string. The model is
-    asked to do this; this makes it true even when it does not (seen in production)."""
+    """'505 Mill Road, apartment 12' -> '500 block of Mill Road', everywhere in a string.
+    The model is asked to do this; this makes it true even when it does not (both a
+    house number and an apartment number were seen in production)."""
     if not text:
         return text
+    text = _APT.sub("", text)
 
     def sub(m):
         before = text[max(0, m.start() - 9):m.start()].lower()
@@ -390,15 +428,35 @@ def geocode(loc: str | None, municipality: str | None, area: str | None,
 
 # ── one run ─────────────────────────────────────────────────────────────────
 
-def _incident(c: dict, res: dict, pt: tuple) -> dict:
+AREA_DEG = float(os.environ.get("APB_RADIO_AREA_DEG", "0.02"))      # ~2 km
+
+
+def coarse(pt: tuple | None) -> tuple | None:
+    """The centre of the ~2 km cell a point falls in: the general area, never the address."""
+    if not pt:
+        return None
+    return (round((math.floor(pt[0] / AREA_DEG) + 0.5) * AREA_DEG, 4),
+            round((math.floor(pt[1] / AREA_DEG) + 0.5) * AREA_DEG, 4))
+
+
+def area_name(res: dict, state: str | None) -> str:
+    town = str(res.get("municipality") or "").strip()[:40]
+    st = (state or "").strip().upper()[:2]
+    return ", ".join(x for x in (town, st) if x) or "general area"
+
+
+def _incident(c: dict, res: dict, pt: tuple, state: str | None = None) -> dict:
+    """What the map shows for a dispatch heard on the radio: kind, general area, time.
+    No words from the call and no address leave the server."""
     itype = res.get("incident_type") if res.get("incident_type") in TYPES else "other"
     pr = max(0.0, min(1.0, float(res.get("priority") or 0.3)))
     when = datetime.fromtimestamp(c["ts"], tz=timezone.utc)
     sentiment = ["calm", "routine", "elevated", "urgent", "distress"][min(4, int(pr * 5))]
+    cell = coarse(pt)
     return {"metro": f"radio_{c['key']}", "call_id": f"rdio{c['id']}", "type": itype,
-            "summary": (res.get("summary") or res.get("transcript") or itype)[:240],
-            "location": (res.get("location_text") or "")[:160], "sentiment": sentiment,
-            "threat_score": round(pr, 2), "emerging": pr >= 0.8, "lat": pt[0], "lon": pt[1],
+            "summary": f"{itype.replace('_', ' ')} dispatch heard on radio",
+            "location": area_name(res, state), "sentiment": sentiment,
+            "threat_score": round(pr, 2), "emerging": pr >= 0.8, "lat": cell[0], "lon": cell[1],
             "at": when.isoformat(), "ts": c["ts"], "source": "radio_stt"}
 
 
@@ -484,9 +542,9 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
             kind = str(res.get("kind") or "unit")
             pt = None
             if kind == "dispatch" and res.get("incident_type") not in (None, "noise"):
-                loc, approx = rdio.system_place(c["inst"], c["system_label"])
-                pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), loc, approx,
-                            res.get("state"))
+                pl = rdio.place_info(c["inst"], c["system_label"], c["system"])
+                pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), pl["loc"],
+                            pl["approx"], res.get("state") or pl.get("state"))
             radio.add_transcript(
                 c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "done",
                 weight=c["weight"], tg_label=c["tg"]["label"], tag=c["tg"]["tag"], kind=kind,
@@ -499,7 +557,7 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
             done += 1
             if pt:
                 _stats["located"] += 1
-                incidents.append(_incident(c, res, pt))
+                incidents.append(_incident(c, res, pt, res.get("state") or pl.get("state")))
         if incidents:
             snapshots.record(incidents)
             _stats["incidents"] += len(incidents)
@@ -509,9 +567,94 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
     return done
 
 
+PROFILE_PROMPT = """You help place public-safety radio systems on a map. Given a radio \
+system's name and its most active talkgroups (id, label, name, group), answer with ONLY one \
+JSON object:
+{"area": the county, city or region the system serves, e.g. "Franklin County, OH" or "statewide Ohio",
+ "state": two-letter US state or Canadian province code,
+ "lat": latitude of the centre of that area, "lon": longitude,
+ "statewide": true if it is a statewide or multi-county network,
+ "confidence": 0.0 to 1.0,
+ "dispatch_talkgroups": [ids of talkgroups that look like fire, EMS or police DISPATCH channels]}
+Judge only from the names given. The listener's town is where the antenna is, which can be \
+far from the system. Use null and low confidence when the names do not say."""
+
+
+def profile_one(key: str, system: int, gen=None) -> dict | None:
+    """Ask once where a system is and which of its active talkgroups are dispatch."""
+    from apb.context import explain
+    from apb.ingest import rdio
+    from apb.store import radio
+    inst = rdio.instance(key)
+    if not inst:
+        return None
+    label = rdio._label(inst, system)
+    tgs = []
+    for tg_id, n in radio.active_talkgroups(key, system):
+        t = rdio.talkgroup(key, system, tg_id)
+        tgs.append(f"{tg_id}\t{t['label']}\t{t.get('name') or ''}\t{t.get('group') or ''}\t{n} calls")
+    text = (PROFILE_PROMPT + f"\n\nSystem: {label}\nListener's town: {inst.get('place') or 'unknown'}\n"
+            "Active talkgroups (id, label, name, group, calls in 6 h):\n" + "\n".join(tgs[:60]))
+    raw, _ = (gen or explain.generate_usage)([{"text": text}], max_tokens=500)
+    m = re.search(r"\{.*\}", raw or "", re.S)
+    if not m:
+        return None
+    try:
+        p = json.loads(m.group(0))
+    except ValueError:
+        return None
+    state = str(p.get("state") or "").strip().upper()[:2] or None
+    conf = max(0.0, min(1.0, float(p.get("confidence") or 0)))
+    lat, lon = p.get("lat"), p.get("lon")
+    ok = isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and -90 < lat < 90 and -180 < lon < 180
+    if ok and state in _US:                        # the point must sit in the state it names
+        at = state_at(float(lat), float(lon))
+        if at and at != state:
+            ok, conf = False, min(conf, 0.3)
+    active = {t for t, _ in radio.active_talkgroups(key, system)}
+    disp = [int(t) for t in (p.get("dispatch_talkgroups") or []) if str(t).lstrip("-").isdigit() and int(t) in active]
+    radio.set_profile(key, system, str(p.get("area") or "")[:80] or None, state,
+                      float(lat) if ok else None, float(lon) if ok else None,
+                      bool(p.get("statewide")), conf, disp)
+    return {"area": p.get("area"), "state": state, "ok": ok, "confidence": conf, "dispatch": disp}
+
+
+PROFILES_PER_RUN = int(os.environ.get("APB_RADIO_PROFILES_PER_RUN", "4"))
+
+
+def profile_some(gen=None) -> int:
+    """Profile the busiest systems that have none yet (re-profile after 14 days)."""
+    from apb.store import radio, spend
+    have = radio.profiles()
+    now = time.time()
+    done = 0
+    for key, system, n in radio.active_systems():
+        p = have.get((key, system))
+        if p and now - (p.get("profiled_at") or 0) < 14 * 86400:
+            continue
+        if not spend.allow("radio_profile_calls", 1, monthly_cap=3000, daily_cap=300):
+            break
+        try:
+            if profile_one(key, system, gen) is not None:
+                done += 1
+                _stats["profiles"] = _stats.get("profiles", 0) + 1
+        except Exception as e:
+            _stats["errors"] += 1
+            log.info("radio stt: profile %s/%s: %s", key, system, str(e)[:120])
+        if done >= PROFILES_PER_RUN:
+            break
+    if done:
+        _weights["at"] = 0.0                       # pick up new dispatch talkgroups now
+    return done
+
+
 def _loop() -> None:
     time.sleep(120)                                    # let the lane learn configs first
     while not _stop.is_set():
+        try:
+            profile_some()
+        except Exception as e:
+            log.info("radio stt: profiling failed: %s", e)
         try:
             run_once()
         except Exception as e:
@@ -535,6 +678,20 @@ def scrub_existing() -> int:
                 c.execute("UPDATE radio_transcripts SET text = ?, summary = ?, location_text = ? "
                           "WHERE key = ? AND id = ?", (*new, r[0], r[1]))
                 changed += 1
+        c.commit()
+    from apb.store import snapshots
+    with snapshots.db_lock:                        # radio incidents published before this
+        c = snapshots.conn()
+        rows = c.execute("SELECT metro, call_id, type, lat, lon FROM incidents "
+                         "WHERE metro LIKE 'radio_%'").fetchall()
+        for r in rows:
+            cell = coarse((r[3], r[4])) if r[3] is not None else None
+            summary = f"{str(r[2] or 'other').replace('_', ' ')} dispatch heard on radio"
+            c.execute("UPDATE incidents SET lat = ?, lon = ?, summary = ?, location = ? "
+                      "WHERE metro = ? AND call_id = ?",
+                      (cell[0] if cell else None, cell[1] if cell else None, summary,
+                       "general area", r[0], r[1]))
+            changed += 1
         c.commit()
     return changed
 

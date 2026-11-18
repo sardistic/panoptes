@@ -205,8 +205,12 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   60/min per viewer, `APB_RDIO_CAL_PER_MIN` (20) per source shared with transcription).
 - **Smart transcription** (`apb/context/radio_stt.py`): fire / EMS / law dispatch
   talkgroups first, tactical channels only when their system is surging or an event is
-  nearby, never public works / schools / transit. Gemini transcribes and extracts type,
-  block-level location and units, redacting PII; only the redacted text is stored.
+  nearby, never public works / schools / transit. Systems that tag nothing get a one-time
+  profile (one text call: area, state, which active talkgroups are dispatch), and
+  transcripts promote or demote talkgroups by how often they really carry dispatches.
+  Gemini transcribes and extracts type, block-level location and units; only redacted
+  text is stored, and **none of it is published**: the API, map, board and sitrep show
+  incident kind, urgency, system and a ~2 km area (`APB_RADIO_AREA_DEG`), nothing more.
   Budget: `APB_RADIO_STT_DAILY_SEC` seconds of audio a day (7200). Dispatches with a
   block address are geocoded (Census geocoder, checked against the system's area) and
   become incidents on the map (`metro` `radio_<hash>`, fusion kind `radio_transcript`,

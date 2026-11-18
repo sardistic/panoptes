@@ -45,6 +45,10 @@ def _conn() -> sqlite3.Connection:
             units TEXT, priority REAL, seconds REAL, lat REAL, lon REAL, done_at REAL,
             PRIMARY KEY (key, id));
         CREATE INDEX IF NOT EXISTS idx_rt_ts ON radio_transcripts(ts);
+        CREATE TABLE IF NOT EXISTS radio_profiles (
+            key TEXT NOT NULL, system INTEGER NOT NULL, area TEXT, state TEXT, lat REAL,
+            lon REAL, statewide INTEGER, confidence REAL, dispatch_tgs TEXT, profiled_at REAL,
+            PRIMARY KEY (key, system));
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
@@ -223,6 +227,74 @@ def stt_stats(hours: float = 24.0) -> dict:
     out["audio_sec"] = round(sum(r[2] for r in rows))
     out["located"] = located
     return out
+
+
+def set_profile(key: str, system: int, area: str | None, state: str | None,
+                lat: float | None, lon: float | None, statewide: bool, confidence: float,
+                dispatch_tgs: list[int]) -> None:
+    import json as _json
+    with _lock:
+        c = _conn()
+        c.execute("INSERT OR REPLACE INTO radio_profiles VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  (key, system, area, state, lat, lon, 1 if statewide else 0, confidence,
+                   _json.dumps(sorted(set(int(t) for t in dispatch_tgs))), time.time()))
+        c.commit()
+
+
+def profiles() -> dict[tuple, dict]:
+    import json as _json
+    with _lock:
+        rows = _conn().execute("SELECT * FROM radio_profiles").fetchall()
+    out = {}
+    for r in rows:
+        d = dict(r)
+        try:
+            d["dispatch_tgs"] = set(_json.loads(d.get("dispatch_tgs") or "[]"))
+        except ValueError:
+            d["dispatch_tgs"] = set()
+        out[(d["key"], d["system"])] = d
+    return out
+
+
+def learned_places(min_n: int = 3) -> dict[tuple, dict]:
+    """Where each system's located dispatches actually were (median), once there are
+    enough of them. Internal only: built from block-level geocodes."""
+    with _lock:
+        rows = _conn().execute("SELECT key, system, lat, lon FROM radio_transcripts "
+                               "WHERE status = 'done' AND lat IS NOT NULL").fetchall()
+    pts: dict[tuple, list] = {}
+    for k, s, la, lo in rows:
+        pts.setdefault((k, s), []).append((la, lo))
+    out = {}
+    for ks, p in pts.items():
+        if len(p) >= min_n:
+            lats, lons = sorted(x[0] for x in p), sorted(x[1] for x in p)
+            out[ks] = {"lat": lats[len(lats) // 2], "lon": lons[len(lons) // 2], "n": len(p)}
+    return out
+
+
+def talkgroup_stats() -> dict[tuple, tuple[int, int]]:
+    """(key, system, talkgroup) -> (transcribed calls, of which dispatch)."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT key, system, talkgroup, COUNT(*), SUM(CASE WHEN kind = 'dispatch' THEN 1 ELSE 0 END) "
+            "FROM radio_transcripts WHERE status = 'done' GROUP BY key, system, talkgroup").fetchall()
+    return {(r[0], r[1], r[2]): (r[3], r[4] or 0) for r in rows}
+
+
+def active_talkgroups(key: str, system: int, hours: float = 6.0, limit: int = 60) -> list[tuple[int, int]]:
+    with _lock:
+        rows = _conn().execute("SELECT talkgroup, COUNT(*) AS n FROM radio_recent WHERE key = ? AND "
+                               "system = ? AND ts >= ? GROUP BY talkgroup ORDER BY n DESC LIMIT ?",
+                               (key, system, time.time() - hours * 3600, limit)).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
+def active_systems(hours: float = 6.0) -> list[tuple[str, int, int]]:
+    with _lock:
+        rows = _conn().execute("SELECT key, system, COUNT(*) AS n FROM radio_recent WHERE ts >= ? "
+                               "GROUP BY key, system ORDER BY n DESC", (time.time() - hours * 3600,)).fetchall()
+    return [(r[0], r[1], r[2]) for r in rows]
 
 
 def series(key: str, system: int, hours: float = 24.0) -> list[dict]:

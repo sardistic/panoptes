@@ -2706,7 +2706,8 @@ function playNextLive(){ if(radioLive&&radioQueue.length&&radioPlaying==null) pl
 function stopLive(){ if(radioLive){ clearInterval(radioLive.timer); radioLive=null; } radioQueue=[]; }
 const callTime = ts => new Date(ts*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 function callRow(c){
-  const tx=c.text?`<div class="rc-tx">${c.type&&c.type!=='noise'?`<i>${esc(String(c.type).replace(/_/g,' '))}</i>`:''}${esc(c.text)}${c.location?` — <b>${esc(c.location)}</b>`:''}</div>`:'';
+  const tx=c.kind==='dispatch'&&c.type&&c.type!=='noise'
+    ?`<div class="rc-tx"><i>${esc(String(c.type).replace(/_/g,' '))} dispatch</i>${c.located?'placed on the map':'area not placed'}</div>`:'';
   return `<div class="rc${c.weight>=0.8?' hi':''}" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
     +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup)}</b> · ${esc(c.tag)}</div>${tx}</div>`;
 }
@@ -2726,10 +2727,10 @@ async function openRadio(r,at){
   const tags=Object.entries(r.tags||{}).map(([k,v])=>`${esc(k)} ${esc(v)}`).join(' · ');
   const html=`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
     +`<div class="meta">${radioRate(r)} <span class="rspark"></span></div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
-    +`<div class="meta">${r.approx?'place approximate'+(r.area?' — heard from '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
+    +`<div class="meta">${r.approx?'place approximate'+(r.area?' — '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
     +`<div class="rcalls"><div class="rc-head"><button class="rc-live" title="play each new call as it arrives">● LIVE</button>`
     +`<label><input type="checkbox" class="rc-disp" checked> dispatch only</label></div><div class="rc-list"><div class="rc-m">loading calls…</div></div></div>`
-    +`<div class="meta" style="margin-top:6px">audio relayed on request from a volunteer's public scanner; transcripts are machine-made and redacted</div></div>`;
+    +`<div class="meta" style="margin-top:6px">audio relayed on request from a volunteer's public scanner · placed ${r.placed_by==='dispatches'?'from its own dispatches':r.placed_by==='profile'?'from its system and talkgroup names':r.placed_by==='label'?'from its name':"at the listener's town"}</div></div>`;
   const pop=L.popup({maxWidth:340,minWidth:300}).setLatLng(where).setContent(html).openOn(map);
   pop.on('remove',stopLive);
   const el=pop.getElement();
@@ -2812,7 +2813,7 @@ function drawBoard(){
     ||'<div class="empty">no system above its normal</div>')
     +((b.heard||[]).length?'<h4>Heard on dispatch</h4>'+b.heard.map((t,i)=>
       `<div class="row brow" data-h="${i}"><div class="t"><span class="ty">${esc(String(t.type||'call').replace(/_/g,' '))}</span><span class="sev ${t.priority>=0.7?'hot':'lo'}">${esc(callTime(t.ts))}</span></div>`
-      +`<div class="loc">${esc(t.summary||t.text||'')}${t.location?' · '+esc(t.location):''}</div><div class="loc">${esc(t.system||'')}${t.lat==null?' · not placed':''} · <a href="#" class="rc-hear" data-src="${esc(t.audio)}">▶ hear</a></div></div>`).join(''):'')
+      +`<div class="loc">${esc(t.system||'')}${t.area?' · '+esc(t.area):''}${t.lat==null?' · not placed':''} · <a href="#" class="rc-hear" data-src="${esc(t.audio)}">▶ hear</a></div></div>`).join(''):'')
     +'<div id="radioAll"></div>';
   if((b.internet||[]).length) html+='<h4>Internet</h4>'+b.internet.map((d,i)=>
     `<div class="row brow" data-n="${i}"><div class="loc" style="margin-top:0;color:var(--txt)">${esc(d.summary)}</div></div>`).join('');

@@ -12,11 +12,15 @@ from apb.common.models import SignalKind
 def db(tmp_path, monkeypatch):
     from apb.context import radio_stt
     from apb.ingest import rdio
-    from apb.store import radio, snapshots, spend
+    from apb.context import tasking
+    from apb.store import alertlog, events, feedhealth, metrics, radio, snapshots, spend
     monkeypatch.setattr(snapshots, "DB_PATH", tmp_path / "t.sqlite")
     monkeypatch.setattr(snapshots, "_conn", None)
-    for mod in (radio, spend):
-        monkeypatch.setattr(mod, "_ready", False)
+    for mod in (radio, spend, events, feedhealth, alertlog, metrics, tasking):
+        monkeypatch.setattr(mod, "_ready", False)      # every store recreates its tables here
+    monkeypatch.setattr(events, "_hist_ready", False)
+    rdio._places["at"] = 0.0
+    radio_stt._weights["at"] = 0.0
     monkeypatch.delenv("APB_STATE_DATABASE_URL", raising=False)
     monkeypatch.setenv("APB_RDIO_PROXY", "socks5h://proxy.test:1080")
     rdio._cfg.clear()
@@ -269,3 +273,110 @@ def test_scrub_existing_blockifies_stored_transcripts(db):
     row = radio.transcripts(3600)[0]
     assert row["location_text"] == "500 block of Mill Road" and "505" not in row["text"]
     assert radio_stt.scrub_existing() == 0
+
+
+# ── placement by evidence; nothing transcribed is published ──────────────────
+
+def test_profile_places_a_system_and_names_its_dispatch_talkgroups(db, monkeypatch):
+    from apb.context import radio_stt
+    from apb.ingest import rdio
+    from apb.store import radio
+    now = time.time()
+    radio.add_recent(db["key"], [(1, now - 60, 1, 8), (2, now - 50, 1, 9), (3, now - 40, 1, 77)])
+    monkeypatch.setattr(radio_stt, "state_at", lambda lat, lon: "OH")
+    seen = {}
+
+    def gen(parts, max_tokens):
+        seen["prompt"] = parts[0]["text"]
+        return json.dumps({"area": "Franklin County, OH", "state": "OH", "lat": 39.97, "lon": -83.0,
+                           "statewide": False, "confidence": 0.8,
+                           "dispatch_talkgroups": [77, 9999]}), {}          # 9999 is not active
+    out = radio_stt.profile_one(db["key"], 1, gen)
+    assert out["ok"] and out["dispatch"] == [77]
+    assert "Listener's town: Essex, MD" in seen["prompt"] and "77\t77" in seen["prompt"]
+    rdio._places["at"] = 0.0
+    pl = rdio.place_info(db, "Baltimore County", 1)
+    assert pl["by"] == "profile" and pl["loc"] == (39.97, -83.0) and not pl["approx"]
+    radio_stt._weights["at"] = 0.0
+    w, _ = radio_stt.weight_for(db["key"], 1, 77, rdio.talkgroup(db["key"], 1, 77))
+    assert w == 0.9                                                    # untagged, but dispatch
+
+
+def test_profile_point_in_the_wrong_state_is_rejected(db, monkeypatch):
+    from apb.context import radio_stt
+    from apb.store import radio
+    radio.add_recent(db["key"], [(1, time.time(), 1, 7)])
+    monkeypatch.setattr(radio_stt, "state_at", lambda lat, lon: "PA")
+    out = radio_stt.profile_one(db["key"], 1, lambda parts, max_tokens: (json.dumps(
+        {"area": "Franklin County, OH", "state": "OH", "lat": 40.6, "lon": -80.2, "confidence": 0.9}), {}))
+    assert not out["ok"] and out["confidence"] <= 0.3
+    assert radio.profiles()[(db["key"], 1)]["lat"] is None
+
+
+def test_own_dispatches_beat_the_profile_and_demote_chatty_talkgroups(db):
+    from apb.context import radio_stt
+    from apb.ingest import rdio
+    from apb.store import radio
+    now = time.time()
+    for i, (la, lo) in enumerate([(39.40, -76.60), (39.42, -76.55), (39.38, -76.58)]):
+        radio.add_transcript(db["key"], 10 + i, now, 1, 7, "done", kind="dispatch", lat=la, lon=lo)
+    for i in range(9):
+        radio.add_transcript(db["key"], 100 + i, now, 1, 7, "done", kind="unit")
+    rdio._places["at"] = 0.0
+    pl = rdio.place_info(db, "Baltimore County", 1)
+    assert pl["by"] == "dispatches" and pl["loc"] == (39.40, -76.58)
+    radio_stt._weights["at"] = 0.0                                     # 3 of 12 = 25 %: neither
+    assert radio_stt.weight_for(db["key"], 1, 7, {"tag": "Fire Dispatch"})[0] == 1.0
+    for i in range(30):
+        radio.add_transcript(db["key"], 200 + i, now, 1, 7, "done", kind="unit")
+    radio_stt._weights["at"] = 0.0
+    assert radio_stt.weight_for(db["key"], 1, 7, {"tag": "Fire Dispatch"})[0] == 0.5
+
+
+def test_published_incident_is_a_coarse_area_without_words():
+    from apb.context.radio_stt import _incident, blockify, coarse
+    c = {"key": "abcdef0123", "id": 5, "ts": time.time()}
+    res = {"incident_type": "fire", "priority": 0.7, "transcript": "Engine 5, 500 block of Oak",
+           "summary": "Structure fire", "location_text": "500 block of Oak Ave", "municipality": "Essex"}
+    inc = _incident(c, res, (39.3071, -76.4823), "MD")
+    assert (inc["lat"], inc["lon"]) == coarse((39.3071, -76.4823)) == (39.31, -76.49)
+    assert inc["summary"] == "fire dispatch heard on radio" and inc["location"] == "Essex, MD"
+    assert "Oak" not in json.dumps(inc) and "Engine" not in json.dumps(inc)
+    assert blockify("300 block of South Broad Street, apartment 1203") == "300 block of South Broad Street"
+
+
+def test_api_never_serves_transcript_words(db, monkeypatch):
+    import importlib
+    import os
+    for f in ("APB_POLLER_OFF", "APB_BLUESKY_OFF", "APB_NEWS_OFF", "APB_GNEWS_OFF",
+              "APB_SOCIAL_RSS_OFF", "APB_ADSB_OFF", "APB_CAMERAS_OFF", "APB_SAMPLER_OFF", "APB_RDIO_OFF"):
+        os.environ[f] = "1"
+    from fastapi.testclient import TestClient
+    from apb.store import radio
+    now = time.time()
+    radio.add_recent(db["key"], [(42, now - 30, 1, 7)])
+    radio.add_transcript(db["key"], 42, now - 30, 1, 7, "done", kind="dispatch", incident_type="fire",
+                         text="Engine 5 respond 500 block of Oak Ave, caller [REDACTED]",
+                         summary="Fire on Oak Ave", location_text="500 block of Oak Ave",
+                         units=["Engine 5"], priority=0.7, lat=39.3071, lon=-76.4823)
+    main = importlib.import_module("apb.api.main")
+    with TestClient(main.app) as c:
+        bodies = [c.get("/live/radio/transcripts").text,
+                  c.get(f"/live/radio/{db['key']}:1/calls").text,
+                  c.get("/live/board").text]
+    for body in bodies:
+        assert "Oak" not in body and "Engine 5" not in body and "REDACTED" not in body
+    t = json.loads(bodies[0])[0]
+    assert t["type"] == "fire" and (t["lat"], t["lon"]) == (39.31, -76.49)
+    assert json.loads(bodies[1])[0]["located"] is True
+
+
+def test_scrub_coarsens_radio_incidents_already_published(db):
+    from apb.context import radio_stt
+    from apb.store import snapshots
+    snapshots.record([{"metro": "radio_abcdef0123", "call_id": "rdio1", "type": "fire",
+                       "summary": "Fire at 500 block of Oak Ave", "location": "500 block of Oak Ave",
+                       "lat": 39.3071, "lon": -76.4823, "ts": time.time()}])
+    radio_stt.scrub_existing()
+    row = snapshots.query(1.0)[0]
+    assert (row["lat"], row["lon"]) == (39.31, -76.49) and "Oak" not in row["summary"] + row["location"]

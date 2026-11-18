@@ -241,3 +241,24 @@ Consequences: coverage follows where hobbyists publish (about 160 systems, about
 instances, uneven). Audio contains PII the transcripts redact — accepted by the owner;
 the guardrail still governs stored and exposed records. Cost at the default cap is
 roughly two hours of audio a day (Gemini bills about 32 audio tokens per second).
+
+### 2026-11-18 — Radio transcripts are internal; systems are placed by evidence
+
+Context: the owner asked not to publish the transcribed data, only to use transcribed
+addresses to place incidents in their general area; and asked why many radio systems
+stacked on one spot (a volunteer in Economy, PA carries Franklin MARCS, which serves
+Columbus, OH — every system fell back to the listener's town).
+
+Decision: transcripts (redacted) stay in the server's store. Nothing served contains
+their words, addresses or units: incidents carry the type, urgency and the centre of a
+~2 km cell; the calls list shows only "fire dispatch, placed / not placed". Already
+published radio incidents were coarsened at startup. Systems are placed by, in order:
+the median of their own geocoded dispatches (>= 3), a one-time model profile from the
+system and talkgroup names (point checked against the Census state it names), the label
+in the gazetteer near the listener, the listener's town. The profile also names the
+dispatch talkgroups of systems that tag nothing; transcripts then promote (>= 40 %
+dispatch over >= 3 calls) or demote (< 10 % over >= 8) a talkgroup.
+
+Consequences: audio playback is unchanged (the owner asked to hear the radio; it still
+carries what the transcripts redact). Profiling costs one small text call per system
+(capped 300 a day). Placement improves as dispatches accumulate.

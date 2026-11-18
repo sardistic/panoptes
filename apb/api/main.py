@@ -1,7 +1,8 @@
 """Query + alerting API over stored incidents (dissemination layer).
 
-Only redacted incident records are exposed here, and unredacted transcripts are
-never stored or served. One exception for audio (2026-11-17, the owner's call): a
+Only redacted incident records are exposed here. Radio transcripts are internal: they
+are stored redacted and used only to classify calls and place them in a ~2 km area;
+their words and addresses are never served. One exception for audio (2026-11-17, the owner's call): a
 call published by a volunteer's public Rdio Scanner can be replayed on request through
 /live/radio/audio — relayed, briefly cached, rate-limited per source, never archived.
 
@@ -1403,8 +1404,8 @@ def _board(limit: int) -> dict:
         for t in radio_store.transcripts(1800.0, min_priority=0.4, limit=60):
             if t.get("kind") != "dispatch" or t.get("incident_type") in (None, "noise"):
                 continue
-            inst = rdio.instance(t["key"])
-            heard.append(_transcript_out(t, rdio._label(inst, t["system"]) if inst else None))
+            label, area = _system_area(rdio, rdio.instance(t["key"]), t["system"])
+            heard.append(_transcript_out(t, label, area))
             if len(heard) >= 8:
                 break
     except Exception as e:
@@ -1449,8 +1450,8 @@ def _sitrep() -> dict:
     for d in board["internet"]:
         lines.append(f"Internet: {d['summary'][:160]}")
     for t in board.get("heard", [])[:5]:
-        lines.append(f"Heard on dispatch ({t['system'] or 'radio'}): {t['type']} — "
-                     f"{(t['summary'] or '')[:140]}" + (f" at {t['location']}" if t.get("location") else ""))
+        lines.append(f"Heard on dispatch ({t['system'] or 'radio'}): {t['type']} call, priority "
+                     f"{t.get('priority')}" + (f", {t['area']}" if t.get("area") else ""))
     for r in board.get("radio", []):
         lines.append(f"Radio surge: {r['system']} {r['calls']} calls in the last window, "
                      f"{r['per10']}/10min vs {r['normal']} normal (z {r['z']}); busiest: "
@@ -1651,14 +1652,25 @@ _audio_hits: dict[str, deque] = defaultdict(deque)
 _AUDIO_PER_MIN = 60
 
 
-def _transcript_out(t: dict, label: str | None = None) -> dict:
+def _transcript_out(t: dict, label: str | None = None, area: str | None = None) -> dict:
+    """What leaves the server about a transcribed call: what kind of incident, how
+    urgent, the system, and the ~2 km area it is in. Never the words, the address or
+    the units — those stay internal and only serve to place the area."""
+    from apb.context.radio_stt import coarse
+    cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
     return {"id": f"{t['key']}:{t['system']}", "call": t["id"], "ts": t["ts"],
             "system": label, "talkgroup": t.get("tg_label"), "tag": t.get("tag"),
-            "kind": t.get("kind"), "type": t.get("incident_type"), "text": t.get("text"),
-            "summary": t.get("summary"), "location": t.get("location_text"),
-            "units": t.get("units"), "priority": t.get("priority"),
-            "lat": t.get("lat"), "lon": t.get("lon"),
+            "kind": t.get("kind"), "type": t.get("incident_type"), "priority": t.get("priority"),
+            "area": area, "lat": cell[0] if cell else None, "lon": cell[1] if cell else None,
             "audio": f"/live/radio/audio/{t['key']}/{t['id']}"}
+
+
+def _system_area(rdio, inst, system) -> tuple[str | None, str | None]:
+    if not inst:
+        return None, None
+    label = rdio._label(inst, system)
+    pl = rdio.place_info(inst, label, system)
+    return label, pl.get("area") or (pl.get("state") or None)
 
 
 @app.get("/live/radio/transcripts")
@@ -1666,24 +1678,24 @@ def live_radio_transcripts(max_age_minutes: float = Query(60.0, gt=0.0, le=4320.
                            located_only: bool = False,
                            min_priority: float = Query(0.0, ge=0.0, le=1.0),
                            limit: int = Query(200, ge=1, le=500)):
-    """Calls the smart-radio worker transcribed (redacted text, extracted type and
-    block-level location). `located_only` keeps the ones geocoded onto the map."""
+    """Calls the smart-radio worker classified: incident type, urgency, system and the
+    ~2 km area. The transcript text and addresses are never published."""
     from apb.ingest import rdio
     from apb.store import radio as radio_store
     out = []
     for t in radio_store.transcripts(max_age_minutes * 60.0, located_only, min_priority, limit):
-        inst = rdio.instance(t["key"])
-        out.append(_transcript_out(t, rdio._label(inst, t["system"]) if inst else None))
+        label, area = _system_area(rdio, rdio.instance(t["key"]), t["system"])
+        out.append(_transcript_out(t, label, area))
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=30"})
 
 
 @app.get("/live/radio/{rid}/calls")
 def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     """Newest calls on one radio system: time, talkgroup, how much it matters, a
-    playable audio link, and the transcript when the worker made one."""
+    playable audio link, and the incident kind when the worker classified it."""
     if not _RADIO_ID_RE.match(rid):
         return JSONResponse({"error": "bad id"}, status_code=400)
-    from apb.context.radio_stt import importance
+    from apb.context.radio_stt import weight_for
     from apb.ingest import rdio
     from apb.store import radio as radio_store
     key, _, system = rid.partition(":")
@@ -1692,13 +1704,12 @@ def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     out = []
     for c in radio_store.recent_calls(key, int(system), limit):
         tg = rdio.talkgroup(key, int(system), c["talkgroup"])
-        weight, family = importance(tg)
+        weight, family = weight_for(key, int(system), c["talkgroup"], tg)
         row = {"id": c["id"], "ts": c["ts"], "talkgroup": tg["label"], "tag": tg["tag"],
                "group": tg.get("group"), "weight": weight, "family": family,
                "audio": f"/live/radio/audio/{key}/{c['id']}"}
-        if c.get("status") == "done":
-            row.update(kind=c.get("kind"), type=c.get("incident_type"), text=c.get("text"),
-                       summary=c.get("summary"), location=c.get("location_text"),
+        if c.get("status") == "done":             # classification only, never the words
+            row.update(kind=c.get("kind"), type=c.get("incident_type"),
                        priority=c.get("priority"), located=c.get("lat") is not None)
         out.append(row)
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=8"})

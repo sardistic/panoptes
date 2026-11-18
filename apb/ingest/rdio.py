@@ -129,19 +129,56 @@ def load_instances(path: Path | None = None) -> list[dict]:
     return out
 
 
-def system_place(inst: dict, label: str) -> tuple[tuple[float, float] | None, bool]:
-    """Where a system is, and whether that is only approximate. The label usually
-    names a county or city ("Baltimore County"); the operator's own town is the
-    fallback, and a label that resolves far from the operator is not believed."""
+_places = {"at": 0.0, "learned": {}, "profiles": {}}
+
+
+def _place_tables() -> tuple[dict, dict]:
+    if time.time() - _places["at"] > 60.0:
+        from apb.store import radio
+        try:
+            _places.update(at=time.time(), learned=radio.learned_places(), profiles=radio.profiles())
+        except Exception as e:
+            log.info("rdio: place tables unavailable: %s", e)
+            _places["at"] = time.time()
+    return _places["learned"], _places["profiles"]
+
+
+def place_info(inst: dict, label: str, system=None) -> dict:
+    """Where a system is and how we know. Best evidence first:
+      dispatches  the median of its own geocoded dispatches (3 or more)
+      profile     the area the model read off the system and talkgroup names,
+                  checked against the Census state at that point
+      label       the system label resolved in the gazetteer near the listener
+      listener    the volunteer's own town — where the antenna is, not the radio
+    Listener and weak profiles are approximate."""
     from apb.fusion.places import resolve_place
+    key = inst.get("key")
+    learned, profiles = _place_tables()
+    if system is not None:
+        lp = learned.get((key, system))
+        if lp:
+            return {"loc": (lp["lat"], lp["lon"]), "approx": False, "by": "dispatches", "area": None,
+                    "state": (profiles.get((key, system)) or {}).get("state")}
+        pf = profiles.get((key, system))
+        if pf and pf.get("lat") is not None and (pf.get("confidence") or 0) >= 0.4:
+            return {"loc": (pf["lat"], pf["lon"]), "approx": bool(pf.get("statewide"))
+                    or (pf.get("confidence") or 0) < 0.6, "by": "profile", "area": pf.get("area"),
+                    "state": pf.get("state")}
     hit = resolve_place(label) if label else None
     base = inst.get("loc")
     if hit and base:
         km = math.hypot(hit.lat - base[0], (hit.lon - base[1]) * math.cos(math.radians(base[0]))) * 111.0
-        return ((hit.lat, hit.lon), False) if km <= 400.0 else (base, True)
+        if km <= 400.0:
+            return {"loc": (hit.lat, hit.lon), "approx": False, "by": "label", "area": None, "state": None}
+        return {"loc": base, "approx": True, "by": "listener", "area": inst.get("place"), "state": None}
     if hit:
-        return (hit.lat, hit.lon), True
-    return base, True
+        return {"loc": (hit.lat, hit.lon), "approx": True, "by": "label", "area": None, "state": None}
+    return {"loc": base, "approx": True, "by": "listener", "area": inst.get("place"), "state": None}
+
+
+def system_place(inst: dict, label: str, system=None) -> tuple[tuple[float, float] | None, bool]:
+    p = place_info(inst, label, system)
+    return p["loc"], p["approx"]
 
 
 def count_calls(results: list[dict], last_id: int | None) -> tuple[int, dict[int, dict]]:
@@ -479,13 +516,14 @@ def activity(max_age_sec: float = 1800.0) -> list[dict]:
         if not inst:
             continue
         label = _label(inst, r["system"])
-        loc, approx = system_place(inst, label)
+        pl = place_info(inst, label, r["system"])
+        loc = pl["loc"]
         top = sorted(r["tags"].items(), key=lambda kv: -kv[1])[:3]
         out.append({"id": f"{r['key']}:{r['system']}", "system": label, "ts": r["ts"],
                     "calls": r["calls"], "per10": r["per10"], "normal": r["base"], "z": r["z"],
                     "tags": dict(top), "lat": loc[0] if loc else None,
-                    "lon": loc[1] if loc else None, "approx": approx,
-                    "area": inst.get("place")})
+                    "lon": loc[1] if loc else None, "approx": pl["approx"],
+                    "placed_by": pl["by"], "area": pl["area"] or inst.get("place")})
     out.sort(key=lambda d: (-(d["z"] if d["z"] is not None else -99), -d["per10"]))
     return out
 
