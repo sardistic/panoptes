@@ -470,7 +470,7 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
     if not picked:
         return 0
     fetch = fetch or rdio.fetch_calls
-    gen = gen or explain.generate_usage
+    gen = gen or (lambda parts, max_tokens: explain.generate_usage(parts, max_tokens, feature="radio_stt"))
     locate = locate or geocode
     clips: list[dict] = []
     by_key: dict[str, list[dict]] = {}
@@ -595,7 +595,8 @@ def profile_one(key: str, system: int, gen=None) -> dict | None:
         tgs.append(f"{tg_id}\t{t['label']}\t{t.get('name') or ''}\t{t.get('group') or ''}\t{n} calls")
     text = (PROFILE_PROMPT + f"\n\nSystem: {label}\nListener's town: {inst.get('place') or 'unknown'}\n"
             "Active talkgroups (id, label, name, group, calls in 6 h):\n" + "\n".join(tgs[:60]))
-    raw, _ = (gen or explain.generate_usage)([{"text": text}], max_tokens=500)
+    raw, _ = (gen or (lambda parts, max_tokens: explain.generate_usage(parts, max_tokens, feature="radio_profile")))(
+        [{"text": text}], max_tokens=500)
     m = re.search(r"\{.*\}", raw or "", re.S)
     if not m:
         return None

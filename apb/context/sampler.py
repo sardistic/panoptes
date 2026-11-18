@@ -147,7 +147,7 @@ def cams_pass(registry) -> int:
             log.info("sampler cams: no stills from %d cameras in chunk", len(chunk))
             continue
         try:
-            text = explain.generate(parts, max_tokens=800)
+            text = explain.generate(parts, max_tokens=800, feature="camera_sampler")
         except Exception as e:
             _state["errors"] += 1
             log.info("sampler cams gemini: %s", e)

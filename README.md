@@ -121,6 +121,12 @@ register to unlock the keyed lanes.
   the side panel's **Right now** tab.
 - `/status` — per-lane operational health (rows, freshness, backoff, buffers), plus
   sampler state, the Street View budget and YouTube / Windy daily quota counters.
+- `/status/costs` — what the paid APIs cost: every Gemini call is metered by feature
+  (`camera_sampler`, `camera_tasking`, `radio_stt`, `radio_profile`, `sitrep`,
+  `explain:*`) and model, priced with `APB_PRICE_IN_TEXT` / `APB_PRICE_IN_AUDIO` /
+  `APB_PRICE_OUT` (USD per million tokens; Gemini 2.5 Flash list prices by default), by
+  day for up to 90 days; Street View and the free quotas alongside. `/status.costs` is
+  the short version. Estimates — the provider's billing page is authoritative.
 - `/status/health` — feed-silence report: every lane, buffer and camera inventory is
   judged against its own normal and named when it is `failing` (fetch errors),
   `silent` (zero rows where rows are normal) or `stale` (freshest record far older

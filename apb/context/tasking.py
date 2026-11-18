@@ -280,7 +280,8 @@ def check_event(registry, event: dict) -> dict | None:
     if not spend.allow("gemini_tasking", 1, monthly_cap=daily * 31, daily_cap=daily):
         log.info("tasking: daily model budget reached")
         return None
-    text = explain.generate([{"text": prompt_for(event, got)}] + parts, max_tokens=700)
+    text = explain.generate([{"text": prompt_for(event, got)}] + parts, max_tokens=700,
+                            feature="camera_tasking")
     obs, verdict = parse_reply(text, len(got))
     if not obs and not verdict:
         log.info("tasking: unparseable reply: %r", text[:160])

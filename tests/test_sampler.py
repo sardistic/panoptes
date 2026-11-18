@@ -53,7 +53,7 @@ def test_cams_pass_records_observations(monkeypatch):
 
     monkeypatch.setattr(explain, "api_key", lambda: "k")
     seen = {}
-    def gen(parts, max_tokens):
+    def gen(parts, max_tokens, **_):
         seen["images"] = sum(1 for p in parts if "inline_data" in p)
         return 'OBS: [{"i":1,"vehicles":4,"pedestrians":0,"road_wet":true,"visibility":"good","notable":""},' \
                '{"i":2,"vehicles":0,"pedestrians":2,"road_wet":false,"visibility":"reduced","notable":"fog"}]'
@@ -121,7 +121,7 @@ def test_cams_pass_tolerates_backticks_and_zero_index(monkeypatch):
             return b"\xff\xd8", "image/jpeg"
 
     monkeypatch.setattr(explain, "api_key", lambda: "k")
-    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens:
+    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens, **_:
         '`OBS: `[{"i": 0, "vehicles": 3, "pedestrians": 0, "road_wet": false, "visibility": "good", "notable": ""}, '
         '{"i": 1, "vehicles": 5, "pedestrians": 1, "road_wet": false, "visibility": "good", "notable": "x"}]')
     assert sampler.cams_pass(Reg()) == 2

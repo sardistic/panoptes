@@ -1470,7 +1470,7 @@ def _sitrep() -> dict:
               "say plainly when the example text looks unrelated to a real incident (keyword noise), "
               "and end with any blind spot that limits confidence. No preamble, no markdown headings.\n\n"
               + "\n".join(lines))
-    return {"text": explain.generate([{"text": prompt}], max_tokens=350).strip(),
+    return {"text": explain.generate([{"text": prompt}], max_tokens=350, feature="sitrep").strip(),
             "generated_at": _time.time(), "items": len(lines)}
 
 
@@ -1525,6 +1525,7 @@ def status():
         "lanes_paused": _cad.kind_status(),
         "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
+        "costs": _costs_brief(),
         "memory": _memory(),
         "lanes": lanes,
         "buffers": {"social": social_store.stats(), "news": news_store.stats()},
@@ -1546,6 +1547,34 @@ def status():
 
 
 _BOOT_AT = _time.time()
+
+
+def _costs_brief() -> dict:
+    """Today and the 7-day average, from the usage meter, plus the metered spends."""
+    from apb.store import usage as usage_store
+    try:
+        s = usage_store.summary(7)
+    except Exception as e:                    # the status page must not fail on the meter
+        log.info("costs unavailable: %s", e)
+        return {}
+    return {"gemini_today_usd": s["today_usd"], "gemini_avg_day_usd": s["avg_day_usd"],
+            "gemini_7d_usd": s["total_usd"],
+            "top_features_7d": {k: v["usd"] for k, v in list(s["by_feature"].items())[:5]}}
+
+
+@app.get("/status/costs")
+def status_costs(days: int = Query(30, ge=1, le=90)):
+    """What the paid APIs cost: Gemini by feature and by day (estimated from token
+    counts), Street View (metered), and the free-quota counters."""
+    from apb.context import street
+    from apb.store import spend
+    from apb.store import usage as usage_store
+    out = {"gemini": usage_store.summary(days), "streetview": street.budget(),
+           "quotas": {"youtube_units": spend.used("youtube_units"), "windy_requests": spend.used("windy"),
+                      "radio_audio_sec": spend.used("radio_stt_sec"),
+                      "radio_profile_calls": spend.used("radio_profile_calls"),
+                      "camera_checks": spend.used("gemini_tasking")}}
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=60"})
 
 
 def _memory() -> dict:

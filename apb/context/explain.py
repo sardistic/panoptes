@@ -311,7 +311,13 @@ class GenerateError(RuntimeError):
         self.status, self.detail = status, detail
 
 
-def generate_usage(parts: list[dict], max_tokens: int = 800) -> tuple[str, dict]:
+def _meter(feature: str, model: str, usage: dict) -> None:
+    from apb.store import usage as usage_store
+    usage_store.record(feature, model, usage)
+
+
+def generate_usage(parts: list[dict], max_tokens: int = 800,
+                   feature: str = "other") -> tuple[str, dict]:
     """generate(), plus the response's usageMetadata (token counts by modality)."""
     key = api_key()
     if not key:
@@ -340,10 +346,11 @@ def generate_usage(parts: list[dict], max_tokens: int = 800) -> tuple[str, dict]
     j = r.json()
     text = "".join(p.get("text", "") for c in j.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
+    _meter(feature, model, j.get("usageMetadata") or {})
     return text, j.get("usageMetadata") or {}
 
 
-def generate(parts: list[dict], max_tokens: int = 800) -> str:
+def generate(parts: list[dict], max_tokens: int = 800, feature: str = "other") -> str:
     """One model call with the same model fallback as explain(); returns the text."""
     key = api_key()
     if not key:
@@ -369,7 +376,9 @@ def generate(parts: list[dict], max_tokens: int = 800) -> str:
         break
     if r is None or r.status_code != 200:
         raise RuntimeError(f"gemini {r.status_code if r else '?'}")
-    return "".join(p.get("text", "") for c in r.json().get("candidates", [])[:1]
+    j = r.json()
+    _meter(feature, model, j.get("usageMetadata") or {})
+    return "".join(p.get("text", "") for c in j.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
 
 
@@ -419,6 +428,7 @@ def explain(ctx: dict, stills: list[tuple[str, bytes, str]]) -> dict:
             pass
         raise RuntimeError(f"gemini {r.status_code if r else '?'}: {msg[:200]}")
     data = r.json()
+    _meter("explain:" + str(ctx.get("focus") or "overview")[:20], model, data.get("usageMetadata") or {})
     text = "".join(p.get("text", "") for c in data.get("candidates", [])[:1]
                    for p in (c.get("content") or {}).get("parts", []))
     obs = None

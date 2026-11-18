@@ -325,7 +325,7 @@ def test_tasked_check_reads_nearest_cameras_and_becomes_a_signal(db, monkeypatch
     monkeypatch.setattr(explain, "api_key", lambda: "k")
     seen = {}
 
-    def gen(parts, max_tokens):
+    def gen(parts, max_tokens, **_):
         seen["prompt"] = parts[0]["text"]
         seen["images"] = sum(1 for p in parts if "inline_data" in p)
         return ('OBS: [{"i":1,"vehicles":6,"pedestrians":3,"road_wet":false,"visibility":"good",'
@@ -357,7 +357,7 @@ def test_one_lenient_frame_does_not_confirm_a_scene_the_model_calls_normal(db, m
     from apb.context import explain, tasking
     from apb.fusion.sources import derived_signals
     monkeypatch.setattr(explain, "api_key", lambda: "k")
-    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens: (
+    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens, **_: (
         'OBS: [{"i":1,"evidence":"supports","notable":"vehicle stopped on shoulder"},'
         '{"i":2,"evidence":"none"}]\nVERDICT: no - normal late-night traffic.'))
     e = {"uid": "fev:47.61:-122.33:1", "lat": 47.61, "lon": -122.33, "latest_score": 9.0,
@@ -371,7 +371,7 @@ def test_one_lenient_frame_does_not_confirm_a_scene_the_model_calls_normal(db, m
 def test_tasking_skips_standing_clusters_and_respects_budget(db, monkeypatch):
     from apb.context import explain, tasking
     monkeypatch.setattr(explain, "api_key", lambda: "k")
-    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens: "OBS: []\nVERDICT: nothing.")
+    monkeypatch.setattr(explain, "generate", lambda parts, max_tokens, **_: "OBS: []\nVERDICT: nothing.")
     now = time.time()
     base = {"lat": 47.61, "lon": -122.33, "latest_score": 9.0, "last_seen": now, "types": {"fire": 2}}
     assert tasking.enqueue([{**base, "uid": "old", "age_min": 900, "trend": "steady"}]) == 0
