@@ -1,7 +1,9 @@
 """Query + alerting API over stored incidents (dissemination layer).
 
-Only redacted incident records are exposed here. Raw audio and unredacted
-transcripts are intentionally NOT served by this API.
+Only redacted incident records are exposed here, and unredacted transcripts are
+never stored or served. One exception for audio (2026-11-17, the owner's call): a
+call published by a volunteer's public Rdio Scanner can be replayed on request through
+/live/radio/audio — relayed, briefly cached, rate-limited per source, never archived.
 
 All startup side effects (feed registration, background pollers) run in the
 FastAPI lifespan handler — importing this module is side-effect free, so tests,
@@ -304,7 +306,9 @@ def _startup() -> None:
     if _poller_leader and not _off("APB_RDIO_OFF"):
         try:
             from apb.ingest import rdio
-            rdio.start()
+            if rdio.start():
+                from apb.context import radio_stt
+                radio_stt.start()          # transcribes the calls that matter, on a budget
         except Exception as e:
             log.warning("rdio lane disabled: %s", e)
 
@@ -338,6 +342,7 @@ async def _lifespan(app: FastAPI):
         social_store.stop()
         news_store.stop()
         __import__("apb.ingest.rdio", fromlist=["stop"]).stop()
+        __import__("apb.context.radio_stt", fromlist=["stop"]).stop()
         maritime_store.stop()
         if _poller_thread and _poller_thread.is_alive():
             _poller_thread.join(timeout=5.0)
@@ -1391,10 +1396,23 @@ def _board(limit: int) -> dict:
         radio_rows = [r for r in act if r["z"] is not None and r["z"] >= 3.0 and r["calls"] >= 8][:6]
     except Exception as e:
         log.info("board: radio unavailable: %s", e)
+    heard: list[dict] = []
+    try:
+        from apb.ingest import rdio
+        from apb.store import radio as radio_store
+        for t in radio_store.transcripts(1800.0, min_priority=0.4, limit=60):
+            if t.get("kind") != "dispatch" or t.get("incident_type") in (None, "noise"):
+                continue
+            inst = rdio.instance(t["key"])
+            heard.append(_transcript_out(t, rdio._label(inst, t["system"]) if inst else None))
+            if len(heard) >= 8:
+                break
+    except Exception as e:
+        log.info("board: transcripts unavailable: %s", e)
     return {
         "generated_at": now, "active": len(items), "events": items[:limit],
         "anomalies": anomalies, "notable_cells": notable,
-        "radio": radio_rows, "radio_systems": radio_live,
+        "radio": radio_rows, "radio_systems": radio_live, "heard": heard,
         "internet": [d for d in _live_feed("radar", 0.0) if d.get("ongoing")][:8],
         "health": {"feeds": health["feeds"], "by_state": health["by_state"],
                    "healthy_share": health["healthy_share"],
@@ -1430,6 +1448,9 @@ def _sitrep() -> dict:
                      f"{a['baseline_mean']} normal (z {a['zscore']})")
     for d in board["internet"]:
         lines.append(f"Internet: {d['summary'][:160]}")
+    for t in board.get("heard", [])[:5]:
+        lines.append(f"Heard on dispatch ({t['system'] or 'radio'}): {t['type']} — "
+                     f"{(t['summary'] or '')[:140]}" + (f" at {t['location']}" if t.get("location") else ""))
     for r in board.get("radio", []):
         lines.append(f"Radio surge: {r['system']} {r['calls']} calls in the last window, "
                      f"{r['per10']}/10min vs {r['normal']} normal (z {r['z']}); busiest: "
@@ -1502,6 +1523,7 @@ def status():
         "backing_off": {"count": len(backing_off), "feeds": backing_off[:40]},
         "lanes_paused": _cad.kind_status(),
         "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
+        "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
         "memory": _memory(),
         "lanes": lanes,
         "buffers": {"social": social_store.stats(), "news": news_store.stats()},
@@ -1621,6 +1643,122 @@ def live_radio(max_age_minutes: float = Query(30.0, gt=0.0, le=720.0),
 
 
 _RADIO_ID_RE = __import__("re").compile(r"^[0-9a-f]{10}:-?\d{1,9}$")
+_RADIO_KEY_RE = __import__("re").compile(r"^[0-9a-f]{10}$")
+_audio_cache: "dict[tuple, tuple[bytes, str]]" = {}
+_audio_cache_bytes = 0
+_AUDIO_CACHE_MAX = 24 * 1024 * 1024
+_audio_hits: dict[str, deque] = defaultdict(deque)
+_AUDIO_PER_MIN = 60
+
+
+def _transcript_out(t: dict, label: str | None = None) -> dict:
+    return {"id": f"{t['key']}:{t['system']}", "call": t["id"], "ts": t["ts"],
+            "system": label, "talkgroup": t.get("tg_label"), "tag": t.get("tag"),
+            "kind": t.get("kind"), "type": t.get("incident_type"), "text": t.get("text"),
+            "summary": t.get("summary"), "location": t.get("location_text"),
+            "units": t.get("units"), "priority": t.get("priority"),
+            "lat": t.get("lat"), "lon": t.get("lon"),
+            "audio": f"/live/radio/audio/{t['key']}/{t['id']}"}
+
+
+@app.get("/live/radio/transcripts")
+def live_radio_transcripts(max_age_minutes: float = Query(60.0, gt=0.0, le=4320.0),
+                           located_only: bool = False,
+                           min_priority: float = Query(0.0, ge=0.0, le=1.0),
+                           limit: int = Query(200, ge=1, le=500)):
+    """Calls the smart-radio worker transcribed (redacted text, extracted type and
+    block-level location). `located_only` keeps the ones geocoded onto the map."""
+    from apb.ingest import rdio
+    from apb.store import radio as radio_store
+    out = []
+    for t in radio_store.transcripts(max_age_minutes * 60.0, located_only, min_priority, limit):
+        inst = rdio.instance(t["key"])
+        out.append(_transcript_out(t, rdio._label(inst, t["system"]) if inst else None))
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=30"})
+
+
+@app.get("/live/radio/{rid}/calls")
+def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
+    """Newest calls on one radio system: time, talkgroup, how much it matters, a
+    playable audio link, and the transcript when the worker made one."""
+    if not _RADIO_ID_RE.match(rid):
+        return JSONResponse({"error": "bad id"}, status_code=400)
+    from apb.context.radio_stt import importance
+    from apb.ingest import rdio
+    from apb.store import radio as radio_store
+    key, _, system = rid.partition(":")
+    if not rdio.instance(key):
+        return JSONResponse({"error": "unknown system"}, status_code=404)
+    out = []
+    for c in radio_store.recent_calls(key, int(system), limit):
+        tg = rdio.talkgroup(key, int(system), c["talkgroup"])
+        weight, family = importance(tg)
+        row = {"id": c["id"], "ts": c["ts"], "talkgroup": tg["label"], "tag": tg["tag"],
+               "group": tg.get("group"), "weight": weight, "family": family,
+               "audio": f"/live/radio/audio/{key}/{c['id']}"}
+        if c.get("status") == "done":
+            row.update(kind=c.get("kind"), type=c.get("incident_type"), text=c.get("text"),
+                       summary=c.get("summary"), location=c.get("location_text"),
+                       priority=c.get("priority"), located=c.get("lat") is not None)
+        out.append(row)
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=8"})
+
+
+@app.get("/live/radio/audio/{key}/{call_id}")
+def live_radio_audio(request: Request, key: str, call_id: int):
+    """One call's audio, relayed through the egress proxy from the instance that
+    published it and cached briefly. Only calls the lane itself has listed can be
+    asked for (no arbitrary hosts, no enumeration); every request counts against the
+    instance's per-minute allowance, so a popular page cannot flood a home server."""
+    global _audio_cache_bytes
+    if not _RADIO_KEY_RE.match(key) or not 0 < call_id < 10**13:
+        return JSONResponse({"error": "bad id"}, status_code=400)
+    from apb.ingest import rdio
+    from apb.store import radio as radio_store
+    inst = rdio.instance(key)
+    if not inst or not radio_store.has_call(key, call_id):
+        return JSONResponse({"error": "unknown call"}, status_code=404)
+    hit = _audio_cache.get((key, call_id))
+    if hit is None:
+        ip = request.client.host if request.client else "?"
+        now = _time.time()
+        with _hits_lock:
+            q = _audio_hits[ip]
+            while q and q[0] < now - 60.0:
+                q.popleft()
+            if len(q) >= _AUDIO_PER_MIN:
+                return JSONResponse({"error": "slow down"}, status_code=429,
+                                    headers={"Retry-After": "20"})
+            q.append(now)
+        try:
+            got = rdio.fetch_calls(inst, [call_id])
+        except Exception as e:
+            log.info("radio audio %s/%s: %s", key, call_id, str(e)[:120])
+            return JSONResponse({"error": "source unavailable"}, status_code=424)
+        if call_id not in got:
+            return JSONResponse({"error": "source busy or call gone"}, status_code=503,
+                                headers={"Retry-After": "20"})
+        hit = got[call_id]
+        _audio_cache[(key, call_id)] = hit
+        _audio_cache_bytes += len(hit[0])
+        while _audio_cache_bytes > _AUDIO_CACHE_MAX and _audio_cache:
+            old = next(iter(_audio_cache))
+            _audio_cache_bytes -= len(_audio_cache.pop(old)[0])
+    data, mime = hit
+    headers = {"Cache-Control": "private, max-age=3600", "Accept-Ranges": "bytes"}
+    rng = request.headers.get("range", "")
+    if rng.startswith("bytes="):
+        try:                                   # Safari asks for byte ranges before playing
+            a, _, b = rng[6:].split(",")[0].partition("-")
+            start = int(a) if a else max(0, len(data) - int(b))
+            end = min(len(data) - 1, int(b)) if (a and b) else len(data) - 1
+            if start > end or start >= len(data):
+                raise ValueError
+            return Response(data[start:end + 1], status_code=206, media_type=mime, headers={
+                **headers, "Content-Range": f"bytes {start}-{end}/{len(data)}"})
+        except ValueError:
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{len(data)}"})
+    return Response(data, media_type=mime, headers=headers)
 
 
 @app.get("/live/radio/{rid}")

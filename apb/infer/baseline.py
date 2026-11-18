@@ -103,6 +103,8 @@ def detect_rate_anomalies(incidents: list[dict], window_hours: float = 1.0,
         if idx < 0:
             continue
         m = d.get("metro", "?")
+        if str(m).startswith("radio_"):
+            continue                       # radio systems are scored against their own normal
         buckets[m][idx] += 1
         if isinstance(d.get("lon"), (int, float)):
             lon_sum[m] += d["lon"]

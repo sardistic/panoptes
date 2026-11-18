@@ -49,6 +49,7 @@ _SOURCE_KIND: dict[str, SignalKind] = {
     "emsc": SignalKind.weather, "gdacs": SignalKind.context,
     "sigmet": SignalKind.weather, "amtrak": SignalKind.traffic,
     "squawk": SignalKind.aircraft, "radar": SignalKind.context,
+    "radio_stt": SignalKind.radio_transcript,     # dispatches heard and transcribed
     # "chp" is real dispatch CAD — the default SignalKind.cad is correct.
 }
 
@@ -69,7 +70,9 @@ def _dt_from_ts(ts: float | None, fallback: object = None) -> datetime:
 
 def incident_to_signal(d: dict) -> EventSignal:
     """Convert a normalized CAD/live incident dict into an EventSignal."""
-    source = str(d.get("source") or "cad")
+    # the snapshot store keeps no source column: radio transcripts are known by metro
+    source = str(d.get("source") or ("radio_stt" if str(d.get("metro") or "").startswith("radio_")
+                                      else "cad"))
     call_id = str(d.get("call_id") or _id(source, d.get("summary"), d.get("ts")))
     raw_type = str(d.get("summary") or d.get("type") or "")
     norm = d.get("type") or classify(raw_type)[0]
@@ -85,7 +88,7 @@ def incident_to_signal(d: dict) -> EventSignal:
         raw_type=raw_type,
         normalized_type=IncidentType(norm if norm in IncidentType._value2member_map_ else "other"),
         summary=str(d.get("summary") or raw_type or norm),
-        confidence=0.85,
+        confidence=0.7 if source == "radio_stt" else 0.85,
         severity=float(d.get("threat_score", 0.3) or 0.3),
         dedupe_key=f"cad:{d.get('metro')}:{call_id}",
         metadata={"sentiment": d.get("sentiment"), "emerging": d.get("emerging")},

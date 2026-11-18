@@ -33,6 +33,18 @@ def _conn() -> sqlite3.Connection:
             calls INTEGER, per10 REAL, tags TEXT, z REAL, base REAL);
         CREATE INDEX IF NOT EXISTS idx_rc ON radio_calls(key, system, ts);
         CREATE INDEX IF NOT EXISTS idx_rc_ts ON radio_calls(ts);
+        CREATE TABLE IF NOT EXISTS radio_recent (
+            key TEXT NOT NULL, id INTEGER NOT NULL, ts REAL NOT NULL, system INTEGER,
+            talkgroup INTEGER, PRIMARY KEY (key, id));
+        CREATE INDEX IF NOT EXISTS idx_rr_ts ON radio_recent(ts);
+        CREATE INDEX IF NOT EXISTS idx_rr_ks ON radio_recent(key, system, ts);
+        CREATE TABLE IF NOT EXISTS radio_transcripts (
+            key TEXT NOT NULL, id INTEGER NOT NULL, ts REAL NOT NULL, system INTEGER,
+            talkgroup INTEGER, status TEXT NOT NULL, weight REAL, tg_label TEXT, tag TEXT,
+            kind TEXT, incident_type TEXT, text TEXT, summary TEXT, location_text TEXT,
+            units TEXT, priority REAL, seconds REAL, lat REAL, lon REAL, done_at REAL,
+            PRIMARY KEY (key, id));
+        CREATE INDEX IF NOT EXISTS idx_rt_ts ON radio_transcripts(ts);
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
@@ -113,6 +125,103 @@ def latest(max_age_sec: float = 1800.0) -> list[dict]:
         except ValueError:
             d["tags"] = {}
         out.append(d)
+    return out
+
+
+RECENT_SEC = 6 * 3600.0
+TRANSCRIPT_SEC = 3 * 86400.0
+
+
+def add_recent(key: str, rows: list[tuple]) -> int:
+    """Remember call metadata (id, ts, system, talkgroup) for playback and selection."""
+    if not rows:
+        return 0
+    now = time.time()
+    with _lock:
+        c = _conn()
+        c.executemany("INSERT OR IGNORE INTO radio_recent VALUES (?,?,?,?,?)",
+                      [(key, int(i), float(ts), s, tg) for i, ts, s, tg in rows])
+        c.execute("DELETE FROM radio_recent WHERE ts < ?", (now - RECENT_SEC,))
+        c.commit()
+    return len(rows)
+
+
+def candidates(since: float, limit: int = 4000) -> list[dict]:
+    """Recent calls nobody has tried to transcribe yet, newest first."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT r.key, r.id, r.ts, r.system, r.talkgroup FROM radio_recent r "
+            "LEFT JOIN radio_transcripts t ON t.key = r.key AND t.id = r.id "
+            "WHERE r.ts >= ? AND t.id IS NULL ORDER BY r.ts DESC LIMIT ?", (since, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_transcript(key: str, call_id: int, ts: float, system, talkgroup, status: str,
+                   **fields) -> None:
+    """Record an attempt (status done / skipped / failed) and, when done, its redacted
+    result. Raw transcripts are never stored."""
+    import json as _json
+    units = fields.get("units")
+    row = (key, int(call_id), float(ts), system, talkgroup, status, fields.get("weight"),
+           fields.get("tg_label"), fields.get("tag"), fields.get("kind"), fields.get("incident_type"),
+           fields.get("text"), fields.get("summary"), fields.get("location_text"),
+           _json.dumps(units) if units is not None else None, fields.get("priority"),
+           fields.get("seconds"), fields.get("lat"), fields.get("lon"), time.time())
+    with _lock:
+        c = _conn()
+        c.execute("INSERT OR REPLACE INTO radio_transcripts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", row)
+        c.execute("DELETE FROM radio_transcripts WHERE ts < ?", (time.time() - TRANSCRIPT_SEC,))
+        c.commit()
+
+
+def _tr(r) -> dict:
+    import json as _json
+    d = dict(r)
+    try:
+        d["units"] = _json.loads(d["units"]) if d.get("units") else []
+    except ValueError:
+        d["units"] = []
+    return d
+
+
+def recent_calls(key: str, system: int, limit: int = 40) -> list[dict]:
+    """Newest calls on one system, with the transcript when there is one."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT r.id, r.ts, r.talkgroup, t.status, t.kind, t.incident_type, t.text, t.summary, "
+            "t.location_text, t.priority, t.lat, t.lon FROM radio_recent r "
+            "LEFT JOIN radio_transcripts t ON t.key = r.key AND t.id = r.id "
+            "WHERE r.key = ? AND r.system = ? ORDER BY r.ts DESC LIMIT ?",
+            (key, system, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def has_call(key: str, call_id: int) -> bool:
+    with _lock:
+        return _conn().execute("SELECT 1 FROM radio_recent WHERE key = ? AND id = ?",
+                               (key, call_id)).fetchone() is not None
+
+
+def transcripts(max_age_sec: float = 3600.0, located_only: bool = False,
+                min_priority: float = 0.0, limit: int = 500) -> list[dict]:
+    sql = ("SELECT * FROM radio_transcripts WHERE status = 'done' AND ts >= ? AND "
+           "COALESCE(priority, 0) >= ?" + (" AND lat IS NOT NULL" if located_only else "")
+           + " ORDER BY ts DESC LIMIT ?")
+    with _lock:
+        rows = _conn().execute(sql, (time.time() - max_age_sec, min_priority, limit)).fetchall()
+    return [_tr(r) for r in rows]
+
+
+def stt_stats(hours: float = 24.0) -> dict:
+    since = time.time() - hours * 3600
+    with _lock:
+        rows = _conn().execute("SELECT status, COUNT(*), COALESCE(SUM(seconds),0) FROM radio_transcripts "
+                               "WHERE done_at >= ? GROUP BY status", (since,)).fetchall()
+        located = _conn().execute("SELECT COUNT(*) FROM radio_transcripts WHERE done_at >= ? AND "
+                                  "status = 'done' AND lat IS NOT NULL", (since,)).fetchone()[0]
+    out = {r[0]: r[1] for r in rows}
+    out["audio_sec"] = round(sum(r[2] for r in rows))
+    out["located"] = located
     return out
 
 

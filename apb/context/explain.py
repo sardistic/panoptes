@@ -303,6 +303,46 @@ def build_prompt(ctx: dict, weather: dict, camera_names: list[str]) -> str:
     return "\n".join(lines)
 
 
+class GenerateError(RuntimeError):
+    """A model call that failed after fallbacks; `status` and `detail` say why."""
+
+    def __init__(self, status: int | None, detail: str = ""):
+        super().__init__(f"gemini {status if status is not None else '?'}: {detail[:160]}")
+        self.status, self.detail = status, detail
+
+
+def generate_usage(parts: list[dict], max_tokens: int = 800) -> tuple[str, dict]:
+    """generate(), plus the response's usageMetadata (token counts by modality)."""
+    key = api_key()
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+    body = {"contents": [{"role": "user", "parts": parts}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": max_tokens,
+                                 "thinkingConfig": {"thinkingBudget": 0}}}
+    r = None
+    for model in healthy_models(key)[:3]:
+        try:
+            r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body, timeout=60.0)
+            if r.status_code == 400 and "thinking" in r.text.lower():
+                slim = {**body, "generationConfig": {k: v for k, v in body["generationConfig"].items() if k != "thinkingConfig"}}
+                r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=slim, timeout=60.0)
+        except httpx.TimeoutException:
+            _benched[model] = time.time() + _BENCH_SEC
+            continue
+        if r.status_code == 200:
+            break
+        if r.status_code in (429, 503):
+            _benched[model] = time.time() + _BENCH_SEC
+            continue
+        break
+    if r is None or r.status_code != 200:
+        raise GenerateError(r.status_code if r is not None else None, r.text if r is not None else "")
+    j = r.json()
+    text = "".join(p.get("text", "") for c in j.get("candidates", [])[:1]
+                   for p in (c.get("content") or {}).get("parts", []))
+    return text, j.get("usageMetadata") or {}
+
+
 def generate(parts: list[dict], max_tokens: int = 800) -> str:
     """One model call with the same model fallback as explain(); returns the text."""
     key = api_key()

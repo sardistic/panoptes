@@ -212,3 +212,32 @@ deployed service gets its own Radar-read-only token (`CLOUDFLARE_RADAR_TOKEN`).
 Shodan is used only by `discover/shodan_sweep.py` to find intentionally public
 services for the existing discoverers; it is not a live lane and is not used to find
 cameras or devices exposed by accident.
+
+### 2026-11-17 — Radio audio is replayable; dispatch is transcribed on a budget
+
+Context: PulsePoint's API went behind a bot challenge (2026-11-14), taking 488 fire/EMS
+feeds with it. The owner asked for an alternative before shelving it, for more radio
+coverage, to be able to hear the radio, and for budgeted speech-to-text on the calls
+that matter. The API header and memory said raw audio is never served and that
+transcription was deferred until the activity layer worked; it now works.
+
+Decision:
+- Audio: a call already published by a volunteer's open Rdio Scanner is relayed on
+  request (`/live/radio/audio`), only for calls the lane listed, through the WARP egress,
+  cached 24 MB, 60/min per viewer and `APB_RDIO_CAL_PER_MIN` per source. No archive.
+  Viewers never connect to an operator's home server, and operators' addresses never
+  reach the browser (systems are keyed by a 10-hex hash).
+- Transcription: Gemini (already keyed, accepts audio, extracts structure in the same
+  call) rather than local Whisper (a 1 GB container that was being OOM-killed a week
+  ago). Selection by talkgroup tag/label: dispatch first; boosts for surging systems and
+  nearby events. Daily cap in audio seconds through the spend store. The model redacts
+  per the README guardrail; only redacted text is stored; radio unit ids are dropped.
+- PulsePoint replacement: transcribed dispatches with a block-level address are geocoded
+  (Census geocoder, must fall within 80 km of the system, 150 km if the system's place
+  is approximate) and written to the incident store, so they render and fuse like a
+  dispatch feed. Fusion counts radio activity and radio transcripts as ONE sensor family.
+
+Consequences: coverage follows where hobbyists publish (about 160 systems, about 55
+instances, uneven). Audio contains PII the transcripts redact — accepted by the owner;
+the guardrail still governs stored and exposed records. Cost at the default cap is
+roughly two hours of audio a day (Gemini bills about 32 audio tokens per second).

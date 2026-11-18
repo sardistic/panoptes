@@ -191,6 +191,32 @@ registries (Socrata, ArcGIS hubs, PulsePoint, P2C, Southern Software). This runs
 `p2c_agencies.json`, `southern_agencies.json`, `type_map.json`). Production just
 serves those catalogs — no discovery keys needed in prod.
 
+## Public scanner radio (Rdio Scanner lane + smart transcription)
+
+Volunteers publish their own SDR captures of public-safety radio with Rdio Scanner. The
+`rdio` lane (`apb/ingest/rdio.py`) watches the instances that need no access code,
+always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without one):
+
+- **Activity:** every 10 min, the newest call ids per instance -> calls per system,
+  scored against that system's own normal (`/live/radio`, RADIO layer, board).
+- **Listening:** each system's popup lists its recent calls with a play button and a
+  LIVE mode that plays new calls as they land. Audio is relayed on request by
+  `/live/radio/audio/{key}/{call}` (only calls the lane has listed, 24 MB cache,
+  60/min per viewer, `APB_RDIO_CAL_PER_MIN` (20) per source shared with transcription).
+- **Smart transcription** (`apb/context/radio_stt.py`): fire / EMS / law dispatch
+  talkgroups first, tactical channels only when their system is surging or an event is
+  nearby, never public works / schools / transit. Gemini transcribes and extracts type,
+  block-level location and units, redacting PII; only the redacted text is stored.
+  Budget: `APB_RADIO_STT_DAILY_SEC` seconds of audio a day (7200). Dispatches with a
+  block address are geocoded (Census geocoder, checked against the system's area) and
+  become incidents on the map (`metro` `radio_<hash>`, fusion kind `radio_transcript`,
+  counted as the same sensor as radio activity). `/live/radio/transcripts`.
+- **Growing the list:** paste Censys / Shodan result pages into a file, then
+  `python -m apb.discover.rdio_import pages.txt` and
+  `python -m apb.discover.rdio_probe --proxy ... --skip-known --merge-into <list>`;
+  production reloads the list when the file changes. The lists hold operators' home
+  addresses: they are gitignored and live in the state directory.
+
 ## Radio activity pipeline (activity-first)
 
 The radio foundation is **activity/metadata**, not transcripts.

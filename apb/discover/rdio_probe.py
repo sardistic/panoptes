@@ -106,7 +106,8 @@ async def probe(t: dict, proxy: str | None) -> dict:
     return out
 
 
-async def run(cands: dict, proxy: str | None, parallel: int = 4) -> list[dict]:
+async def run(cands: dict, proxy: str | None, parallel: int = 4,
+              skip: set[str] | None = None) -> list[dict]:
     sem = asyncio.Semaphore(parallel)
 
     async def one(t):
@@ -114,7 +115,23 @@ async def run(cands: dict, proxy: str | None, parallel: int = 4) -> list[dict]:
             r = await probe(t, proxy)
             await asyncio.sleep(0.5)
             return r
-    return await asyncio.gather(*(one(t) for t in targets(cands)))
+    todo = [t for t in targets(cands) if not skip or _tkey(t) not in skip]
+    return await asyncio.gather(*(one(t) for t in todo))
+
+
+def _tkey(r: dict) -> str:
+    return f"{r['host']}:{r.get('port') or 443}"
+
+
+def merge(existing: dict, results: list[dict]) -> dict:
+    """Fold fresh probe results into an instance file: a re-probed target replaces its
+    old entry, everything else is kept."""
+    rows = {_tkey(r): r for r in existing.get("instances", [])}
+    for r in results:
+        rows[_tkey(r)] = r
+    inst = list(rows.values())
+    return {"probed_at": int(time.time()), "via_proxy": existing.get("via_proxy", True),
+            "states": dict(Counter(r["state"] for r in inst)), "instances": inst}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -122,14 +139,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--candidates", default="data/rdio_candidates.json")
     ap.add_argument("--out", default="data/rdio_instances.json")
     ap.add_argument("--proxy", help="SOCKS proxy URL, e.g. socks5h://warp-egress:1080")
+    ap.add_argument("--merge-into", help="instance file to fold results into (instead of --out)")
+    ap.add_argument("--skip-known", action="store_true",
+                    help="only probe targets that are not in the --merge-into file yet")
     args = ap.parse_args(argv)
     cands = json.loads(Path(args.candidates).read_text(encoding="utf-8"))
-    results = asyncio.run(run(cands, args.proxy))
+    existing: dict = {}
+    if args.merge_into:
+        try:
+            existing = json.loads(Path(args.merge_into).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            existing = {}
+    skip = ({_tkey(r) for r in existing.get("instances", [])} if args.skip_known else None)
+    results = asyncio.run(run(cands, args.proxy, skip=skip))
     states = Counter(r["state"] for r in results)
-    Path(args.out).write_text(json.dumps({
-        "probed_at": int(time.time()), "via_proxy": bool(args.proxy),
-        "states": dict(states), "instances": results}, indent=1), encoding="utf-8")
-    print(dict(states))
+    if args.merge_into:
+        merged = merge(existing, results)
+        tmp = Path(args.merge_into + ".tmp")
+        tmp.write_text(json.dumps(merged, indent=1), encoding="utf-8")
+        tmp.replace(args.merge_into)                   # the app reloads on mtime: no torn reads
+        print(f"probed {len(results)}: {dict(states)}; file now {merged['states']}")
+    else:
+        Path(args.out).write_text(json.dumps({
+            "probed_at": int(time.time()), "via_proxy": bool(args.proxy),
+            "states": dict(states), "instances": results}, indent=1), encoding="utf-8")
+        print(dict(states))
     return 0
 
 

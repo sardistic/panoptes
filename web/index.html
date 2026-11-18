@@ -278,6 +278,19 @@
   #board .rall:hover{color:var(--txt)}
   #board .brow .hot{color:var(--red)}
   #board .brow .noloc{color:var(--dimmer)}
+  .rcalls{margin-top:9px;border-top:1px solid var(--line);padding-top:7px}
+  .rcalls .rc-head{display:flex;align-items:center;gap:10px;font:500 9.5px/1 var(--font);color:var(--dim);margin-bottom:6px}
+  .rcalls button{background:none;border:1px solid var(--line);color:var(--txt-2);font:600 9px/1 var(--font);letter-spacing:.08em;padding:4px 7px;cursor:pointer}
+  .rcalls button.on{border-color:#4fd1c5;color:#4fd1c5}
+  .rcalls .rc-list{max-height:230px;overflow:auto}
+  .rcalls .rc{display:grid;grid-template-columns:22px 1fr;gap:2px 6px;padding:4px 0;border-top:1px solid rgba(120,140,165,.08)}
+  .rcalls .rc .rc-play{padding:2px 0;width:20px;height:18px;border-color:transparent;color:#4fd1c5}
+  .rcalls .rc.playing .rc-play{color:#e0a030}
+  .rcalls .rc .rc-m{font:500 9.5px/1.35 var(--font);color:var(--dim)}
+  .rcalls .rc .rc-m b{color:var(--txt-2);font-weight:600}
+  .rcalls .rc.hi .rc-m b{color:#4fd1c5}
+  .rcalls .rc .rc-tx{grid-column:2;font:400 10px/1.4 var(--font);color:var(--txt)}
+  .rcalls .rc .rc-tx i{color:#e0a030;font-style:normal;margin-right:5px;text-transform:uppercase;font-size:8.5px;letter-spacing:.08em}
   /* ── camera popup: still or HLS player, edge to edge ── */
   .campop .leaflet-popup-content{max-width:380px;min-width:300px}
   .pop.cam .frame{margin:10px -15px 0;background:#000;min-height:150px;position:relative}
@@ -1205,7 +1218,7 @@ const sevColor = t => t>=0.7?SEV.hi:t>=0.4?SEV.mid:SEV.lo;
 const winHours = () => document.getElementById('window').value;
 const winLabel = () => document.getElementById('window').selectedOptions[0].textContent.trim();
 const isNational = () => document.getElementById('metro').value==='__all__';
-const cityName = m => (m||'?').replace(/^(ag_|pp_|p2c_|ss_)/,'').replace(/_/g,' ').slice(0,30);
+const cityName = m => (m||'?').replace(/^radio_.*$/,'radio dispatch').replace(/^(ag_|pp_|p2c_|ss_)/,'').replace(/_/g,' ').slice(0,30);
 
 
 function ago(ts){
@@ -1833,17 +1846,26 @@ async function openIncident(d){
     +`<span class="chip ${cls}">${d.threat_score.toFixed(2)}</span></div>`
     +(d.summary?`<div class="sum">${esc(d.summary)}</div>`:'')
     +`<div class="meta">${esc(d.location||'')} · ${esc(d.sentiment)} · ${esc(ago(d.ts))}</div>`
-    +`<div class="meta">${feeds.length?`${feeds.length} nearby feed(s)`:'no public feeds nearby'}</div>`;
+    +`<div class="meta">${feeds.length?`${feeds.length} nearby feed(s)`:'no public feeds nearby'}</div>`
+    +(/^radio_[0-9a-f]{10}$/.test(d.metro||'')&&/^rdio\d+$/.test(d.call_id||'')
+      ?`<div class="meta">heard on radio dispatch · <a href="#" class="rc-hear" data-src="/live/radio/audio/${esc(d.metro.slice(6))}/${esc(String(d.call_id).slice(4))}">▶ hear the call</a></div>`:'');
   const pop=L.popup().setLatLng([d.lat,d.lon])
     .setContent(base+`<div class="meta" style="opacity:.55">checking news…</div></div>`)
     .openOn(map);
+  wireHear(pop);
   fetchCorrelation(d.lat,d.lon,d.type).then(r=>{       // incident-level correlation
     if(!map.hasLayer(pop)) return;
     const any=(r.articles||[]).length || (r.local||[]).length;
     pop.setContent(base+(any
       ? `<div class="kick" style="margin-top:11px">Possible Cause</div>`+articlesHtml(r)
       : `<div class="empty">${r.throttled?'news search busy — try again in a minute':'no related news nearby'}</div>`)+`</div>`);
+    wireHear(pop);
   });
+}
+function wireHear(pop){
+  const el=pop.getElement&&pop.getElement(); if(!el) return;
+  el.querySelectorAll('.rc-hear').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); const p=radioPlayer();
+    p.src=a.dataset.src; p.play().catch(()=>{ a.textContent='audio unavailable'; }); });
 }
 
 // ── controls ─────────────────────────────────────────────────────────────────
@@ -2671,16 +2693,64 @@ function drawRadio(){
     m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
   });
 }
+// one shared player: a row's ▶ plays that call; "live" queues each new call as it lands
+let radioAudio=null, radioLive=null, radioQueue=[], radioPlaying=null;
+function radioPlayer(){
+  if(!radioAudio){ radioAudio=new Audio(); radioAudio.preload='auto';
+    radioAudio.onended=radioAudio.onerror=()=>{ radioPlaying=null; markPlaying(); playNextLive(); }; }
+  return radioAudio;
+}
+function markPlaying(){ document.querySelectorAll('.rcalls .rc').forEach(n=>n.classList.toggle('playing',+n.dataset.id===radioPlaying)); }
+function playCall(c){ const p=radioPlayer(); radioPlaying=c.id; p.src=c.audio; markPlaying(); p.play().catch(()=>{ radioPlaying=null; markPlaying(); }); }
+function playNextLive(){ if(radioLive&&radioQueue.length&&radioPlaying==null) playCall(radioQueue.shift()); }
+function stopLive(){ if(radioLive){ clearInterval(radioLive.timer); radioLive=null; } radioQueue=[]; }
+const callTime = ts => new Date(ts*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function callRow(c){
+  const tx=c.text?`<div class="rc-tx">${c.type&&c.type!=='noise'?`<i>${esc(String(c.type).replace(/_/g,' '))}</i>`:''}${esc(c.text)}${c.location?` — <b>${esc(c.location)}</b>`:''}</div>`:'';
+  return `<div class="rc${c.weight>=0.8?' hi':''}" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
+    +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup)}</b> · ${esc(c.tag)}</div>${tx}</div>`;
+}
+async function loadCalls(pop,r){
+  let calls=[]; try{ const res=await fetch(`/live/radio/${encodeURIComponent(r.id)}/calls?limit=30`); calls=res.ok?await res.json():[]; }catch(_){}
+  const el=pop.getElement&&pop.getElement(); const list=el&&el.querySelector('.rc-list'); if(!list) return calls;
+  const disp=el.querySelector('.rc-disp').checked;
+  const shown=calls.filter(c=>!disp||c.weight>=0.8);
+  list.innerHTML=shown.map(callRow).join('')||`<div class="rc-m" style="padding:6px 0">${disp?'no dispatch calls in the last few minutes — untick to see all':'no calls in the last few minutes'}</div>`;
+  list.querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{ const c=calls.find(x=>String(x.id)===n.dataset.id); if(c) playCall(c); });
+  markPlaying();
+  return calls;
+}
 async function openRadio(r,at){
   const where=at||(r.lat!=null?[r.lat,r.lon]:null); if(!where) return;
+  stopLive();
   const tags=Object.entries(r.tags||{}).map(([k,v])=>`${esc(k)} ${esc(v)}`).join(' · ');
-  const body=spark=>`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
-    +`<div class="meta">${radioRate(r)} ${spark}</div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
+  const html=`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
+    +`<div class="meta">${radioRate(r)} <span class="rspark"></span></div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
     +`<div class="meta">${r.approx?'place approximate'+(r.area?' — heard from '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
-    +`<div class="meta">call counts only — no audio is collected</div></div>`;
-  const pop=L.popup({maxWidth:320}).setLatLng(where).setContent(body('')).openOn(map);
+    +`<div class="rcalls"><div class="rc-head"><button class="rc-live" title="play each new call as it arrives">● LIVE</button>`
+    +`<label><input type="checkbox" class="rc-disp" checked> dispatch only</label></div><div class="rc-list"><div class="rc-m">loading calls…</div></div></div>`
+    +`<div class="meta" style="margin-top:6px">audio relayed on request from a volunteer's public scanner; transcripts are machine-made and redacted</div></div>`;
+  const pop=L.popup({maxWidth:340,minWidth:300}).setLatLng(where).setContent(html).openOn(map);
+  pop.on('remove',stopLive);
+  const el=pop.getElement();
+  el.querySelector('.rc-disp').onchange=()=>loadCalls(pop,r);
+  el.querySelector('.rc-live').onclick=async ev=>{
+    const b=ev.currentTarget;
+    if(radioLive){ stopLive(); b.classList.remove('on'); return; }
+    b.classList.add('on');
+    const seen=new Set((await loadCalls(pop,r)).map(c=>c.id));
+    radioPlayer();                                    // unlocked by this click
+    radioLive={timer:setInterval(async()=>{
+      if(!map.hasLayer(pop)){ stopLive(); return; }
+      const calls=await loadCalls(pop,r), disp=el.querySelector('.rc-disp').checked;
+      calls.filter(c=>!seen.has(c.id)).reverse().forEach(c=>{ seen.add(c.id); if(!disp||c.weight>=0.8) radioQueue.push(c); });
+      if(radioQueue.length>12) radioQueue=radioQueue.slice(-12);   // never fall minutes behind
+      playNextLive();
+    },8000)};
+  };
+  loadCalls(pop,r);
   try{ const s=await (await fetch('/live/radio/'+encodeURIComponent(r.id)+'?hours=24')).json();
-    if(map.hasLayer(pop)&&s.length>1) pop.setContent(body(sparkSvg(s.map(p=>p.per10)))); }catch(_){}
+    const sp=el.querySelector('.rspark'); if(sp&&s.length>1) sp.innerHTML=sparkSvg(s.map(p=>p.per10)); }catch(_){}
 }
 function drawRadioList(){
   const el=document.getElementById('radioAll'); if(!el) return;
@@ -2739,7 +2809,11 @@ function drawBoard(){
   if(b.radio_systems||radioRows.length) html+=`<h4>Radio · ${esc(Math.max(b.radio_systems||0,radioRows.length))} systems watched</h4>`+((b.radio||[]).map((r,i)=>
     `<div class="row brow" data-r="${i}"><div class="t"><span class="ty">${esc(r.system)}</span><span class="sev mid">${esc(r.z)}σ</span></div>`
     +`<div class="loc">${esc(r.per10)} calls / 10 min vs ${esc(r.normal)} normal · ${esc(Object.keys(r.tags||{}).join(', '))}${r.approx?' · place approximate':''}</div></div>`).join('')
-    ||'<div class="empty">no system above its normal</div>')+'<div id="radioAll"></div>';
+    ||'<div class="empty">no system above its normal</div>')
+    +((b.heard||[]).length?'<h4>Heard on dispatch</h4>'+b.heard.map((t,i)=>
+      `<div class="row brow" data-h="${i}"><div class="t"><span class="ty">${esc(String(t.type||'call').replace(/_/g,' '))}</span><span class="sev ${t.priority>=0.7?'hot':'lo'}">${esc(callTime(t.ts))}</span></div>`
+      +`<div class="loc">${esc(t.summary||t.text||'')}${t.location?' · '+esc(t.location):''}</div><div class="loc">${esc(t.system||'')}${t.lat==null?' · not placed':''} · <a href="#" class="rc-hear" data-src="${esc(t.audio)}">▶ hear</a></div></div>`).join(''):'')
+    +'<div id="radioAll"></div>';
   if((b.internet||[]).length) html+='<h4>Internet</h4>'+b.internet.map((d,i)=>
     `<div class="row brow" data-n="${i}"><div class="loc" style="margin-top:0;color:var(--txt)">${esc(d.summary)}</div></div>`).join('');
   el.innerHTML=html;
@@ -2747,6 +2821,9 @@ function drawBoard(){
   el.querySelectorAll('[data-i]').forEach(r=>r.onclick=()=>openBoardEvent(b.events[+r.dataset.i]));
   el.querySelectorAll('[data-a]').forEach(r=>r.onclick=()=>{ const a=b.anomalies[+r.dataset.a]; if(a.lat!=null) focusSurge({...a,_c:[a.lat,a.lon]}); });
   el.querySelectorAll('[data-r]').forEach(r=>r.onclick=()=>{ const d=b.radio[+r.dataset.r]; if(d.lat!=null) map.flyTo([d.lat,d.lon],d.approx?8:10); });
+  el.querySelectorAll('[data-h]').forEach(r=>{ const t=b.heard[+r.dataset.h];
+    r.querySelector('.rc-hear').onclick=ev=>{ ev.preventDefault(); ev.stopPropagation(); const p=radioPlayer(); p.src=t.audio; p.play().catch(()=>{}); };
+    r.onclick=()=>{ if(t.lat!=null) map.flyTo([t.lat,t.lon],Math.max(map.getZoom(),14)); }; });
   el.querySelectorAll('[data-n]').forEach(r=>r.onclick=()=>{ const d=b.internet[+r.dataset.n]; map.flyTo([d.lat,d.lon],4); });
   drawRadioList();
   loadSitrep();

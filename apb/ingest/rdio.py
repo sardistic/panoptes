@@ -24,6 +24,7 @@ kept out of git; the API only ever shows a short hash and the system labels.
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -31,6 +32,8 @@ import math
 import os
 import threading
 import time
+from collections import deque
+from datetime import datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -45,7 +48,14 @@ _stop = threading.Event()
 _thread: threading.Thread | None = None
 _instances: list[dict] = []
 _cfg: dict[str, tuple[float, dict]] = {}       # key -> (fetched at, {system id: {...}})
-_stats = {"polls": 0, "calls": 0, "errors": 0, "closed": 0, "last": 0.0}
+_stats = {"polls": 0, "calls": 0, "errors": 0, "closed": 0, "last": 0.0, "audio_fetched": 0,
+          "audio_refused": 0, "reloads": 0}
+_loaded_mtime = 0.0
+# One budget per instance for every audio request (playback + transcription): these
+# are volunteers' home connections, so a popular page must not turn into a flood.
+CAL_PER_MIN = int(os.environ.get("APB_RDIO_CAL_PER_MIN", "20"))
+_cal_hits: dict[str, deque] = {}
+_cal_lock = threading.Lock()
 
 
 def off() -> bool:
@@ -190,10 +200,134 @@ async def _ask(inst: dict, want_cfg: bool) -> dict:
 
 
 def _systems_from_cfg(cfg: dict) -> dict:
-    return {s.get("id"): {"label": str(s.get("label") or ""),
-                          "tags": {t.get("id"): str(t.get("tag") or "Untagged")
-                                   for t in s.get("talkgroups") or []}}
-            for s in cfg.get("systems") or []}
+    out = {}
+    for s in cfg.get("systems") or []:
+        tgs = {}
+        for t in s.get("talkgroups") or []:
+            tgs[t.get("id")] = {"label": str(t.get("label") or t.get("id"))[:60],
+                                "name": str(t.get("name") or "")[:80],
+                                "tag": str(t.get("tag") or "Untagged")[:40],
+                                "group": str(t.get("group") or "")[:40]}
+        out[s.get("id")] = {"label": str(s.get("label") or "")[:80],
+                            "tags": {k: v["tag"] for k, v in tgs.items()}, "tg": tgs}
+    return out
+
+
+def talkgroup(key: str, system, tg) -> dict:
+    """Label / name / tag / group for one talkgroup (from the instance's own config)."""
+    s = _cfg.get(key, (0, {}))[1].get(system, {})
+    return (s.get("tg") or {}).get(tg) or {"label": str(tg), "name": "", "tag": "Untagged", "group": ""}
+
+
+def instance(key: str) -> dict | None:
+    return next((i for i in _instances if i["key"] == key), None)
+
+
+def parse_ts(v) -> float | None:
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+def cal_allowed(key: str, n: int = 1, now: float | None = None) -> bool:
+    """Reserve n audio requests against the instance's per-minute allowance."""
+    now = now or time.time()
+    with _cal_lock:
+        q = _cal_hits.setdefault(key, deque())
+        while q and q[0] < now - 60.0:
+            q.popleft()
+        if len(q) + n > CAL_PER_MIN:
+            return False
+        q.extend([now] * n)
+        return True
+
+
+def audio_mime(name: str | None, data: bytes) -> str:
+    if data[:3] == b"ID3" or (len(data) > 1 and data[0] == 0xFF and data[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    if data[4:8] == b"ftyp":
+        return "audio/mp4"
+    if data[:4] == b"RIFF":
+        return "audio/wav"
+    if data[:4] == b"OggS":
+        return "audio/ogg"
+    ext = (name or "").rsplit(".", 1)[-1].lower()
+    return {"mp3": "audio/mpeg", "m4a": "audio/mp4", "aac": "audio/aac", "wav": "audio/wav",
+            "ogg": "audio/ogg"}.get(ext, "application/octet-stream")
+
+
+def _audio_bytes(a) -> bytes:
+    if isinstance(a, dict) and isinstance(a.get("data"), list):
+        return bytes(a["data"])
+    if isinstance(a, list):
+        return bytes(a)
+    if isinstance(a, str):
+        try:
+            return base64.b64decode(a)
+        except ValueError:
+            return b""
+    return b""
+
+
+def _connect(inst: dict) -> tuple[str, dict]:
+    port = inst.get("port")
+    url = f"{inst['scheme']}://{inst['host']}" + (f":{port}" if port else "") + "/"
+    kw = {"open_timeout": 15, "max_size": 16_000_000, "user_agent_header": UA}
+    if proxy():
+        kw["proxy"] = proxy()
+    if inst["scheme"] == "wss" and inst["host"].replace(".", "").isdigit():
+        import ssl
+        ctx = ssl.create_default_context()        # bare addresses have no matching certificate
+        ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+        kw["ssl"] = ctx
+    return url, kw
+
+
+async def _fetch_calls(inst: dict, ids: list[int]) -> dict:
+    """{call id: (audio bytes, mime)} for the requested calls, over ONE connection.
+    Only the audio and its type are kept; the transmitting unit's id is discarded."""
+    import websockets
+    url, kw = _connect(inst)
+    out: dict = {}
+    async with websockets.connect(url, **kw) as ws:
+        for cid in ids:
+            await ws.send(json.dumps(["CAL", cid]))
+            for _ in range(8):
+                raw = await asyncio.wait_for(ws.recv(), timeout=15)
+                if isinstance(raw, bytes):
+                    continue
+                msg = json.loads(raw)
+                cmd = msg[0] if isinstance(msg, list) and msg else None
+                body = msg[1] if isinstance(msg, list) and len(msg) > 1 else None
+                if cmd == "PIN":
+                    out["__pin__"] = True
+                    return out
+                if cmd == "CAL" and isinstance(body, dict):
+                    data = _audio_bytes(body.get("audio"))
+                    if data:
+                        out[body.get("id", cid)] = (data, audio_mime(body.get("audioName"), data))
+                    break
+    return out
+
+
+def fetch_calls(inst: dict, ids: list[int]) -> dict:
+    """Synchronous wrapper with the per-instance allowance; {} when over it."""
+    ids = list(dict.fromkeys(int(i) for i in ids))[:10]
+    if not ids:
+        return {}
+    if not proxy() and os.environ.get("APB_RDIO_DIRECT", "") != "1":
+        return {}
+    if not cal_allowed(inst["key"], len(ids)):
+        _stats["audio_refused"] += len(ids)
+        return {}
+    got = asyncio.run(_fetch_calls(inst, ids))
+    if got.pop("__pin__", None):
+        from apb.store import radio
+        radio.set_state(inst["key"], state="closed", next_at=time.time() + 30 * 86400.0)
+        _stats["closed"] += 1
+    _stats["audio_fetched"] += len(got)
+    return got
 
 
 def poll_instance(inst: dict, now: float | None = None, ask=None) -> int:
@@ -227,6 +361,9 @@ def poll_instance(inst: dict, now: float | None = None, ask=None) -> int:
         return 0
     ids = [r["id"] for r in results if isinstance(r.get("id"), int)]
     newest = max(ids) if ids else st["last_id"]
+    radio.add_recent(key, [(r["id"], parse_ts(r.get("dateTime")) or now, r.get("system"), r.get("talkgroup"))
+                           for r in results if isinstance(r.get("id"), int)
+                           and (st["last_id"] is None or r["id"] > st["last_id"])])
     total, per = count_calls(results, st["last_id"])
     if st["last_id"] is not None and st["last_poll"] and (newest or 0) >= st["last_id"]:
         counts: dict[int, tuple[int, dict]] = {}
@@ -261,10 +398,32 @@ def _due(now: float) -> list[dict]:
     return [i for _, i in due[:PER_TICK]]
 
 
+def maybe_reload() -> bool:
+    """Pick up a re-probed instance list without a restart."""
+    global _instances, _loaded_mtime
+    try:
+        mtime = instances_path().stat().st_mtime
+    except OSError:
+        return False
+    if mtime <= _loaded_mtime:
+        return False
+    fresh = load_instances()
+    _loaded_mtime = mtime
+    if not fresh:
+        return False
+    before = {i["key"] for i in _instances}
+    _instances = fresh
+    _stats["reloads"] += 1
+    log.info("rdio: instance list reloaded — %d instances (%d new)", len(fresh),
+             len({i["key"] for i in fresh} - before))
+    return True
+
+
 def _loop() -> None:
     time.sleep(45)
     while not _stop.is_set():
         try:
+            maybe_reload()
             for inst in _due(time.time()):
                 if _stop.is_set():
                     break
@@ -278,12 +437,16 @@ def _loop() -> None:
 
 def start() -> bool:
     """Start the lane if there is an instance list and an egress proxy."""
-    global _thread, _instances
+    global _thread, _instances, _loaded_mtime
     if _thread or off():
         return False
     _instances = load_instances()
     if not _instances:
         return False
+    try:
+        _loaded_mtime = instances_path().stat().st_mtime
+    except OSError:
+        pass
     if not proxy() and os.environ.get("APB_RDIO_DIRECT", "") != "1":
         log.warning("rdio: %d instances listed but APB_RDIO_PROXY is not set — lane not started "
                     "(it must not connect from this host's own address)", len(_instances))

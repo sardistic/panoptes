@@ -97,18 +97,21 @@ def detect(
         weight = 0.0
         for p in pts:
             kind = p.source_kind.value
+            # radio activity and radio transcripts are one sensor: hearing the dispatch
+            # that made the system busy is not a second, independent confirmation
+            fam = "radio" if kind.startswith("radio") else kind
             sources[kind] += 1
             types[p.normalized_type.value] += 1
             coarse = is_coarse(p)
             weight += _COARSE_WEIGHT if coarse else 1.0
             if kind == "cad":
-                corroborating_sources[kind] += 1
+                corroborating_sources[fam] += 1
             elif kind in _OBSERVER_KINDS:
                 if p.severity >= 0.35:
-                    corroborating_sources[kind] += 1
+                    corroborating_sources[fam] += 1
             elif p.normalized_type.value != "other" and p.severity >= 0.35:
                 if not coarse or p.normalized_type.value in precise_types:
-                    corroborating_sources[kind] += 1
+                    corroborating_sources[fam] += 1
         source_count = len(corroborating_sources)
         if source_count < min_sources:
             continue
