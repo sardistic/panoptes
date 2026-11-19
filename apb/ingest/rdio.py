@@ -51,6 +51,8 @@ _cfg: dict[str, tuple[float, dict]] = {}       # key -> (fetched at, {system id:
 _stats = {"polls": 0, "calls": 0, "errors": 0, "closed": 0, "last": 0.0, "audio_fetched": 0,
           "audio_refused": 0, "reloads": 0}
 _loaded_mtime = 0.0
+_proxy = {"ok": None, "at": 0.0, "down_since": None, "downs": 0}
+PROXY_PROBE = ("www.cloudflare.com", 443)     # any always-up host proves the egress works
 # One budget per instance for every audio request (playback + transcription): these
 # are volunteers' home connections, so a popular page must not turn into a flood.
 CAL_PER_MIN = int(os.environ.get("APB_RDIO_CAL_PER_MIN", "20"))
@@ -348,12 +350,60 @@ async def _fetch_calls(inst: dict, ids: list[int]) -> dict:
     return out
 
 
+async def _probe_proxy(url: str) -> bool:
+    from python_socks.async_.asyncio import Proxy
+    try:
+        sock = await Proxy.from_url(url, rdns=True).connect(*PROXY_PROBE, timeout=8)
+        sock.close()
+        return True
+    except Exception:
+        return False
+
+
+def proxy_ok(now: float | None = None, probe=None) -> bool:
+    """Is the egress proxy itself working? Checked at most once a minute through a SOCKS
+    connection to a host that is always up — a scanner failing must not look like the
+    proxy failing, and the proxy failing must not be blamed on 90 scanners."""
+    now = now or time.time()
+    if not proxy():
+        return True
+    if _proxy["ok"] is not None and now - _proxy["at"] < 60.0:
+        return _proxy["ok"]
+    ok = (probe or (lambda: asyncio.run(_probe_proxy(proxy()))))()
+    was = _proxy["ok"]
+    _proxy.update(ok=ok, at=now)
+    if not ok and was is not False:
+        _proxy["down_since"] = now
+        _proxy["downs"] += 1
+        log.warning("rdio: egress proxy is down — pausing the lane (no scanner is penalised)")
+    if ok and was is False:
+        down = round((now - (_proxy["down_since"] or now)) / 60)
+        _proxy["down_since"] = None
+        n = _retry_failing()
+        log.info("rdio: egress proxy back after %d min — retrying %d failing instances now", down, n)
+    return ok
+
+
+def _retry_failing() -> int:
+    """Clear the backoff of every failing instance so it is asked again right away."""
+    from apb.store import radio
+    n = 0
+    for key, st in radio.states().items():
+        if st.get("state") == "failing" or (st.get("fails") or 0) > 0:
+            radio.set_state(key, fails=0, next_at=0.0,
+                            state="open" if st.get("state") == "failing" else st.get("state"))
+            n += 1
+    return n
+
+
 def fetch_calls(inst: dict, ids: list[int]) -> dict:
     """Synchronous wrapper with the per-instance allowance; {} when over it."""
     ids = list(dict.fromkeys(int(i) for i in ids))[:10]
     if not ids:
         return {}
     if not proxy() and os.environ.get("APB_RDIO_DIRECT", "") != "1":
+        return {}
+    if not proxy_ok():
         return {}
     if not cal_allowed(inst["key"], len(ids)):
         _stats["audio_refused"] += len(ids)
@@ -378,6 +428,9 @@ def poll_instance(inst: dict, now: float | None = None, ask=None) -> int:
     try:
         got = (ask or (lambda i, w: asyncio.run(_ask(i, w))))(inst, want_cfg)
     except Exception as e:
+        if ask is None and proxy() and not proxy_ok(probe=None, now=time.time() + 61):
+            _stats["errors"] += 1
+            return 0                                   # the proxy failed, not this scanner
         fails = (st["fails"] or 0) + 1
         radio.set_state(key, fails=fails, state="failing" if fails >= 3 else st["state"],
                         next_at=now + min(6 * 3600.0, EVERY * 2 ** min(fails, 6)))
@@ -461,6 +514,9 @@ def _loop() -> None:
     while not _stop.is_set():
         try:
             maybe_reload()
+            if not proxy_ok():
+                _stop.wait(60.0)
+                continue
             for inst in _due(time.time()):
                 if _stop.is_set():
                     break
@@ -480,6 +536,12 @@ def start() -> bool:
     _instances = load_instances()
     if not _instances:
         return False
+    try:
+        n = _retry_failing()                       # a restart is a fresh attempt for everyone
+        if n:
+            log.info("rdio: cleared backoff on %d instances at start", n)
+    except Exception as e:
+        log.info("rdio: could not clear backoff: %s", e)
     try:
         _loaded_mtime = instances_path().stat().st_mtime
     except OSError:
@@ -531,4 +593,7 @@ def activity(max_age_sec: float = 1800.0) -> list[dict]:
 def status() -> dict:
     from apb.store import radio
     return {**_stats, "running": bool(_thread and _thread.is_alive()), "listed": len(_instances),
-            "via_proxy": bool(proxy()), **radio.stats()}
+            "via_proxy": bool(proxy()), "proxy_ok": _proxy["ok"],
+            "proxy_down_min": (round((time.time() - _proxy["down_since"]) / 60)
+                               if _proxy["down_since"] else None),
+            "proxy_downs": _proxy["downs"], **radio.stats()}

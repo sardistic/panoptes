@@ -1606,7 +1606,17 @@ def _components() -> list[dict]:
     samp = sampler.status()
     mem = _memory()
     paused = _cad.kind_status()
-    return [{
+    rdio_st = __import__("apb.ingest.rdio", fromlist=["status"]).status()
+    radio_part = []
+    if rdio_st.get("listed"):
+        down = rdio_st.get("proxy_ok") is False
+        open_n = (rdio_st.get("instances") or {}).get("open", 0)
+        radio_part = [{
+            "name": "radio egress", "ok": not down and open_n > 0,
+            "detail": (f"proxy down {rdio_st.get('proxy_down_min')} min — radio lane paused" if down
+                       else f"{open_n} of {rdio_st['listed']} scanners answering"),
+        }]
+    return radio_part + [{
         "name": "memory", "ok": not (mem["used_share"] and mem["used_share"] >= 0.85),
         "detail": (f"{mem['rss_mb']} MB of {mem['limit_mb']} MB, up {mem['uptime_min']} min"
                    if mem["rss_mb"] is not None else "not measurable on this host"),

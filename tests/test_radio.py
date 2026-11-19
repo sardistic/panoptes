@@ -380,3 +380,23 @@ def test_scrub_coarsens_radio_incidents_already_published(db):
     radio_stt.scrub_existing()
     row = snapshots.query(1.0)[0]
     assert (row["lat"], row["lon"]) == (39.31, -76.49) and "Oak" not in row["summary"] + row["location"]
+
+
+def test_dead_proxy_pauses_the_lane_without_blaming_scanners(db, monkeypatch):
+    from apb.ingest import rdio
+    from apb.store import radio
+    rdio._proxy.update(ok=None, at=0.0, down_since=None, downs=0)
+    up = {"v": True}
+    monkeypatch.setattr(rdio, "_probe_proxy", None)
+    t0 = time.time() - 120
+    assert rdio.proxy_ok(now=t0, probe=lambda: up["v"]) is True
+    radio.set_state(db["key"], state="failing", fails=5, next_at=t0 + 6 * 3600)
+    up["v"] = False
+    assert rdio.proxy_ok(now=t0 + 100, probe=lambda: up["v"]) is False
+    assert rdio.status()["proxy_ok"] is False
+    assert rdio.fetch_calls(db, [1]) == {}                       # no audio while the egress is down
+    up["v"] = True
+    assert rdio.proxy_ok(now=t0 + 200, probe=lambda: up["v"]) is True
+    st = radio.state(db["key"])                                  # recovery clears the backoff
+    assert (st["state"], st["fails"], st["next_at"]) == ("open", 0, 0.0)
+    assert rdio._proxy["downs"] == 1
