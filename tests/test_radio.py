@@ -473,7 +473,7 @@ def test_area_summary_is_cleaned_placed_and_published_without_addresses(db, monk
     assert len(out) == 1 and out[0]["id"] == f"{db['key']}:1"
     a = out[0]["areas"][0]
     assert a["area"] == "Essex" and "1234" not in a["activity"] and "Engine 12" not in a["activity"]
-    assert "1200 block" in a["activity"] or "1200" in a["activity"]
+    assert "1200" not in a["activity"] and "Oak Avenue" in a["activity"]   # a road, no number
     assert (a["lat"], a["lon"]) == (39.31, -76.49)              # the ~2 km cell, not the call
     assert out[0]["areas"][1]["lat"] is None                     # unknown stays off the map
     assert radio_areas.due(now) == []                            # nothing new since
@@ -490,3 +490,17 @@ def test_area_summaries_respect_the_daily_cap(db, monkeypatch):
         _add_done(db, 10 + n, now - 60 * n, "Engine respond Main St")
     assert radio_areas.run_once(now, gen=lambda p, max_tokens: ("[]", {})) == 0
     assert radio_areas.status()["budget_stops"] >= 1
+
+
+def test_area_lines_never_carry_conditions_block_numbers_or_streets():
+    from apb.context.radio_areas import area_label, clean
+    assert clean("EMS dispatched to the 100 block of Old Bridge Road for a hemorrhage.") == \
+        "EMS dispatched to Old Bridge Road for a medical call."
+    assert "seizure" not in clean("Code 3 to a seizure call on Beatrice Street")
+    assert "panic" not in clean("responding to a panic attack call on Poplar Avenue")
+    assert clean("Medic 12 and Mama 1 at 1234 Oak Avenue") == "Medic and Mama at Oak Avenue"
+    assert area_label({"area": "Le Chateau Cove", "town": "Memphis"}) == "Memphis"
+    assert area_label({"area": "Country Haven Drive and Country Meadow Lane"}) == "unknown"
+    assert area_label({"area": "Henderson County"}) == "Henderson County"
+    assert area_label({"area": "I-26 near Fletcher"}) == "I-26 near Fletcher"
+    assert area_label({"area": "Falls Church"}) == "Falls Church"

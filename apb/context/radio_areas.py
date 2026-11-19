@@ -36,16 +36,28 @@ PROMPT = """You summarise public-safety radio traffic for a public situational-a
 map. Below are machine transcripts of recent calls on one radio system, numbered. Group \
 them by the AREA they concern (a town, county, highway corridor or district; "unknown" \
 when the calls do not say) and answer with ONLY a JSON array:
-[{"area": the area's name as people would say it, e.g. "Hendersonville" or "I-26 near Fletcher",
+[{"area": a town, city, county or highway corridor, e.g. "Hendersonville" or "I-26 near Fletcher" \
+— never a street, cove, intersection or address (put the town the street is in, or "unknown"),
   "town": the town or city if the area is in or next to one, else null,
   "state": two-letter state code or null,
   "activity": one sentence, at most 160 characters, on what is going on there: call types, \
 tempo, which kinds of agencies (fire, EMS, sheriff, highway patrol, air medical),
   "priority": 0.0 (routine) to 1.0 (active threat to life),
   "calls": [the numbers of the calls that belong to this area]}]
-Leave out people's names, house numbers (a road or "the 1200 block" is fine), unit or \
-aircraft identifiers, licence plates and any medical or victim details. Skip radio checks \
-and noise. Do not invent anything the calls do not say."""
+Leave out people's names, house numbers and block numbers (name a road, never a number \
+on it), unit or aircraft identifiers and licence plates. Medical calls are just "a medical \
+call": never the condition, injury, symptom, age or sex (no "seizure", "overdose", \
+"hemorrhage", "panic attack"). Skip radio checks and noise. Do not invent anything the \
+calls do not say."""
+
+# conditions that must not be published even if the model names them
+_MEDICAL = re.compile(
+    r"\b(?:seizures?|overdos\w*|od\b|hemorrhag\w*|bleeding|panic attacks?|cardiac arrest|"
+    r"heart attacks?|strokes?|unconscious\w*|unresponsive|diabetic\w*|suicid\w*|"
+    r"psychiatric|psych\b|mental health|pregnan\w*|labou?r|childbirth|allergic\w*|"
+    r"breathing (?:problems?|difficult\w*)|difficulty breathing|chest pains?|"
+    r"intoxicat\w*|drunk|syncope|fainted|sick person|lift assist|dead body|doa|deceased|"
+    r"death|cpr|gunshot wounds?|stab wounds?|lacerations?|fractures?)\b", re.I)
 
 
 def off() -> bool:
@@ -106,12 +118,34 @@ _UNIT = re.compile(r"\b(?:Engine|Medic|Ladder|Truck|Rescue|Squad|Unit|Car|Troope
                    r"Medic|Ambulance|Battalion|Chief|Tower|Brush|Tanker)\s*-?\s*\d+[A-Z]?\b", re.I)
 
 
+_BLOCK = re.compile(r"\b(?:the\s+)?\d+\s*(?:-\s*)?(?:block|blk)\s+(?:of\s+)?", re.I)
+_STREETY = re.compile(r"\b(?:Road|Rd|Street|St|Avenue|Ave|Drive|Dr|Lane|Ln|Court|Ct|Cove|Cv|Boulevard|"
+                      r"Blvd|Way|Place|Pl|Circle|Cir|Terrace|Ter|Trail|Trl|Loop|Run|Row|Alley|Path)\.?\s*$|"
+                      r"\b(?:and|&|at)\b", re.I)
+
+
 def clean(s) -> str:
-    """Backstop on what the model wrote: blocks, not house numbers; no unit identifiers."""
+    """Backstop on what the model wrote: no house or block numbers, no unit identifiers,
+    no medical conditions (they become "medical")."""
     from apb.context.radio_stt import blockify
     s = blockify(str(s or "").strip()) or ""
+    s = _BLOCK.sub("", s)
     s = _UNIT.sub(lambda m: re.sub(r"\s*-?\s*\d+[A-Z]?$", "", m.group(0)), s)
-    return re.sub(r"\s{2,}", " ", s)[:200]
+    s = _MEDICAL.sub("medical", s)
+    s = re.sub(r"\b(?:a|an)\s+medical\b", "a medical", s, flags=re.I)
+    s = re.sub(r"\bmedical(?:\s*(?:,|and|or|/)\s*medical)+\b", "medical", s, flags=re.I)
+    s = re.sub(r"\bmedical\s+(?:call|emergency|incident)s?\s+call\b", "medical call", s, flags=re.I)
+    s = re.sub(r"\ba medical(?=\s*(?:[.,;)]|$))", "a medical call", s, flags=re.I)
+    return re.sub(r"\s{2,}", " ", s).strip()[:200]
+
+
+def area_label(a: dict) -> str:
+    """A town, county or corridor — a street or intersection becomes its town (or unknown)."""
+    name = clean(a.get("area"))[:60]
+    if not name or _STREETY.search(name) and not re.search(r"\b(?:County|I-\d+|US \d+|NC \d+|Highway|Hwy|Route|Interstate)\b", name):
+        town = clean(a.get("town"))[:60]
+        return town if town and not _STREETY.search(town) else "unknown"
+    return name
 
 
 def place(area: dict, rows: list[dict], near: tuple | None) -> tuple | None:
@@ -160,7 +194,7 @@ def summarise(key: str, system: int, rows: list[dict], gen=None, now: float | No
             pr = 0.2
         n = len([i for i in (a.get("calls") or []) if str(i).isdigit()])
         pt = place(a, rows, pl.get("loc"))
-        areas.append({"area": clean(a.get("area"))[:60] or "unknown",
+        areas.append({"area": area_label(a),
                       "state": (str(a.get("state") or "").upper()[:2] or None),
                       "activity": act, "priority": round(pr, 2), "calls": n,
                       "lat": pt[0] if pt else None, "lon": pt[1] if pt else None})
@@ -200,8 +234,9 @@ def public(max_age_sec: float = 5400.0) -> list[dict]:
         out.append({"id": f"{a['key']}:{a['system']}",
                     "system": rdio._label(inst, a["system"]) if inst else None,
                     "ts": a["ts"], "calls": a["calls"],
-                    "areas": [{k: x.get(k) for k in ("area", "state", "activity", "priority", "calls", "lat", "lon")}
-                              for x in a["areas"]]})
+                    "areas": [{**{k: x.get(k) for k in ("state", "priority", "calls", "lat", "lon")},
+                               "area": area_label({"area": x.get("area")}),     # stored rows predate a rule
+                               "activity": clean(x.get("activity"))} for x in a["areas"]]})
     return out
 
 
