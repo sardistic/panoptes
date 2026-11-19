@@ -352,6 +352,8 @@ async def _fetch_calls(inst: dict, ids: list[int]) -> dict:
 
 async def _probe_proxy(url: str) -> bool:
     from python_socks.async_.asyncio import Proxy
+    # python-socks rejects "socks5h://" (websockets accepts it); rdns=True is the "h"
+    url = "socks5://" + url[len("socks5h://"):] if url.startswith("socks5h://") else url
     try:
         sock = await Proxy.from_url(url, rdns=True).connect(*PROXY_PROBE, timeout=8)
         sock.close()

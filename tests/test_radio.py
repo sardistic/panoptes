@@ -400,3 +400,28 @@ def test_dead_proxy_pauses_the_lane_without_blaming_scanners(db, monkeypatch):
     st = radio.state(db["key"])                                  # recovery clears the backoff
     assert (st["state"], st["fails"], st["next_at"]) == ("open", 0, 0.0)
     assert rdio._proxy["downs"] == 1
+
+
+def test_proxy_probe_accepts_the_socks5h_url_the_lane_uses(monkeypatch):
+    # production went 35 min "proxy down" because python-socks rejects socks5h://
+    import asyncio
+    import python_socks.async_.asyncio as ps
+    from apb.ingest import rdio
+    seen = {}
+
+    class P:
+        async def connect(self, host, port, timeout=None):
+            seen["dest"] = (host, port)
+
+            class S:
+                def close(self):
+                    pass
+            return S()
+
+    def from_url(url, rdns=False):
+        assert url.startswith("socks5://") and rdns     # raises ValueError for socks5h in the real library
+        seen["url"] = url
+        return P()
+    monkeypatch.setattr(ps.Proxy, "from_url", staticmethod(from_url))
+    assert asyncio.run(rdio._probe_proxy("socks5h://warp-egress:1080")) is True
+    assert seen == {"url": "socks5://warp-egress:1080", "dest": rdio.PROXY_PROBE}
