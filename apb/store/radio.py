@@ -49,6 +49,9 @@ def _conn() -> sqlite3.Connection:
             key TEXT NOT NULL, system INTEGER NOT NULL, area TEXT, state TEXT, lat REAL,
             lon REAL, statewide INTEGER, confidence REAL, dispatch_tgs TEXT, profiled_at REAL,
             PRIMARY KEY (key, system));
+        CREATE TABLE IF NOT EXISTS radio_areas (
+            key TEXT NOT NULL, system INTEGER NOT NULL, ts REAL NOT NULL, calls INTEGER,
+            newest REAL, areas TEXT, PRIMARY KEY (key, system, ts));
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
@@ -312,3 +315,33 @@ def stats() -> dict:
                           (now - 3600,)).fetchone()
         st = c.execute("SELECT state, COUNT(*) FROM radio_state GROUP BY state").fetchall()
     return {"rows_1h": polls[0], "calls_1h": int(polls[1]), "instances": {r[0]: r[1] for r in st}}
+
+
+def add_areas(key: str, system: int, calls: int, newest: float, areas: list[dict],
+              now: float | None = None) -> None:
+    """One area summary of a system's recent transcribed traffic (kept three days)."""
+    now = now or time.time()
+    with _lock:
+        c = _conn()
+        c.execute("INSERT OR REPLACE INTO radio_areas VALUES (?, ?, ?, ?, ?, ?)",
+                  (key, system, now, calls, newest, json.dumps(areas)))
+        c.execute("DELETE FROM radio_areas WHERE ts < ?", (now - 3 * 86400,))
+        c.commit()
+
+
+def latest_areas(max_age_sec: float = 5400.0) -> list[dict]:
+    """The newest area summary per system, newer than max_age_sec."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT a.* FROM radio_areas a JOIN (SELECT key, system, MAX(ts) m FROM radio_areas "
+            "GROUP BY key, system) b ON a.key = b.key AND a.system = b.system AND a.ts = b.m "
+            "WHERE a.ts >= ? ORDER BY a.ts DESC", (time.time() - max_age_sec,)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["areas"] = json.loads(d["areas"] or "[]")
+        except ValueError:
+            d["areas"] = []
+        out.append(d)
+    return out

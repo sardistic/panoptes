@@ -274,6 +274,12 @@
   .radio-tip{background:rgba(13,16,21,.92);border:1px solid #2c7a73;color:#bfeee9;font:500 9.5px/1.45 var(--font);padding:5px 7px;border-radius:0;box-shadow:none}
   .radio-tip::before{display:none}
   .radio-tip b{color:#4fd1c5;font-weight:600;letter-spacing:.04em}
+  .radio-tip .ra-act{display:block;max-width:260px;white-space:normal;color:var(--txt-2);margin-top:2px}
+  .rareas{margin:6px 0 2px;border-top:1px solid var(--line-2);padding-top:6px}
+  .rareas .ra-h{font:600 9px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+  .rareas .ra{font-size:11.5px;line-height:1.35;color:var(--txt-2);margin:3px 0}
+  .rareas .ra b{color:#4fd1c5;font-weight:600}
+  .rareas .ra.hi b{color:#e0412c}
   #board .rall{cursor:pointer;color:var(--dim);font:500 9.5px/1 var(--font);letter-spacing:.08em;padding:9px 0 3px;text-transform:uppercase}
   #board .rall:hover{color:var(--txt)}
   #board .brow .hot{color:var(--red)}
@@ -2662,10 +2668,11 @@ map.on('moveend zoomend',()=>{ clearTimeout(window._ntT); window._ntT=setTimeout
 // calls per 10 minutes right now, a red ring when the system is far above its own normal.
 // Counts only. A dashed outline means the place is approximate (the listener's town,
 // not the system's footprint); systems with no place at all are listed in the panel.
-let showRadio=true, radioRows=[], radioAllOpen=false; const radioLayer=L.layerGroup().addTo(map);
+let showRadio=true, radioRows=[], radioAllOpen=false, radioAreas=new Map(); const radioLayer=L.layerGroup().addTo(map);
 const radioRate = r => `${esc(r.per10)} calls / 10 min`+(r.normal!=null?` · normal ${esc(r.normal)}`:' · still learning its normal')+(r.z!=null?` · ${esc(r.z)}σ`:'');
 async function loadRadio(){
   try{ const r=await fetch('/live/radio?max_age_minutes=45'); radioRows=r.ok?await r.json():[]; }catch(_){ radioRows=[]; }
+  try{ const r=await fetch('/live/radio/areas'); radioAreas=new Map((r.ok?await r.json():[]).map(a=>[a.id,a])); }catch(_){ radioAreas=new Map(); }
   drawRadio(); if(boardOn) drawRadioList();
 }
 function radioPoints(){
@@ -2697,6 +2704,28 @@ function drawRadio(){
     m.bindTooltip(`<b>${esc(r.system)}</b><br/>${radioRate(r)}`,{direction:'top',className:'radio-tip'});
     m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
   });
+  drawRadioAreas(b);
+}
+// what is going on where, summarised from a system's transcribed calls: an open square
+// on the ~2 km cell (never an address), hover for the line, click for the system
+const AREA_DEG=0.02;
+function drawRadioAreas(b){
+  const sysById=new Map(radioRows.map(r=>[r.id,r]));
+  radioAreas.forEach(s=>(s.areas||[]).forEach(a=>{
+    if(a.lat==null||!b.contains([a.lat,a.lon])) return;
+    const h=AREA_DEG/2, hi=a.priority>=0.6, col=hi?'#e0412c':'#4fd1c5';
+    const sq=L.polyline([[a.lat-h,a.lon-h],[a.lat-h,a.lon+h],[a.lat+h,a.lon+h],[a.lat+h,a.lon-h],[a.lat-h,a.lon-h]],
+      {color:col,weight:hi?1.6:1.1,opacity:.8,dashArray:'2 3',lineJoin:'miter',interactive:true});
+    sq.bindTooltip(`<b>${esc(a.area)}</b> · ${esc(s.system||'radio')} · ${esc(ago(s.ts))}<span class="ra-act">${esc(a.activity)}</span>`,
+      {direction:'top',className:'radio-tip'});
+    const r=sysById.get(s.id); if(r) sq.on('click',()=>openRadio(r));
+    sq.addTo(radioLayer);
+  }));
+}
+function areasHtml(r){
+  const s=radioAreas.get(r.id); if(!s||!(s.areas||[]).length) return '';
+  return `<div class="rareas"><div class="ra-h">What's going on · from ${esc(s.calls)} transcribed calls · ${esc(ago(s.ts))}</div>`
+    +s.areas.slice(0,6).map(a=>`<div class="ra${a.priority>=0.6?' hi':''}"><b>${esc(a.area)}</b> — ${esc(a.activity)}</div>`).join('')+`</div>`;
 }
 // one shared player: a row's ▶ plays that call; "live" queues each new call as it lands
 let radioAudio=null, radioLive=null, radioQueue=[], radioPlaying=null;
@@ -2733,6 +2762,7 @@ async function openRadio(r,at){
   const html=`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
     +`<div class="meta">${radioRate(r)} <span class="rspark"></span></div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
     +`<div class="meta">${r.approx?'place approximate'+(r.area?' — '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
+    +areasHtml(r)
     +`<div class="rcalls"><div class="rc-head"><button class="rc-live" title="play each new call as it arrives">● LIVE</button>`
     +`<label><input type="checkbox" class="rc-disp" checked> dispatch only</label></div><div class="rc-list"><div class="rc-m">loading calls…</div></div></div>`
     +`<div class="meta" style="margin-top:6px">audio relayed on request from a volunteer's public scanner · placed ${r.placed_by==='dispatches'?'from its own dispatches':r.placed_by==='profile'?'from its system and talkgroup names':r.placed_by==='label'?'from its name':"at the listener's town"}</div></div>`;

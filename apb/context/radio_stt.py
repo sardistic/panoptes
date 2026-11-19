@@ -42,6 +42,7 @@ EVERY = float(os.environ.get("APB_RADIO_STT_EVERY", "60"))
 MIN_WEIGHT = float(os.environ.get("APB_RADIO_STT_MIN", "0.8"))
 PER_RUN = int(os.environ.get("APB_RADIO_STT_PER_RUN", "16"))
 PER_INSTANCE = 5
+PER_INSTANCE_FOCUS = 12
 BATCH = 8
 MAX_AGE = 480.0                  # a call older than eight minutes is no longer news
 MIN_SEC, MAX_SEC = 2.5, 90.0     # "copy" / "10-4" and long patches are not worth the budget
@@ -123,6 +124,17 @@ def _weight_tables() -> tuple[dict, dict]:
     return _weights["profiles"], _weights["tg"]
 
 
+def focus() -> set[tuple[str, int]]:
+    """Systems to hear in full (APB_RADIO_FOCUS="key:system,..."): every talkgroup is
+    transcribed, not only dispatch, so the area summaries see the whole picture."""
+    out = set()
+    for part in os.environ.get("APB_RADIO_FOCUS", "").split(","):
+        k, _, sys_ = part.strip().partition(":")
+        if k and sys_.lstrip("-").isdigit():
+            out.add((k, int(sys_)))
+    return out
+
+
 def weight_for(key: str, system, tg_id, tg: dict) -> tuple[float, str]:
     """importance(), corrected by what we have learned about this talkgroup: the system
     profile names its dispatch talkgroups (many systems tag nothing), and transcripts
@@ -139,6 +151,8 @@ def weight_for(key: str, system, tg_id, tg: dict) -> tuple[float, str]:
         w = max(w, 0.95)
     elif n >= 8 and d / n < 0.1:
         w = min(w, 0.5)
+    if w >= 0.1 and (key, system) in focus():
+        w = max(w, 1.0)                            # focus: all but admin/test channels
     return w, fam
 
 
@@ -196,8 +210,9 @@ def pick(now: float | None = None) -> list[dict]:
     out.sort(key=lambda c: (-c["weight"], -c["ts"]))
     per: dict[str, int] = {}
     chosen = []
+    focused = {k for k, _ in focus()}
     for c in out:
-        if per.get(c["key"], 0) >= PER_INSTANCE:
+        if per.get(c["key"], 0) >= (PER_INSTANCE_FOCUS if c["key"] in focused else PER_INSTANCE):
             continue
         per[c["key"]] = per.get(c["key"], 0) + 1
         chosen.append(c)

@@ -310,6 +310,8 @@ def _startup() -> None:
             if rdio.start():
                 from apb.context import radio_stt
                 radio_stt.start()          # transcribes the calls that matter, on a budget
+                from apb.context import radio_areas
+                radio_areas.start()        # what is going on where, from those transcripts
         except Exception as e:
             log.warning("rdio lane disabled: %s", e)
 
@@ -344,6 +346,7 @@ async def _lifespan(app: FastAPI):
         news_store.stop()
         __import__("apb.ingest.rdio", fromlist=["stop"]).stop()
         __import__("apb.context.radio_stt", fromlist=["stop"]).stop()
+        __import__("apb.context.radio_areas", fromlist=["stop"]).stop()
         maritime_store.stop()
         if _poller_thread and _poller_thread.is_alive():
             _poller_thread.join(timeout=5.0)
@@ -1525,6 +1528,7 @@ def status():
         "lanes_paused": _cad.kind_status(),
         "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
+        "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
         "costs": _costs_brief(),
         "memory": _memory(),
         "lanes": lanes,
@@ -1726,6 +1730,15 @@ def live_radio_transcripts(max_age_minutes: float = Query(60.0, gt=0.0, le=4320.
         label, area = _system_area(rdio, rdio.instance(t["key"]), t["system"])
         out.append(_transcript_out(t, label, area))
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=30"})
+
+
+@app.get("/live/radio/areas")
+def live_radio_areas(max_age_minutes: float = Query(90.0, gt=0.0, le=4320.0)):
+    """What is going on where, per radio system: one line per area summarised from the
+    system's recent transcribed calls. Activity only — no addresses, names or units;
+    an area is placed on a ~2 km cell, or not at all."""
+    from apb.context.radio_areas import public
+    return JSONResponse(public(max_age_minutes * 60.0), headers={"Cache-Control": "public, max-age=60"})
 
 
 @app.get("/live/radio/{rid}/calls")

@@ -270,3 +270,14 @@ stills (each still is ~1,100 image tokens, not the ~260 assumed), about $0.53 a 
 the second-largest Gemini line. The owner asked to reduce it. Default
 `APB_SAMPLER_CAMS_BATCH` is now 20 (two full calls an hour, ~$0.21 a day). Camera
 baselines fill more slowly; tasked checks on live events are unaffected.
+
+## 2026-11-19 — Radio area summaries are published; identifying details are not
+
+The owner clarified that "don't publish the data" meant identifying metadata (addresses,
+names), not everything. Transcripts themselves stay internal, but a per-system summary
+of what is going on in each area (one line per town / county / road: call types, tempo,
+agencies) is now published at `/live/radio/areas` and on the map. House numbers become
+blocks, unit and aircraft identifiers are stripped, and areas are placed on ~2 km cells.
+Cost test on NC VIPER (12 clips): $0.0004 per transcribed clip, $0.0006 per summary;
+VIPER in full is about $0.20 a day. `APB_RADIO_FOCUS` makes chosen systems transcribe
+every talkgroup (VIPER's highway-patrol channel weighs 0.2 and was never picked).

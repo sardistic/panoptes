@@ -221,6 +221,14 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   block address are geocoded (Census geocoder, checked against the system's area) and
   become incidents on the map (`metro` `radio_<hash>`, fusion kind `radio_transcript`,
   counted as the same sensor as radio activity). `/live/radio/transcripts`.
+- **Area context:** every 15 min, each system with 3+ transcribed calls in the last hour
+  gets one text-only Gemini call that groups them by town / county / road and writes one
+  line of activity per area (`apb/context/radio_areas.py`, `/live/radio/areas`, shown in
+  the radio popup and as dashed ~2 km squares). Published: area, activity line, priority,
+  call count. Never: house numbers, names, unit ids, plates, medical details (prompt +
+  `clean()` backstop). Cap `APB_RADIO_AREAS_DAILY` (300 calls, ~$0.0008 each).
+  `APB_RADIO_FOCUS=key:system,...` transcribes every talkgroup of chosen systems (not
+  only dispatch) so their summaries see the whole picture.
 - **Growing the list:** paste Censys / Shodan result pages into a file, then
   `python -m apb.discover.rdio_import pages.txt` and
   `python -m apb.discover.rdio_probe --proxy ... --skip-known --merge-into <list>`;

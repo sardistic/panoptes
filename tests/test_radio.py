@@ -425,3 +425,68 @@ def test_proxy_probe_accepts_the_socks5h_url_the_lane_uses(monkeypatch):
     monkeypatch.setattr(ps.Proxy, "from_url", staticmethod(from_url))
     assert asyncio.run(rdio._probe_proxy("socks5h://warp-egress:1080")) is True
     assert seen == {"url": "socks5://warp-egress:1080", "dest": rdio.PROXY_PROBE}
+
+
+def test_focus_hears_every_talkgroup_of_a_system(db, monkeypatch):
+    from apb.context import radio_stt
+    from apb.store import radio
+    now = time.time()
+    radio.add_recent(db["key"], [(600, now - 30, 1, 9)])           # fireground: 0.55, below the bar
+    assert radio_stt.pick(now) == []
+    monkeypatch.setenv("APB_RADIO_FOCUS", f"{db['key']}:1")
+    radio_stt._weights["at"] = 0.0
+    assert [c["id"] for c in radio_stt.pick(now)] == [600]
+    radio.add_recent(db["key"], [(601, now - 20, 1, 8)])           # public works stays out
+    assert [c["id"] for c in radio_stt.pick(now)] == [600]
+
+
+def _add_done(db, n, ts, text, loc=None, lat=None, lon=None, kind="dispatch"):
+    from apb.store import radio
+    radio.add_transcript(db["key"], n, ts, 1, 7, "done", weight=1.0, tg_label="BCoFD Disp",
+                         tag="Fire Dispatch", kind=kind, incident_type="fire", text=text,
+                         summary=text[:60], location_text=loc, units=["Engine 12"], priority=0.5,
+                         seconds=5.0, lat=lat, lon=lon)
+
+
+def test_area_summary_is_cleaned_placed_and_published_without_addresses(db, monkeypatch):
+    from fastapi.testclient import TestClient
+    from apb.api.main import app
+    from apb.context import radio_areas
+    now = time.time()
+    _add_done(db, 1, now - 300, "Engine 12 respond 1200 block of Oak Ave for smoke", "1200 block of Oak Ave",
+              39.3012, -76.4911)
+    _add_done(db, 2, now - 200, "Medic 4 respond Oak Ave", "Oak Ave", 39.3030, -76.4890)
+    _add_done(db, 3, now - 100, "radio check", kind="noise")
+    _add_done(db, 4, now - 50, "Engine 3 returning to quarters")
+    seen = {}
+
+    def gen(parts, max_tokens):
+        seen["text"] = parts[0]["text"]
+        return json.dumps([
+            {"area": "Essex", "town": "Essex", "state": "MD", "priority": 0.6, "calls": [1, 2],
+             "activity": "Engine 12 and Medic 4 on a smoke call at 1234 Oak Avenue"},
+            {"area": "unknown", "town": None, "activity": "Units returning to quarters", "calls": [3]}]), {}
+    assert [k for k, _ in radio_areas.due(now)] == [(db["key"], 1)]
+    assert radio_areas.run_once(now, gen=gen) == 1
+    assert "noise/" not in seen["text"] and "1. [" in seen["text"]          # noise left out
+    out = radio_areas.public()
+    assert len(out) == 1 and out[0]["id"] == f"{db['key']}:1"
+    a = out[0]["areas"][0]
+    assert a["area"] == "Essex" and "1234" not in a["activity"] and "Engine 12" not in a["activity"]
+    assert "1200 block" in a["activity"] or "1200" in a["activity"]
+    assert (a["lat"], a["lon"]) == (39.31, -76.49)              # the ~2 km cell, not the call
+    assert out[0]["areas"][1]["lat"] is None                     # unknown stays off the map
+    assert radio_areas.due(now) == []                            # nothing new since
+    body = TestClient(app).get("/live/radio/areas").json()
+    assert body[0]["areas"][0]["activity"] == a["activity"]
+    assert "units" not in json.dumps(body)
+
+
+def test_area_summaries_respect_the_daily_cap(db, monkeypatch):
+    from apb.context import radio_areas
+    monkeypatch.setenv("APB_RADIO_AREAS_DAILY", "0")
+    now = time.time()
+    for n in range(3):
+        _add_done(db, 10 + n, now - 60 * n, "Engine respond Main St")
+    assert radio_areas.run_once(now, gen=lambda p, max_tokens: ("[]", {})) == 0
+    assert radio_areas.status()["budget_stops"] >= 1
