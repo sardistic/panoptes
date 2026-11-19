@@ -221,6 +221,11 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   block address are geocoded (Census geocoder, checked against the system's area) and
   become incidents on the map (`metro` `radio_<hash>`, fusion kind `radio_transcript`,
   counted as the same sensor as radio activity). `/live/radio/transcripts`.
+- **Incident threads:** the same call links calls into incidents (dispatch + updates +
+  cleared), continues open ones, and places each by block address (Census), road
+  intersection (Overpass) or town — published as a ~2 km cell with the precision word
+  (`apb/context/radio_place.py`, `/live/radio/threads`, chevron markers with a call
+  timeline). Placed threads feed fusion.
 - **Area context:** every 15 min, each system with 3+ transcribed calls in the last hour
   gets one text-only Gemini call that groups them by town / county / road and writes one
   line of activity per area (`apb/context/radio_areas.py`, `/live/radio/areas`, shown in

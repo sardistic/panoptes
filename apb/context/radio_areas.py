@@ -20,6 +20,8 @@ import re
 import threading
 import time
 
+from apb.context.radio_stt import TYPES
+
 log = logging.getLogger(__name__)
 
 EVERY = float(os.environ.get("APB_RADIO_AREAS_EVERY", "900"))
@@ -32,29 +34,47 @@ _stop = threading.Event()
 _thread: threading.Thread | None = None
 _stats = {"runs": 0, "summaries": 0, "errors": 0, "budget_stops": 0, "last": 0.0, "last_error": None}
 
-PROMPT = """You summarise public-safety radio traffic for a public situational-awareness \
-map. Below are machine transcripts of recent calls on one radio system, numbered. Group \
-them by the AREA they concern (a town, county, highway corridor or district; "unknown" \
-when the calls do not say) and answer with ONLY a JSON array:
-[{"area": a town, city, county or highway corridor, e.g. "Hendersonville" or "I-26 near Fletcher" \
-— never a street, cove, intersection or address (put the town the street is in, or "unknown"),
-  "town": the town or city if the area is in or next to one, else null,
-  "state": two-letter state code or null,
-  "activity": one sentence, at most 160 characters, on what is going on there: call types, \
-tempo, which kinds of agencies (fire, EMS, sheriff, highway patrol, air medical),
-  "priority": 0.0 (routine) to 1.0 (active threat to life),
-  "calls": [the numbers of the calls that belong to this area]}]
-Leave out people's names, house numbers and block numbers (name a road, never a number \
-on it), unit or aircraft identifiers and licence plates. Medical calls are just "a medical \
-call": never the condition, injury, symptom, age or sex (no "seizure", "overdose", \
-"hemorrhage", "panic attack"). Skip radio checks and noise. Do not invent anything the \
-calls do not say."""
+PROMPT = """You turn public-safety radio traffic into a public situational-awareness \
+map. Below are machine transcripts of recent calls on one radio system, numbered, and the \
+incidents already open on it (labelled T1, T2, ...). Answer with ONLY one JSON object:
+{"incidents": [{"thread": the open incident's label (e.g. "T2") when these calls continue it, else null,
+   "title": at most 60 characters, e.g. "Vehicle vs deer on NC 280" or "Structure fire on Oak Ave",
+   "type": one of [TYPE_LIST],
+   "town": the town or city it is in or next to, else null,
+   "state": two-letter state code or null,
+   "where": the most precise place said — a block ("1200 block of Oak Ave"), an intersection \
+("NC 280 at Deep Woods Dr"), a road or a landmark; used only to place it on the map, never shown,
+   "activity": one sentence, at most 180 characters, on what happened and how it developed,
+   "priority": 0.0 (routine) to 1.0 (active threat to life),
+   "status": "active" or "cleared",
+   "calls": [the numbers of the calls that belong to it]}],
+ "areas": [{"area": a town, city, county or highway corridor, e.g. "Hendersonville" or "I-26 near \
+Fletcher" — never a street, cove, intersection or address (use the town, or "unknown"),
+   "town": the town or city if the area is in or next to one, else null,
+   "state": two-letter state code or null,
+   "activity": one sentence, at most 160 characters: call types, tempo, which kinds of \
+agencies (fire, EMS, sheriff, highway patrol, air medical),
+   "priority": 0.0 to 1.0,
+   "calls": [the numbers of the calls about this area]}]}
+An incident is one event: its dispatch and the traffic about it (units responding, on \
+scene, updates, transport, clearing). Put a call in an incident only when it clearly \
+belongs — same place, same units, or an explicit reference — and continue an open \
+incident rather than starting a duplicate. Traffic tied to no event (status checks, \
+acknowledgements, routine stops) goes in no incident. Areas cover all the calls.
+In title, activity and area: leave out people's names, house and block numbers (name the \
+road, never a number on it), unit or aircraft identifiers and licence plates. Medical \
+calls are just "a medical call": never the condition, injury, symptom, age or sex (no \
+"seizure", "overdose", "hemorrhage", "panic attack"). Skip radio checks and noise. Do not \
+invent anything the calls do not say."""
+
+OPEN_SEC = 5400.0                                  # an incident with no call for 90 min is closed
+
 
 # conditions that must not be published even if the model names them
 _MEDICAL = re.compile(
-    r"\b(?:seizures?|overdos\w*|od\b|hemorrhag\w*|bleeding|panic attacks?|cardiac arrest|"
+    r"\b(?:seizures?|overdos\w*|hemorrhag\w*|bleeding|panic attacks?|cardiac arrest|"
     r"heart attacks?|strokes?|unconscious\w*|unresponsive|diabetic\w*|suicid\w*|"
-    r"psychiatric|psych\b|mental health|pregnan\w*|labou?r|childbirth|allergic\w*|"
+    r"psychiatric|psych\b|mental health|pregnan\w*|childbirth|allergic\w*|"
     r"breathing (?:problems?|difficult\w*)|difficulty breathing|chest pains?|"
     r"intoxicat\w*|drunk|syncope|fainted|sick person|lift assist|dead body|doa|deceased|"
     r"death|cpr|gunshot wounds?|stab wounds?|lacerations?|fractures?)\b", re.I)
@@ -103,15 +123,20 @@ def _line(n: int, t: dict) -> str:
             f"{t.get('kind')}/{t.get('incident_type')} @ {where}: {body}")
 
 
-def parse(text: str) -> list[dict]:
-    m = re.search(r"\[.*\]", text or "", re.S)
+def parse(text: str) -> dict:
+    """{"incidents": [...], "areas": [...]} from the reply (a bare array = areas only)."""
+    m = re.search(r"[\[{].*[\]}]", text or "", re.S)
     if not m:
-        return []
+        return {"incidents": [], "areas": []}
     try:
-        arr = json.loads(m.group(0))
+        obj = json.loads(m.group(0))
     except ValueError:
-        return []
-    return [o for o in arr if isinstance(o, dict)] if isinstance(arr, list) else []
+        return {"incidents": [], "areas": []}
+    if isinstance(obj, list):
+        obj = {"areas": obj}
+    if not isinstance(obj, dict):
+        return {"incidents": [], "areas": []}
+    return {k: [o for o in (obj.get(k) or []) if isinstance(o, dict)] for k in ("incidents", "areas")}
 
 
 _UNIT = re.compile(r"\b(?:Engine|Medic|Ladder|Truck|Rescue|Squad|Unit|Car|Trooper|Deputy|Mama|Air|"
@@ -130,6 +155,7 @@ def clean(s) -> str:
     from apb.context.radio_stt import blockify
     s = blockify(str(s or "").strip()) or ""
     s = _BLOCK.sub("", s)
+    s = re.sub(r"\s*\[REDACTED\]", "", s)
     s = _UNIT.sub(lambda m: re.sub(r"\s*-?\s*\d+[A-Z]?$", "", m.group(0)), s)
     s = _MEDICAL.sub("medical", s)
     s = re.sub(r"\b(?:a|an)\s+medical\b", "a medical", s, flags=re.I)
@@ -178,13 +204,24 @@ def summarise(key: str, system: int, rows: list[dict], gen=None, now: float | No
     label = rdio._label(inst, system) if inst else str(system)
     pl = rdio.place_info(inst, label, system) if inst else {}
     rows = sorted(rows, key=lambda r: r["ts"])[-MAX_LINES:]
+    now = now or time.time()
     head = (f"System: {label}. Listener near {inst.get('place') or 'unknown'}"
             + (f"; the system serves {pl['area']}" if pl.get("area") else "") + ".")
-    text = PROMPT + "\n\n" + head + "\n\n" + "\n".join(_line(n, t) for n, t in enumerate(rows, 1))
+    open_ = [t for t in radio.threads(OPEN_SEC, key, system) if t.get("status") != "cleared"][:12]
+    labels = {f"T{i}": t for i, t in enumerate(open_, 1)}
+    opened = "\n".join(
+        f"{lab} (since {time.strftime('%H:%M', time.gmtime(t['first_ts']))}Z, last "
+        f"{time.strftime('%H:%M', time.gmtime(t['last_ts']))}Z): {t.get('title')} — at "
+        f"{t.get('loc_text') or t.get('area') or '?'} — {t.get('activity')}" for lab, t in labels.items())
+    text = (PROMPT.replace("TYPE_LIST", ", ".join(TYPES)) + "\n\n" + head
+            + "\n\nOpen incidents:\n" + (opened or "(none)")
+            + "\n\nCalls:\n" + "\n".join(_line(n, t) for n, t in enumerate(rows, 1)))
     raw, _ = (gen or (lambda parts, max_tokens: explain.generate_usage(parts, max_tokens, feature="radio_areas")))(
-        [{"text": text}], max_tokens=900)
+        [{"text": text}], max_tokens=1600)
+    reply = parse(raw)
+    _stats["threads"] = _stats.get("threads", 0) + link(key, system, reply["incidents"], rows, labels, inst, pl, now)
     areas = []
-    for a in parse(raw):
+    for a in reply["areas"]:
         act = clean(a.get("activity"))
         if not act:
             continue
@@ -201,6 +238,118 @@ def summarise(key: str, system: int, rows: list[dict], gen=None, now: float | No
     areas.sort(key=lambda a: (a["area"] == "unknown", -a["priority"], -a["calls"]))
     radio.add_areas(key, system, len(rows), max(r["ts"] for r in rows), areas, now=now)
     return areas
+
+
+def _nums(obj: dict, n: int) -> list[int]:
+    out = []
+    for i in obj.get("calls") or []:
+        try:
+            k = int(i)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= k <= n:
+            out.append(k)
+    return out
+
+
+def link(key: str, system: int, incidents: list[dict], rows: list[dict], labels: dict,
+         inst: dict, pl: dict, now: float, placer=None) -> int:
+    """Fold the model's incidents into stored threads: continue an open one by its label
+    or start a new one, place it (internally precise, published as a ~2 km cell) and hand
+    a newly placed one to fusion. Returns threads written."""
+    import hashlib
+    from apb.context import radio_place
+    from apb.context.radio_stt import blockify, coarse
+    from apb.store import radio
+    placer = placer or radio_place.place
+    claimed: set[int] = set()
+    written = 0
+    for inc in incidents:
+        nums = [k for k in _nums(inc, len(rows)) if k not in claimed]
+        prev = labels.get(str(inc.get("thread") or "").strip().upper())
+        if not nums and not prev:
+            continue
+        claimed.update(nums)
+        mine = [rows[k - 1] for k in nums]
+        ids = {int(r["id"]) for r in mine}
+        if prev:
+            t = dict(prev)
+        else:
+            if not mine:
+                continue
+            first = min(mine, key=lambda r: r["ts"])
+            tid = hashlib.sha1(f"{key}:{system}:{first['id']}".encode()).hexdigest()[:12]
+            t = {"tid": tid, "key": key, "system": system, "first_ts": first["ts"], "calls": [],
+                 "published": 0, "precision": None, "loc_text": None}
+        t["calls"] = sorted(set(t.get("calls") or []) | ids)
+        if mine:
+            t["first_ts"] = min([t.get("first_ts") or mine[0]["ts"]] + [r["ts"] for r in mine])
+            t["last_ts"] = max([t.get("last_ts") or 0] + [r["ts"] for r in mine])
+        itype = str(inc.get("type") or t.get("type") or "other")
+        t["type"] = itype if itype in TYPES else "other"
+        t["title"] = clean(inc.get("title"))[:80] or t.get("title") or t["type"].replace("_", " ")
+        t["activity"] = clean(inc.get("activity")) or t.get("activity")
+        town = clean(inc.get("town"))[:60] or None
+        t["area"] = area_label({"area": town or t.get("area") or "unknown", "town": town})
+        t["state"] = (str(inc.get("state") or t.get("state") or "").upper()[:2] or None)
+        try:
+            t["priority"] = round(max(0.0, min(1.0, float(inc.get("priority")))), 2)
+        except (TypeError, ValueError):
+            t["priority"] = t.get("priority") or 0.3
+        t["status"] = "cleared" if str(inc.get("status") or "").lower() == "cleared" else "active"
+        where = blockify(str(inc.get("where") or "").strip()[:160]) or None
+        if where != t.get("loc_text") or t.get("precision") not in ("address", "intersection"):
+            located = [r for r in radio.transcripts_for(key, t["calls"]).values() if r.get("lat") is not None]
+            pt, prec = placer(where, town, t["state"], located, inst.get("place"), pl.get("loc"),
+                              bool(pl.get("approx")))
+            rank = {"address": 3, "intersection": 2, "town": 1, None: 0}
+            if pt and rank[prec] >= rank.get(t.get("precision"), 0):
+                cell = coarse(pt)
+                t["lat"], t["lon"], t["precision"] = cell[0], cell[1], prec
+            t["loc_text"] = where or t.get("loc_text")
+            if pt and prec in ("address", "intersection") and not t.get("published"):
+                if not located:                    # a located call already made its own incident
+                    _to_fusion(t, now)
+                t["published"] = 1
+        t["updated"] = now
+        radio.save_thread(t)
+        written += 1
+    return written
+
+
+def _to_fusion(t: dict, now: float) -> None:
+    from datetime import datetime, timezone
+    from apb.store import snapshots
+    pr = float(t.get("priority") or 0.3)
+    snapshots.record([{
+        "metro": f"radio_{t['key']}", "call_id": f"rthr{t['tid']}", "type": t["type"],
+        "summary": f"{t['title']} (heard on radio)", "location": t.get("area") or "general area",
+        "sentiment": ["calm", "routine", "elevated", "urgent", "distress"][min(4, int(pr * 5))],
+        "threat_score": round(pr, 2), "emerging": pr >= 0.8, "lat": t["lat"], "lon": t["lon"],
+        "at": datetime.fromtimestamp(t["first_ts"], tz=timezone.utc).isoformat(), "ts": t["first_ts"]}])
+
+
+def public_threads(max_age_sec: float = 10800.0) -> list[dict]:
+    """What /live/radio/threads serves: each incident, its ~2 km cell and precision word,
+    and its calls in order with a cleaned line each. Never the place text."""
+    from apb.ingest import rdio
+    from apb.store import radio
+    out = []
+    for t in radio.threads(max_age_sec):
+        inst = rdio.instance(t["key"])
+        calls = radio.transcripts_for(t["key"], t["calls"])
+        out.append({
+            "id": t["tid"], "sys": f"{t['key']}:{t['system']}",
+            "system": rdio._label(inst, t["system"]) if inst else None,
+            "type": t.get("type"), "title": clean(t.get("title")), "activity": clean(t.get("activity")),
+            "area": area_label({"area": t.get("area")}), "state": t.get("state"),
+            "priority": t.get("priority"), "status": t.get("status"), "precision": t.get("precision"),
+            "lat": t.get("lat"), "lon": t.get("lon"), "first_ts": t.get("first_ts"), "last_ts": t.get("last_ts"),
+            "calls": [{"id": c["id"], "ts": c["ts"], "talkgroup": c.get("tg_label"), "kind": c.get("kind"),
+                       "line": clean(c.get("text") or c.get("summary"))[:240],
+                       "audio": f"/live/radio/audio/{t['key']}/{c['id']}"}
+                      for c in sorted(calls.values(), key=lambda c: c["ts"])]})
+    return out
 
 
 def run_once(now: float | None = None, gen=None) -> int:

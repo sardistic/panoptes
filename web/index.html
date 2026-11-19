@@ -280,6 +280,13 @@
   .rareas .ra{font-size:11.5px;line-height:1.35;color:var(--txt-2);margin:3px 0}
   .rareas .ra b{color:#4fd1c5;font-weight:600}
   .rareas .ra.hi b{color:#e0412c}
+  .rareas .ra.th{cursor:pointer}
+  .rareas .ra.th:hover b{text-decoration:underline}
+  .rc .rc-line{font-size:11.5px;line-height:1.35;color:var(--txt-2);margin:2px 0 0 26px}
+  .rc .rc-thr{font-size:10px;color:#4fd1c5;margin:2px 0 0 26px;cursor:pointer;letter-spacing:.03em}
+  .rc .rc-thr:hover{text-decoration:underline}
+  .rthread .rc{display:block}
+  .rthread .rc-play{float:left;margin-right:6px}
   #board .rall{cursor:pointer;color:var(--dim);font:500 9.5px/1 var(--font);letter-spacing:.08em;padding:9px 0 3px;text-transform:uppercase}
   #board .rall:hover{color:var(--txt)}
   #board .brow .hot{color:var(--red)}
@@ -2668,11 +2675,12 @@ map.on('moveend zoomend',()=>{ clearTimeout(window._ntT); window._ntT=setTimeout
 // calls per 10 minutes right now, a red ring when the system is far above its own normal.
 // Counts only. A dashed outline means the place is approximate (the listener's town,
 // not the system's footprint); systems with no place at all are listed in the panel.
-let showRadio=true, radioRows=[], radioAllOpen=false, radioAreas=new Map(); const radioLayer=L.layerGroup().addTo(map);
+let showRadio=true, radioRows=[], radioAllOpen=false, radioAreas=new Map(), radioThreads=[]; const radioLayer=L.layerGroup().addTo(map);
 const radioRate = r => `${esc(r.per10)} calls / 10 min`+(r.normal!=null?` · normal ${esc(r.normal)}`:' · still learning its normal')+(r.z!=null?` · ${esc(r.z)}σ`:'');
 async function loadRadio(){
   try{ const r=await fetch('/live/radio?max_age_minutes=45'); radioRows=r.ok?await r.json():[]; }catch(_){ radioRows=[]; }
   try{ const r=await fetch('/live/radio/areas'); radioAreas=new Map((r.ok?await r.json():[]).map(a=>[a.id,a])); }catch(_){ radioAreas=new Map(); }
+  try{ const r=await fetch('/live/radio/threads'); radioThreads=r.ok?await r.json():[]; }catch(_){ radioThreads=[]; }
   drawRadio(); if(boardOn) drawRadioList();
 }
 function radioPoints(){
@@ -2705,6 +2713,51 @@ function drawRadio(){
     m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
   });
   drawRadioAreas(b);
+  drawRadioThreads(b);
+}
+// incidents heard on the radio: linked calls of one event, on the ~2 km cell their
+// place resolved to. A downward chevron (a pin, angular); dashed when only the town is
+// known; red when urgent; bigger with more calls. Click for the call timeline.
+const PRECISION={address:'from a block address',intersection:'from an intersection',town:'town only'};
+function drawRadioThreads(b){
+  radioThreads.forEach(t=>{
+    if(t.lat==null||!b.contains([t.lat,t.lon])) return;
+    const zz=map.getZoom(), n=(t.calls||[]).length, s=6+Math.min(6,n*.8), hi=(t.priority||0)>=0.6;
+    const col=t.status==='cleared'?'#7c8a93':hi?'#e0412c':'#e8b04a';
+    const o=(dx,dy)=>screenOffset(t.lat,t.lon,dx,dy,zz);
+    const g=L.featureGroup([[[-s,-s*1.6],[0,0],[s,-s*1.6]],[[-s*.55,-s*1.6],[0,-s*.7],[s*.55,-s*1.6]]].map(l=>
+      L.polyline(l.map(q=>o(q[0],q[1])),{color:col,weight:hi?2:1.5,opacity:.95,lineJoin:'miter',
+        dashArray:t.precision==='town'?'3 3':null,interactive:true})));
+    g.bindTooltip(`<b>${esc(t.title)}</b> · ${esc(t.area||'')}<br/>${esc(n)} linked call${n===1?'':'s'} · ${esc(ago(t.last_ts))}${t.status==='cleared'?' · cleared':''}`,
+      {direction:'top',className:'radio-tip'});
+    g.on('click',()=>openThread(t)); g.addTo(radioLayer);
+  });
+}
+function openThread(t,where){
+  stopLive();
+  const at=where||(t.lat!=null?[t.lat,t.lon]:null);
+  const sys=radioRows.find(r=>r.id===t.sys);
+  const calls=(t.calls||[]);
+  const html=`<div class="pop"><div class="kick">Radio incident · ${esc(String(t.type||'other').replace(/_/g,' '))}${t.status==='cleared'?' · cleared':''}</div>`
+    +`<div class="ttl">${esc(t.title)}</div>`
+    +`<div class="meta">${esc(t.area||'area unknown')} · placed ${esc(PRECISION[t.precision]||'not placed')} · ${esc(callTime(t.first_ts))}–${esc(callTime(t.last_ts))}</div>`
+    +(t.activity?`<div class="meta" style="color:var(--txt-2)">${esc(t.activity)}</div>`:'')
+    +`<div class="rcalls rthread"><div class="rc-list">`+calls.map(c=>`<div class="rc" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
+      +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup||'')}</b>${c.kind?' · '+esc(c.kind):''}</div>`
+      +(c.line?`<div class="rc-line">${esc(c.line)}</div>`:'')+`</div>`).join('')+`</div></div>`
+    +`<div class="meta" style="margin-top:6px">${esc(calls.length)} calls linked by the model · `
+    +(sys?`<a href="#" class="th-sys">${esc(t.system||'system')}</a>`:esc(t.system||''))+` · place shown as a ~2 km area</div></div>`;
+  if(!at){ if(sys) openRadio(sys); return; }
+  const pop=L.popup({maxWidth:360,minWidth:300}).setLatLng(at).setContent(html).openOn(map);
+  const el=pop.getElement();
+  el.querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{ const c=calls.find(x=>String(x.id)===n.dataset.id); if(c) playCall(c); });
+  const sl=el.querySelector('.th-sys'); if(sl) sl.onclick=ev=>{ ev.preventDefault(); openRadio(sys); };
+  markPlaying();
+}
+function threadsHtml(r){
+  const ts=radioThreads.filter(t=>t.sys===r.id).slice(0,6); if(!ts.length) return '';
+  return `<div class="rareas"><div class="ra-h">Incidents heard · linked calls</div>`
+    +ts.map(t=>`<div class="ra th${(t.priority||0)>=0.6?' hi':''}" data-th="${esc(t.id)}"><b>${esc(t.title)}</b> — ${esc(t.area||'')} · ${esc((t.calls||[]).length)} calls · ${esc(ago(t.last_ts))}</div>`).join('')+`</div>`;
 }
 // what is going on where, summarised from a system's transcribed calls: an open square
 // on the ~2 km cell (never an address), hover for the line, click for the system
@@ -2743,7 +2796,9 @@ function callRow(c){
   const tx=c.kind==='dispatch'&&c.type&&c.type!=='noise'
     ?`<div class="rc-tx"><i>${esc(String(c.type).replace(/_/g,' '))} dispatch</i>${c.located?'placed on the map':'area not placed'}</div>`:'';
   return `<div class="rc${c.weight>=0.8?' hi':''}" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
-    +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup)}</b> · ${esc(c.tag)}</div>${tx}</div>`;
+    +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup)}</b> · ${esc(c.tag)}</div>${tx}`
+    +(c.line?`<div class="rc-line">${esc(c.line)}</div>`:'')
+    +(c.thread?`<div class="rc-thr" data-th="${esc(c.thread)}">↳ ${esc(c.thread_title||'linked incident')}</div>`:'')+`</div>`;
 }
 async function loadCalls(pop,r){
   let calls=[]; try{ const res=await fetch(`/live/radio/${encodeURIComponent(r.id)}/calls?limit=30`); calls=res.ok?await res.json():[]; }catch(_){}
@@ -2752,6 +2807,7 @@ async function loadCalls(pop,r){
   const shown=calls.filter(c=>!disp||c.weight>=0.8);
   list.innerHTML=shown.map(callRow).join('')||`<div class="rc-m" style="padding:6px 0">${disp?'no dispatch calls in the last few minutes — untick to see all':'no calls in the last few minutes'}</div>`;
   list.querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{ const c=calls.find(x=>String(x.id)===n.dataset.id); if(c) playCall(c); });
+  list.querySelectorAll('.rc-thr').forEach(n=>n.onclick=()=>{ const t=radioThreads.find(x=>x.id===n.dataset.th); if(t) openThread(t); });
   markPlaying();
   return calls;
 }
@@ -2762,7 +2818,7 @@ async function openRadio(r,at){
   const html=`<div class="pop"><div class="kick">Radio system${r.z!=null&&r.z>=3?' · surge':''}</div><div class="ttl">${esc(r.system)}</div>`
     +`<div class="meta">${radioRate(r)} <span class="rspark"></span></div>`+(tags?`<div class="meta">busiest now: ${tags}</div>`:'')
     +`<div class="meta">${r.approx?'place approximate'+(r.area?' — '+esc(r.area):''):esc(r.area||'')} · ${esc(ago(r.ts))}</div>`
-    +areasHtml(r)
+    +threadsHtml(r)+areasHtml(r)
     +`<div class="rcalls"><div class="rc-head"><button class="rc-live" title="play each new call as it arrives">● LIVE</button>`
     +`<label><input type="checkbox" class="rc-disp" checked> dispatch only</label></div><div class="rc-list"><div class="rc-m">loading calls…</div></div></div>`
     +`<div class="meta" style="margin-top:6px">audio relayed on request from a volunteer's public scanner · placed ${r.placed_by==='dispatches'?'from its own dispatches':r.placed_by==='profile'?'from its system and talkgroup names':r.placed_by==='label'?'from its name':"at the listener's town"}</div></div>`;
@@ -2770,6 +2826,7 @@ async function openRadio(r,at){
   pop.on('remove',stopLive);
   const el=pop.getElement();
   el.querySelector('.rc-disp').onchange=()=>loadCalls(pop,r);
+  el.querySelectorAll('[data-th]').forEach(n=>n.onclick=()=>{ const t=radioThreads.find(x=>x.id===n.dataset.th); if(t) openThread(t, t.lat!=null?null:where); });
   el.querySelector('.rc-live').onclick=async ev=>{
     const b=ev.currentTarget;
     if(radioLive){ stopLive(); b.classList.remove('on'); return; }

@@ -364,8 +364,10 @@ def test_api_never_serves_transcript_words(db, monkeypatch):
         bodies = [c.get("/live/radio/transcripts").text,
                   c.get(f"/live/radio/{db['key']}:1/calls").text,
                   c.get("/live/board").text]
-    for body in bodies:
+    for body in (bodies[0], bodies[2]):                       # classification only
         assert "Oak" not in body and "Engine 5" not in body and "REDACTED" not in body
+    assert "500" not in bodies[1] and "Engine 5" not in bodies[1] and "REDACTED" not in bodies[1]
+    assert json.loads(bodies[1])[0]["line"] == "Engine respond Oak Ave, caller"
     t = json.loads(bodies[0])[0]
     assert t["type"] == "fire" and (t["lat"], t["lon"]) == (39.31, -76.49)
     assert json.loads(bodies[1])[0]["located"] is True
@@ -504,3 +506,71 @@ def test_area_lines_never_carry_conditions_block_numbers_or_streets():
     assert area_label({"area": "Henderson County"}) == "Henderson County"
     assert area_label({"area": "I-26 near Fletcher"}) == "I-26 near Fletcher"
     assert area_label({"area": "Falls Church"}) == "Falls Church"
+
+
+def test_calls_are_linked_into_threads_placed_and_sent_to_fusion(db, monkeypatch):
+    from apb.context import radio_areas, radio_place
+    from apb.store import radio, snapshots
+    now = time.time()
+    _add_done(db, 21, now - 600, "Troop G respond NC 280 at Deep Woods, vehicle struck a deer")
+    _add_done(db, 22, now - 500, "Trooper 4 on scene NC 280 Deep Woods", kind="unit")
+    _add_done(db, 23, now - 400, "10-4 headed to the station", kind="unit")
+    placed = []
+
+    def crosser(a, b, anchor, radius):
+        placed.append((a, b, radius))
+        return (35.4321, -82.5432)
+    monkeypatch.setattr(radio_place, "town_point", lambda town, near, max_km=250.0: (35.40, -82.50))
+
+    def gen1(parts, max_tokens):
+        assert "Open incidents:\n(none)" in parts[0]["text"]
+        return json.dumps({"incidents": [{"thread": None, "title": "Vehicle vs deer on NC 280",
+                                          "type": "traffic", "town": "Fletcher", "state": "NC",
+                                          "where": "NC 280 at Deep Woods", "priority": 0.4,
+                                          "activity": "Trooper 4 responded to a deer strike.",
+                                          "status": "active", "calls": [1, 2]}],
+                           "areas": []}), {}
+    real = radio_place.place
+    monkeypatch.setattr(radio_place, "place", lambda *a, **k: real(*a, **{**k, "crosser": crosser,
+                                                                          "geocode": lambda *x: None}))
+    assert radio_areas.run_once(now, gen=gen1) == 1
+    th = radio_areas.public_threads()
+    assert len(th) == 1 and [c["id"] for c in th[0]["calls"]] == [21, 22]
+    t = th[0]
+    assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == (35.43, -82.55)
+    assert placed == [("NC 280", "Deep Woods", 15000)]
+    assert "Trooper 4" not in json.dumps(th) and "Deep Woods" not in t["title"] + t["area"]
+    assert "loc_text" not in t and "where" not in t
+    rows = snapshots.query(1.0)
+    assert [r["call_id"] for r in rows] == [f"rthr{t['id']}"] and rows[0]["type"] == "traffic"
+
+    # a later call continues the open incident by its label instead of starting another
+    _add_done(db, 24, now - 60, "Troop G, deer removed, NC 280 clear", kind="unit")
+    radio.add_recent(db["key"], [(n, now - 600 + 100 * k, 1, 7) for k, n in enumerate((21, 22, 23))]
+                     + [(24, now - 60, 1, 7)])
+
+    def gen2(parts, max_tokens):
+        assert "T1 (since" in parts[0]["text"] and "Vehicle vs deer" in parts[0]["text"]
+        return json.dumps({"incidents": [{"thread": "T1", "title": "Vehicle vs deer on NC 280",
+                                          "type": "traffic", "town": "Fletcher", "where": "NC 280 at Deep Woods",
+                                          "activity": "Deer removed, road clear.", "status": "cleared",
+                                          "calls": [4]}], "areas": []}), {}
+    assert radio_areas.run_once(now + 1, gen=gen2) == 1
+    th = radio_areas.public_threads()
+    assert len(th) == 1 and [c["id"] for c in th[0]["calls"]] == [21, 22, 24]
+    assert th[0]["status"] == "cleared" and len(snapshots.query(1.0)) == 1
+    from apb.api.main import app
+    from fastapi.testclient import TestClient
+    calls = TestClient(app).get(f"/live/radio/{db['key']}:1/calls").json()
+    assert {c["id"]: c.get("thread") for c in calls}[24] == th[0]["id"]
+
+
+def test_split_and_road_filters():
+    from apb.context.radio_place import road_filter, split_where
+    assert split_where("NC 280 at Deep Woods Dr") == ("NC 280", "Deep Woods Dr")
+    assert split_where("Main St and 5th Ave") == ("Main St", "5th Ave")
+    assert split_where("1200 block of Oak Ave") is None
+    assert split_where("the mall") is None
+    assert road_filter("NC 280") == '["ref"~"(^|[^0-9])280($|[^0-9])",i]'
+    assert road_filter("Deep Woods Dr") == '["name"~"^(north |south |east |west |n |s |e |w )?Deep Woods",i]'
+    assert road_filter("I-26") == '["ref"~"(^|[^0-9])26($|[^0-9])",i]'

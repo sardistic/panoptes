@@ -281,3 +281,16 @@ blocks, unit and aircraft identifiers are stripped, and areas are placed on ~2 k
 Cost test on NC VIPER (12 clips): $0.0004 per transcribed clip, $0.0006 per summary;
 VIPER in full is about $0.20 a day. `APB_RADIO_FOCUS` makes chosen systems transcribe
 every talkgroup (VIPER's highway-patrol channel weighs 0.2 and was never picked).
+
+## 2026-11-19 — Radio calls are linked into incident threads and placed
+
+The owner's standing goal: use calls to locate where incidents happen, and link calls
+with each other. The area-summary call now also returns incidents: a dispatch and the
+traffic about it (responding, on scene, updates, cleared), continuing open threads by
+label (T1, T2...) so later calls join the same incident. Each thread is placed by the
+best evidence — a geocoded block address (Census), else the node where two named roads
+meet near the town (Overpass, keyless; "NC 280 at Deep Woods"), else the town — and
+published as the ~2 km cell plus the precision word. The place text stays internal.
+Threads placed by address or intersection go to fusion (metro `radio_<key>`, call_id
+`rthr<tid>`) unless a call already did. Cleaned per-call lines are now published
+(`clean()`: no house/block numbers, unit numbers, conditions or [REDACTED] markers).

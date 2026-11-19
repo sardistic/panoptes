@@ -1741,6 +1741,17 @@ def live_radio_areas(max_age_minutes: float = Query(90.0, gt=0.0, le=4320.0)):
     return JSONResponse(public(max_age_minutes * 60.0), headers={"Cache-Control": "public, max-age=60"})
 
 
+@app.get("/live/radio/threads")
+def live_radio_threads(max_age_minutes: float = Query(180.0, gt=0.0, le=4320.0)):
+    """Incidents heard on the radio: calls linked into one thread per event (dispatch,
+    units responding, updates, clearing), each placed on a ~2 km cell with how it was
+    placed (address / intersection / town). Cleaned lines only — no addresses, names,
+    unit numbers or medical details."""
+    from apb.context.radio_areas import public_threads
+    return JSONResponse(public_threads(max_age_minutes * 60.0)[:400],
+                        headers={"Cache-Control": "public, max-age=30"})
+
+
 @app.get("/live/radio/{rid}/calls")
 def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     """Newest calls on one radio system: time, talkgroup, how much it matters, a
@@ -1753,6 +1764,9 @@ def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     key, _, system = rid.partition(":")
     if not rdio.instance(key):
         return JSONResponse({"error": "unknown system"}, status_code=404)
+    from apb.context.radio_areas import clean
+    in_thread = {cid: (t["tid"], clean(t.get("title")))
+                 for t in radio_store.threads(4 * 3600.0, key, int(system)) for cid in t["calls"]}
     out = []
     for c in radio_store.recent_calls(key, int(system), limit):
         tg = rdio.talkgroup(key, int(system), c["talkgroup"])
@@ -1760,9 +1774,12 @@ def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
         row = {"id": c["id"], "ts": c["ts"], "talkgroup": tg["label"], "tag": tg["tag"],
                "group": tg.get("group"), "weight": weight, "family": family,
                "audio": f"/live/radio/audio/{key}/{c['id']}"}
-        if c.get("status") == "done":             # classification only, never the words
+        if c.get("status") == "done":             # cleaned words: no numbers, units or conditions
             row.update(kind=c.get("kind"), type=c.get("incident_type"),
-                       priority=c.get("priority"), located=c.get("lat") is not None)
+                       priority=c.get("priority"), located=c.get("lat") is not None,
+                       line=clean(c.get("text") or c.get("summary"))[:240] or None)
+        if c["id"] in in_thread:
+            row["thread"], row["thread_title"] = in_thread[c["id"]]
         out.append(row)
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=8"})
 

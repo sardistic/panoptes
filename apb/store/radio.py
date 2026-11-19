@@ -52,6 +52,12 @@ def _conn() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS radio_areas (
             key TEXT NOT NULL, system INTEGER NOT NULL, ts REAL NOT NULL, calls INTEGER,
             newest REAL, areas TEXT, PRIMARY KEY (key, system, ts));
+        CREATE TABLE IF NOT EXISTS radio_threads (
+            tid TEXT PRIMARY KEY, key TEXT NOT NULL, system INTEGER NOT NULL, first_ts REAL,
+            last_ts REAL, type TEXT, title TEXT, activity TEXT, area TEXT, state TEXT,
+            priority REAL, status TEXT, loc_text TEXT, lat REAL, lon REAL, precision TEXT,
+            calls TEXT, updated REAL, published INTEGER DEFAULT 0);
+        CREATE INDEX IF NOT EXISTS idx_rth ON radio_threads(key, system, last_ts);
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
@@ -345,3 +351,51 @@ def latest_areas(max_age_sec: float = 5400.0) -> list[dict]:
             d["areas"] = []
         out.append(d)
     return out
+
+
+_THREAD_COLS = ("tid", "key", "system", "first_ts", "last_ts", "type", "title", "activity", "area",
+                "state", "priority", "status", "loc_text", "lat", "lon", "precision", "calls",
+                "updated", "published")
+
+
+def save_thread(t: dict) -> None:
+    """Insert or replace one incident thread (calls = list of call ids)."""
+    row = {**t, "calls": json.dumps(sorted(set(int(c) for c in t.get("calls") or []))),
+           "updated": t.get("updated") or time.time(), "published": int(bool(t.get("published")))}
+    with _lock:
+        c = _conn()
+        c.execute(f"INSERT OR REPLACE INTO radio_threads ({', '.join(_THREAD_COLS)}) VALUES "
+                  f"({', '.join('?' for _ in _THREAD_COLS)})", tuple(row.get(k) for k in _THREAD_COLS))
+        c.execute("DELETE FROM radio_threads WHERE last_ts < ?", (time.time() - 3 * 86400,))
+        c.commit()
+
+
+def _thread(r) -> dict:
+    d = dict(r)
+    try:
+        d["calls"] = json.loads(d.get("calls") or "[]")
+    except ValueError:
+        d["calls"] = []
+    return d
+
+
+def threads(max_age_sec: float = 10800.0, key: str | None = None, system: int | None = None) -> list[dict]:
+    """Incident threads active within max_age_sec, newest activity first."""
+    sql, args = "SELECT * FROM radio_threads WHERE last_ts >= ?", [time.time() - max_age_sec]
+    if key is not None:
+        sql += " AND key = ? AND system = ?"
+        args += [key, system]
+    with _lock:
+        rows = _conn().execute(sql + " ORDER BY last_ts DESC", args).fetchall()
+    return [_thread(r) for r in rows]
+
+
+def transcripts_for(key: str, ids: list[int]) -> dict[int, dict]:
+    """{call id: transcript row} for the given calls of one instance."""
+    ids = [int(i) for i in ids][:500]
+    if not ids:
+        return {}
+    with _lock:
+        rows = _conn().execute(f"SELECT * FROM radio_transcripts WHERE key = ? AND id IN "
+                               f"({', '.join('?' for _ in ids)})", [key, *ids]).fetchall()
+    return {r["id"]: _tr(r) for r in rows}
