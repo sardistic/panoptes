@@ -614,7 +614,12 @@ let atlasStyleJson = null;     // the Umbral Atlas style, reused by the clip's s
 const CENTERS = {};            // metro -> [lat,lon], from /live/metros
 const LIVE_METROS = new Set(); // all metros from /live/metros are live CAD
 
-const map = L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true})
+// Every glyph is a hairline polyline a few px across, so the canvas renderer's default
+// hit test (the stroke itself) is nearly impossible to hover. `tolerance` widens every
+// path's hit area by that many px on each side — bigger for fingers than for a mouse.
+const HIT_PX = matchMedia('(pointer:coarse)').matches ? 14 : 8;
+const map = L.map('map',{zoomControl:false,attributionControl:true,preferCanvas:true,
+    renderer:L.canvas({tolerance:HIT_PX})})
   .setView([39.5, -98.35], 4);   // canvas renderer: thousands of incident dots stay fast
 map.attributionControl.setPrefix(false);
 map.attributionControl.setPosition('bottomleft');   // bottom-right belongs to the clip
