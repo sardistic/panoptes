@@ -1532,6 +1532,7 @@ def status():
         "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
         "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
+        "streams": __import__("apb.ingest.streams", fromlist=["status"]).status(),
         "costs": _costs_brief(),
         "memory": _memory(),
         "lanes": lanes,
