@@ -230,6 +230,12 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   `state/roads.sqlite`); block addresses try numbers inside the block (600 → 601, 650,
   651). Precision: address > intersection > street > town. Threads still at town level
   are re-placed every pass for 6 h.
+- **Scanner streams:** `apb/ingest/streams.py` reads the public Xiph Icecast directory
+  for police / fire / EMS MP3 streams (FDNY, DC Fire, Maricopa County, Charlotte Fire…;
+  ~40 distinct), listens to up to `APB_STREAMS_MAX` (40) through the egress proxy, cuts
+  calls at squelch silence, keeps each call's MP3 for 6 h and records it like an Rdio
+  call (one system, one talkgroup) — so it is transcribed, linked, placed and shown
+  like any scanner. List in `state/streams.json` (out of git), refreshed daily.
 - **Live indicators:** `/live/radio/feed?since=<now of the last reply>` returns calls the
   lane newly saw (system, talkgroup, weight), newly transcribed calls (cleaned line, ~2 km
   cell) and threads just written. The map polls it every 5 s: each call pings its antenna,

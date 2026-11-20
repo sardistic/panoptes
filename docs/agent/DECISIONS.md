@@ -363,3 +363,25 @@ weather, radar separate). Now:
   are released one every 1.2-3.2 s; the strip is built once and only new rows animate;
   bubbles only from zoom 7. New incident pings spread over up to 12 s.
 
+### 2026-11-19 — Radio expansion: our own stream recorder for Icecast scanner feeds
+
+Owner: "expand radios; if we need to operate our own crawler for specific broadcasters
+so be it." Options checked: Shodan filtered search needs paid credits on the free key;
+crt.sh (CT logs) returned 502s and mostly noise; OpenMHz stays out (Cloudflare + ToS).
+The public Xiph Icecast directory (dir.xiph.org/yp.xml, keyless) lists ~90 public-safety
+MP3 scanner streams (~40 distinct after de-duplication), mostly 16 kbps — FDNY boroughs,
+DC Fire, Maricopa County police/DPS, Charlotte, St. Louis and Baltimore City Fire,
+Louisville, Ohio HP — none covered by our Rdio instances.
+
+`apb/ingest/streams.py` listens through the WARP egress (same rule as Rdio: never from
+the home address), decodes with `miniaudio` (pip wheel, no ffmpeg) to 8 kHz mono, cuts
+calls on a running noise floor (on 3.5x floor, off 2x, 1.6 s hang, 1.2-90 s), stores
+each call's original MP3 bytes for 6 h and lists it in radio_recent (system 1,
+talkgroup 0), with counts into radio_calls every 10 min. To the rest of the code a
+stream is an Rdio instance with one system: `rdio.instance/_label/talkgroup/
+fetch_calls/activity` know about it, so STT, profiles (placement from the stream name),
+threads, the map and the live feed need no stream-specific code. Trial on prod through
+WARP: 4 streams, 2 min, 8 calls, no drops; Gemini transcripts were clean dispatch
+traffic ("Respond for Box 1664 … West 142nd Street … odor of gas"). ~1.5 Mbps and light
+CPU for 40 streams; transcription stays inside the existing daily STT budget.
+
