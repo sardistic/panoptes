@@ -229,6 +229,12 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   (`apb/context/roads.py`, `state/roads.sqlite`): 0.1° tiles of named roads fetched from
   Overpass once when first needed (one at a time, backoff, mirror rotation, 90-day
   refresh); unplaced threads are re-placed for 6 h as tiles arrive.
+- **Live indicators:** `/live/radio/feed?since=<now of the last reply>` returns calls the
+  lane newly saw (system, talkgroup, weight), newly transcribed calls (cleaned line, ~2 km
+  cell) and threads just written. The map polls it every 5 s: each call pings its antenna,
+  each transcription types out in a bubble on its cell (tethered to the antenna), and the
+  "Radio live" strip lists the latest lines. Focus systems (`APB_RADIO_FOCUS`) are polled
+  every `APB_RDIO_FOCUS_EVERY` s (60) instead of every 10 min, so they are near-live.
 - **Area context:** every 15 min, each system with 3+ transcribed calls in the last hour
   gets one text-only Gemini call that groups them by town / county / road and writes one
   line of activity per area (`apb/context/radio_areas.py`, `/live/radio/areas`, shown in

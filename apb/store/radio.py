@@ -62,6 +62,11 @@ def _conn() -> sqlite3.Connection:
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
         """)
+        cols = {r[1] for r in c.execute("PRAGMA table_info(radio_recent)").fetchall()}
+        if "seen" not in cols:                    # when the lane first saw the call (live feed)
+            c.execute("ALTER TABLE radio_recent ADD COLUMN seen REAL")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_rr_seen ON radio_recent(seen)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_rt_done ON radio_transcripts(done_at)")
         c.commit()
         _ready = True
     return c
@@ -152,8 +157,8 @@ def add_recent(key: str, rows: list[tuple]) -> int:
     now = time.time()
     with _lock:
         c = _conn()
-        c.executemany("INSERT OR IGNORE INTO radio_recent VALUES (?,?,?,?,?)",
-                      [(key, int(i), float(ts), s, tg) for i, ts, s, tg in rows])
+        c.executemany("INSERT OR IGNORE INTO radio_recent (key, id, ts, system, talkgroup, seen) "
+                      "VALUES (?,?,?,?,?,?)", [(key, int(i), float(ts), s, tg, now) for i, ts, s, tg in rows])
         c.execute("DELETE FROM radio_recent WHERE ts < ?", (now - RECENT_SEC,))
         c.commit()
     return len(rows)
@@ -207,6 +212,20 @@ def recent_calls(key: str, system: int, limit: int = 40) -> list[dict]:
             "WHERE r.key = ? AND r.system = ? ORDER BY r.ts DESC LIMIT ?",
             (key, system, limit)).fetchall()
     return [dict(r) for r in rows]
+
+
+def feed(since: float, max_calls: int = 400, max_lines: int = 60) -> dict:
+    """What happened after `since` (server time): calls the lane newly saw, calls newly
+    transcribed, and incident threads newly written. Feeds the map's live indicators."""
+    with _lock:
+        c = _conn()
+        calls = c.execute("SELECT key, id, ts, system, talkgroup FROM radio_recent WHERE seen > ? "
+                          "ORDER BY seen, ts LIMIT ?", (since, max_calls)).fetchall()
+        lines = c.execute("SELECT * FROM radio_transcripts WHERE done_at > ? AND status = 'done' "
+                          "ORDER BY done_at LIMIT ?", (since, max_lines)).fetchall()
+        threads = c.execute("SELECT tid FROM radio_threads WHERE updated > ?", (since,)).fetchall()
+    return {"calls": [dict(r) for r in calls], "lines": [_tr(r) for r in lines],
+            "threads": [r[0] for r in threads]}
 
 
 def has_call(key: str, call_id: int) -> bool:

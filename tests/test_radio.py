@@ -646,3 +646,35 @@ def test_unplaced_incident_is_re_placed_once_its_roads_are_indexed(db, monkeypat
     assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == (35.43, -82.55)
     assert [r["call_id"] for r in snapshots.query(1.0)] == ["rthrabc123def456"]
     assert radio_areas.replace_pending(now) == 0                     # done once
+
+
+def test_live_feed_reports_new_calls_and_cleaned_lines_after_the_cursor(db, monkeypatch):
+    from fastapi.testclient import TestClient
+    from apb.api.main import app
+    from apb.store import radio
+    c = TestClient(app)
+    now = time.time()
+    first = c.get("/live/radio/feed").json()
+    assert first["calls"] == [] and first["lines"] == []
+    radio.add_recent(db["key"], [(51, now - 30, 1, 7), (52, now - 20, 1, 8)])
+    _add_done(db, 51, now - 30, "Engine 12 respond 1200 block of Oak Ave for a seizure", lat=39.3012, lon=-76.4911)
+    _add_done(db, 53, now - 10, "radio check", kind="noise")
+    radio.add_transcript(db["key"], 53, now - 10, 1, 7, "done", kind="noise", incident_type="noise", text="radio check")
+    d = c.get(f"/live/radio/feed?since={first['now']}").json()
+    assert [(x["sys"], x["id"], x["talkgroup"]) for x in d["calls"]] == [
+        (f"{db['key']}:1", 51, "BCoFD Disp"), (f"{db['key']}:1", 52, "PW 2")]
+    assert d["calls"][0]["weight"] > d["calls"][1]["weight"]
+    assert [x["id"] for x in d["lines"]] == [51]                     # noise is not shown
+    line = d["lines"][0]
+    assert "1200" not in line["line"] and "Engine 12" not in line["line"] and "Oak Ave" in line["line"]
+    from apb.context.radio_stt import coarse
+    assert (line["lat"], line["lon"]) == coarse((39.3012, -76.4911)) != (39.3012, -76.4911)
+    again = c.get(f"/live/radio/feed?since={d['now']}").json()
+    assert again["calls"] == [] and again["lines"] == []
+
+
+def test_focus_instances_are_polled_every_minute(db, monkeypatch):
+    from apb.ingest import rdio
+    monkeypatch.setenv("APB_RADIO_FOCUS", f"{db['key']}:1")
+    assert rdio.every_for(db["key"]) == min(rdio.EVERY, rdio.FOCUS_EVERY)
+    assert rdio.every_for("0123456789") == rdio.EVERY

@@ -445,8 +445,43 @@
     71%{opacity:.95;transform:rotate(45deg) scale(1.05)}
   }
 
+  /* ── live radio: a ping per call the lanes see, a typed line per transcription ── */
+  .rping span{position:absolute;left:0;top:0;width:10px;height:10px;margin:-5px 0 0 -5px;
+    border:1.5px solid #4fd1c5;animation:rping 1.4s ease-out forwards;pointer-events:none}
+  .rping.hi span{border-color:#e8b04a}
+  .rping.hot span{border-color:#e0412c;border-width:2px}
+  .rping.thr span{border-color:#e8b04a;width:16px;height:16px;margin:-8px 0 0 -8px;animation-duration:2.2s}
+  @keyframes rping{0%{transform:rotate(45deg) scale(.4);opacity:1}100%{transform:rotate(45deg) scale(3.2);opacity:0}}
+  .rbub{pointer-events:none}
+  .rbub .b{position:absolute;left:12px;bottom:10px;width:236px;background:rgba(13,16,21,.95);
+    border:1px solid #2c7a73;border-left:2px solid #4fd1c5;padding:5px 8px 6px;
+    font:500 10.5px/1.42 var(--font);color:#d7f3ef;box-shadow:0 3px 14px rgba(0,0,0,.45);
+    animation:rbubin .25s ease-out;pointer-events:auto;cursor:pointer;transition:opacity .8s}
+  .rbub.hot .b{border-left-color:#e0412c;border-color:#7a2c2c}
+  .rbub .k{display:block;font:600 8px/1.3 var(--font);letter-spacing:.12em;text-transform:uppercase;color:#4fd1c5;margin-bottom:2px}
+  .rbub.hot .k{color:#ff6a50}
+  .rbub .caret{display:inline-block;width:5px;height:10px;background:#4fd1c5;vertical-align:-1px;margin-left:1px;animation:pulse 1s steps(1) infinite}
+  .rbub.out .b{opacity:0}
+  @keyframes rbubin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  #radioTicker{left:352px;bottom:44px;width:360px;padding:7px 10px 5px;display:none}
+  #radioTicker.on{display:block}
+  #radioTicker .h{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:#4fd1c5;
+    display:flex;gap:7px;align-items:center;cursor:pointer;user-select:none}
+  #radioTicker .lv{width:6px;height:6px;background:#2c7a73;transform:rotate(45deg)}
+  #radioTicker .lv.on{background:#4fd1c5;box-shadow:0 0 6px #4fd1c5}
+  #radioTicker .n{margin-left:auto;color:var(--dim);font:500 9px/1 var(--mono);letter-spacing:.02em;text-transform:none}
+  #radioTicker .tl{font:500 10.5px/1.4 var(--font);color:var(--txt-2);padding:4px 0 3px;border-top:1px solid var(--line);
+    margin-top:5px;cursor:pointer;animation:rbubin .3s ease-out}
+  #radioTicker .tl b{color:#bfeee9;font-weight:600;text-transform:capitalize}
+  #radioTicker .tl.hot b{color:#ff6a50}
+  #radioTicker .tl .m{display:block;font:500 9px/1.2 var(--mono);color:var(--dim)}
+  #radioTicker.min .tl{display:none}
+  @media (max-width:760px){ #radioTicker{left:8px;right:8px;width:auto;bottom:calc(34vh + 14px)}
+    #radioTicker .tl:nth-of-type(n+3){display:none} .rbub .b{width:190px} }
+
   @media (prefers-reduced-motion:reduce){
     .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil{animation:none!important}
+    .rping span,.rbub .b,.rbub .caret,#radioTicker .tl{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -537,6 +572,7 @@
   </svg>
 </button>
 <div id="clipBubble" class="hud" role="dialog" aria-live="polite" hidden></div>
+<div id="radioTicker" class="hud" aria-live="off"></div>
 
 <div id="footer" class="hud">
   <span>© 2026 PANOPTES</span><span class="sep">·</span>
@@ -2859,8 +2895,94 @@ function drawRadioList(){
 }
 document.getElementById('radioBtn').onclick=e=>{
   showRadio=!showRadio; e.currentTarget.classList.toggle('on',showRadio); e.currentTarget.setAttribute('aria-pressed',String(showRadio));
-  if(showRadio) loadRadio(); else drawRadio();
+  if(showRadio) loadRadio(); else { drawRadio(); radioFx.clearLayers(); radioSayQ.length=0; radioSaying=0; }
+  radioTickerDraw();
 };
+// ── live radio ──
+// Polls /live/radio/feed every few seconds. Each call the lanes newly saw pings its system's
+// antenna (amber when it is a dispatch-weight talkgroup); a scanner polled every 10 min
+// reports in bursts, so a burst is spread over the next poll instead of firing at once.
+// Each newly transcribed call types out in a bubble on its ~2 km cell (tethered to the
+// antenna) or at the antenna, and lands in the "Radio live" strip; an incident thread the
+// linker just wrote flashes. Cleaned lines only, as everywhere else.
+const RADIO_FEED_MS=5000, radioFx=L.layerGroup().addTo(map), radioSayQ=[], RADIO_MAX_SAY=3;
+const radioCalm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+let radioCursor=null, radioFeedBusy=false, radioSaying=0, tickLines=[], tickCalls=[], tickLast=0;
+let tickMin=false; try{ tickMin=localStorage.getItem('radioTickerMin')==='1'; }catch(_){}
+function radioPing(at,cls){
+  if(!at||!map.getBounds().pad(.05).contains(at)) return;
+  const m=L.marker(at,{icon:L.divIcon({className:'rping'+(cls?' '+cls:''),html:'<span></span>',iconSize:[0,0]}),
+    interactive:false,keyboard:false}).addTo(radioFx);
+  setTimeout(()=>radioFx.removeLayer(m),cls==='thr'?2300:1500);
+}
+const sysName=id=>(radioRows.find(r=>r.id===id)||{}).system||'radio';
+const lineKick=l=>[l.kind,l.type&&l.type!=='other'?String(l.type).replace(/_/g,' '):null].filter(Boolean).join(' · ')||'radio';
+function radioSay(l,sysAt){ radioSayQ.push([l,sysAt]); while(radioSayQ.length>8) radioSayQ.shift(); radioSayNext(); }
+function radioSayNext(){
+  while(radioSaying<RADIO_MAX_SAY&&radioSayQ.length){
+    const [l,sysAt]=radioSayQ.shift(), at=l.lat!=null?[l.lat,l.lon]:sysAt;
+    if(!at||!map.getBounds().contains(at)) continue;
+    radioSaying++; radioBubble(l,at,l.lat!=null?sysAt:null);
+  }
+}
+function radioBubble(l,at,from){
+  const hot=(l.priority||0)>=0.6, col=hot?'#e0412c':'#4fd1c5';
+  const m=L.marker(at,{icon:L.divIcon({className:'rbub'+(hot?' hot':''),iconSize:[0,0],
+    html:`<div class="b"><span class="k">${esc(lineKick(l))} · ${esc(l.talkgroup||sysName(l.sys))}</span><span class="t"></span><span class="caret"></span></div>`}),
+    zIndexOffset:900,keyboard:false}).addTo(radioFx);
+  const tether=from&&(from[0]!==at[0]||from[1]!==at[1])
+    ?L.polyline([from,at],{color:col,weight:1,opacity:.7,dashArray:'2 4',interactive:false}).addTo(radioFx):null;
+  radioPing(at,hot?'hot':'hi');
+  const el=m.getElement(), t=el.querySelector('.t'), text=l.line;
+  el.querySelector('.b').onclick=ev=>{ L.DomEvent.stop(ev); const r=radioRows.find(x=>x.id===l.sys); if(r) openRadio(r); };
+  let i=radioCalm?text.length:0;
+  const done=()=>{ const c=el.querySelector('.caret'); if(c) c.remove();
+    setTimeout(()=>{ el.classList.add('out');
+      setTimeout(()=>{ radioFx.removeLayer(m); if(tether) radioFx.removeLayer(tether); radioSaying=Math.max(0,radioSaying-1); radioSayNext(); },800); },6000); };
+  if(i>=text.length){ t.textContent=text; done(); return; }
+  const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length){ clearInterval(tm); done(); } },
+    Math.max(14,Math.min(45,5200/text.length)));                  // a line takes ~1.5-3 s to type
+}
+function radioTickerDraw(){
+  const el=document.getElementById('radioTicker'), now=Date.now();
+  tickCalls=tickCalls.filter(x=>now-x<600000);
+  if(!showRadio||(!tickLines.length&&!tickCalls.length)){ el.classList.remove('on'); return; }
+  el.classList.add('on'); el.classList.toggle('min',tickMin);
+  el.innerHTML=`<div class="h" title="new calls and transcriptions as the radio lanes see them — most public scanners are checked every 10 min, focus systems every minute">`
+    +`<span class="lv${now-tickLast<6000?' on':''}"></span>Radio live<span class="n">${esc(tickCalls.length)} calls seen · 10 min ${tickMin?'▸':'▾'}</span></div>`
+    +tickLines.slice(0,4).map((l,i)=>`<div class="tl${(l.priority||0)>=0.6?' hot':''}" data-i="${i}">`
+      +`<span class="m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))}${l.talkgroup?' · '+esc(l.talkgroup):''}</span>`
+      +`<b>${esc(lineKick(l))}</b> — ${esc(l.line)}</div>`).join('');
+  el.querySelector('.h').onclick=()=>{ tickMin=!tickMin; try{ localStorage.setItem('radioTickerMin',tickMin?'1':'0'); }catch(_){} radioTickerDraw(); };
+  el.querySelectorAll('.tl').forEach(n=>n.onclick=()=>{ const l=tickLines[+n.dataset.i], r=radioRows.find(x=>x.id===l.sys);
+    if(l.lat!=null) map.flyTo([l.lat,l.lon],Math.max(map.getZoom(),11));
+    else if(r&&r.lat!=null) map.flyTo([r.lat,r.lon],Math.max(map.getZoom(),r.approx?8:10));
+    if(r) setTimeout(()=>openRadio(r),l.lat!=null||r.lat!=null?900:0); });
+}
+async function radioFeed(){
+  if(radioFeedBusy||!showRadio||document.hidden) return;
+  radioFeedBusy=true;
+  try{
+    const res=await fetch('/live/radio/feed'+(radioCursor!=null?'?since='+encodeURIComponent(radioCursor):''),{cache:'no-store'});
+    if(!res.ok) return;
+    const d=await res.json(); radioCursor=d.now;
+    const pos=new Map(radioPoints().map(([r,at])=>[r.id,at])), calls=d.calls||[], lines=d.lines||[], per=new Map();
+    if(calls.length){ tickLast=Date.now(); calls.forEach(()=>tickCalls.push(tickLast)); }
+    calls.forEach((c,i)=>{
+      const n=(per.get(c.sys)||0)+1; per.set(c.sys,n);
+      if(n>8||!pos.has(c.sys)) return;                              // a burst: a few pings say it
+      setTimeout(()=>radioPing(pos.get(c.sys),c.weight>=0.8?'hi':''),Math.round(i/calls.length*RADIO_FEED_MS));
+    });
+    lines.forEach(l=>{ tickLines.unshift(l); radioSay(l,pos.get(l.sys)); });
+    tickLines=tickLines.slice(0,12); if(lines.length) tickLast=Date.now();
+    if((d.threads||[]).length){
+      const fresh=new Set(d.threads);
+      try{ const r=await fetch('/live/radio/threads',{cache:'no-cache'}); if(r.ok){ radioThreads=await r.json(); drawRadio();
+        radioThreads.filter(t=>fresh.has(t.id)&&t.lat!=null).forEach(t=>radioPing([t.lat,t.lon],'thr')); } }catch(_){}
+    }
+    radioTickerDraw();
+  }catch(_){ }finally{ radioFeedBusy=false; }
+}
 map.on('moveend zoomend',()=>{ clearTimeout(window._rdT); window._rdT=setTimeout(drawRadio,150); });
 
 // ── "right now" board ──
@@ -3085,7 +3207,8 @@ document.addEventListener('visibilitychange',()=>{
   loadLooks(); setInterval(()=>{ if(!document.hidden) loadLooks(); },300000);
   loadNotable(); setInterval(()=>{ if(!document.hidden) loadNotable(); },300000);
   loadBoard(); boardTimer=setInterval(()=>{ if(!document.hidden) loadBoard(); },60000);
-  loadRadio(); setInterval(()=>{ if(!document.hidden&&(showRadio||boardOn)) loadRadio(); },120000);
+  loadRadio().then(radioFeed); setInterval(()=>{ if(!document.hidden&&(showRadio||boardOn)) loadRadio(); },120000);
+  setInterval(radioFeed,RADIO_FEED_MS); setInterval(radioTickerDraw,15000);
 })();
 });
 </script>

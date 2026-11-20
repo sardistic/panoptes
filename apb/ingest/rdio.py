@@ -40,6 +40,14 @@ log = logging.getLogger(__name__)
 
 UA = "apb/0.1 (+https://panoptes.run; public-safety activity map; call metadata only)"
 EVERY = float(os.environ.get("APB_RDIO_EVERY", "600"))
+# instances carrying an APB_RADIO_FOCUS system are asked every minute: their calls show
+# on the map (and get transcribed) within a minute or two instead of ten
+FOCUS_EVERY = float(os.environ.get("APB_RDIO_FOCUS_EVERY", "60"))
+
+
+def every_for(key: str) -> float:
+    from apb.context.radio_stt import focus
+    return min(EVERY, FOCUS_EVERY) if any(k == key for k, _ in focus()) else EVERY
 PER_TICK = int(os.environ.get("APB_RDIO_PER_TICK", "6"))
 _SAMPLE = 200
 _CFG_TTL = 24 * 3600.0
@@ -469,7 +477,7 @@ def poll_instance(inst: dict, now: float | None = None, ask=None) -> int:
             counts[sid] = (row["n"], tags)
         lon = inst["loc"][1] if inst.get("loc") else None
         radio.record(key, counts, now - st["last_poll"], lon=lon, now=now)
-    radio.set_state(key, last_id=newest, last_poll=now, state="open", fails=0, next_at=now + EVERY)
+    radio.set_state(key, last_id=newest, last_poll=now, state="open", fails=0, next_at=now + every_for(key))
     _stats["polls"] += 1
     _stats["calls"] += total
     _stats["last"] = now

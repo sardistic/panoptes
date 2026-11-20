@@ -1752,6 +1752,41 @@ def live_radio_threads(max_age_minutes: float = Query(180.0, gt=0.0, le=4320.0))
                         headers={"Cache-Control": "public, max-age=30"})
 
 
+@app.get("/live/radio/feed")
+def live_radio_feed(since: float | None = Query(None, ge=0.0)):
+    """Live radio indicators: what the radio lanes saw after `since` (the `now` of the
+    previous reply; omit it for the last 90 s). New calls (system, talkgroup, weight — no
+    content), newly transcribed calls (cleaned line, kind, ~2 km cell when placed) and
+    incident threads written since. Poll every few seconds."""
+    from apb.context.radio_areas import clean
+    from apb.context.radio_stt import coarse, weight_for
+    from apb.ingest import rdio
+    from apb.store import radio as radio_store
+    now = _time.time()
+    since = max(now - 600.0, min(now, since if since is not None else now - 90.0))
+    got = radio_store.feed(since)
+    calls, lines = [], []
+    for c in got["calls"]:
+        if c["system"] is None:
+            continue
+        tg = rdio.talkgroup(c["key"], int(c["system"]), c["talkgroup"])
+        w, _ = weight_for(c["key"], int(c["system"]), c["talkgroup"], tg)
+        calls.append({"sys": f"{c['key']}:{c['system']}", "id": c["id"], "ts": c["ts"],
+                      "talkgroup": tg["label"], "weight": w})
+    for t in got["lines"]:
+        line = clean(t.get("text") or t.get("summary"))[:240]
+        if not line or t.get("incident_type") == "noise" or t.get("system") is None:
+            continue
+        cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
+        lines.append({"sys": f"{t['key']}:{t['system']}", "id": t["id"], "ts": t["ts"],
+                      "talkgroup": t.get("tg_label"), "kind": t.get("kind"), "type": t.get("incident_type"),
+                      "priority": t.get("priority"), "line": line,
+                      "lat": cell[0] if cell else None, "lon": cell[1] if cell else None,
+                      "audio": f"/live/radio/audio/{t['key']}/{t['id']}"})
+    return JSONResponse({"now": now, "calls": calls, "lines": lines, "threads": got["threads"]},
+                        headers={"Cache-Control": "no-store"})
+
+
 @app.get("/live/radio/{rid}/calls")
 def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     """Newest calls on one radio system: time, talkgroup, how much it matters, a

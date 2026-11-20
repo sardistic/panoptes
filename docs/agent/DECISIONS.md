@@ -309,3 +309,17 @@ and mirror rotation, refreshed after 90 days. Threads still at town level are re
 for 6 h as tiles arrive (no model or geocoder calls). Rejected: Geofabrik state
 extracts (GBs per state; a node-location index needs more than the 1 GB container).
 Search radius: 10 km around the town, 20 km around a known system location.
+
+### 2026-11-19 — Live radio indicators: polled feed, honest about latency
+
+Owner asked for live visual indicators of new radio calls and transcriptions. The server
+only learns of a call when it polls the scanner (every 10 min per instance), so "live" is
+bounded by that; focus-system instances are now polled every 60 s (`APB_RDIO_FOCUS_EVERY`)
+— one tiny "newest calls" request a minute. `radio_recent.seen` records when the lane saw
+a call; `/live/radio/feed?since=` returns calls seen, transcriptions done and threads
+written after the cursor (server time, clamped to 10 min). The browser polls every 5 s
+(plain JSON, no SSE — simpler through the Cloudflare tunnel). A 10-minute burst is spread
+over one poll interval and capped at 8 pings per system so it reads as activity, not a
+flash. Transcription is one Gemini reply per clip; the typing effect is presentation
+only. Lines are `clean()`ed exactly like `/calls`.
+
