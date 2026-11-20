@@ -10,9 +10,11 @@ can be overridden per deployment, because prices change and differ by model:
   APB_PRICE_IN_AUDIO  USD per million input audio tokens (1.00)
   APB_PRICE_OUT       USD per million output tokens, thinking included (2.50)
 
-Defaults are the Gemini 2.5 Flash list prices as reported at the time of writing.
-These are estimates; the provider's billing page is the source of truth. A key on
-the free tier costs nothing. SQLite in the snapshot store's file.
+Without those, a per-model table applies (MODEL_PRICES, dated: Gemini 3.8 Flash doubles
+on 2027-01-01), else the Gemini 2.5 Flash list prices. Features ending in "_batch" ran
+on the Batch API and are charged half. These are estimates; the provider's billing page
+is the source of truth. A key on the free tier costs nothing. SQLite in the snapshot
+store's file.
 """
 from __future__ import annotations
 
@@ -43,14 +45,32 @@ def _conn() -> sqlite3.Connection:
     return c
 
 
-def prices() -> dict[str, float]:
+# USD per million tokens, as [(last day the price applies or None, prices), ...].
+# Gemini 3.8 Flash: introductory $0.75 in / $3.75 out through 2026-12-31, then $1.50 /
+# $7.50 (pricing page, 2026-11). No separate audio rate is published for it; input
+# audio is assumed to cost the input rate.
+MODEL_PRICES = {
+    "gemini-3.8-flash": [("2026-12-31", {"in_text": 0.75, "in_audio": 0.75, "out": 3.75}),
+                         (None, {"in_text": 1.50, "in_audio": 1.50, "out": 7.50})],
+    "gemini-3.5-flash-lite": [(None, {"in_text": 0.30, "in_audio": 0.30, "out": 2.50})],
+}
+_DEFAULT = {"in_text": 0.30, "in_audio": 1.00, "out": 2.50}
+
+
+def prices(model: str | None = None, day: str | None = None) -> dict[str, float]:
+    """Prices for a model on a day (UTC "YYYY-MM-DD"). APB_PRICE_* override everything."""
     def f(name: str, default: float) -> float:
         try:
             return float(os.environ.get(name, default))
         except ValueError:
             return default
-    return {"in_text": f("APB_PRICE_IN_TEXT", 0.30), "in_audio": f("APB_PRICE_IN_AUDIO", 1.00),
-            "out": f("APB_PRICE_OUT", 2.50)}
+    base = _DEFAULT
+    steps = MODEL_PRICES.get(str(model or "").removeprefix("models/"))
+    if steps:
+        day = day or time.strftime("%Y-%m-%d", time.gmtime())
+        base = next((p for until, p in steps if until is None or day <= until), steps[-1][1])
+    return {"in_text": f("APB_PRICE_IN_TEXT", base["in_text"]), "in_audio": f("APB_PRICE_IN_AUDIO", base["in_audio"]),
+            "out": f("APB_PRICE_OUT", base["out"])}
 
 
 def split(usage: dict) -> dict[str, int]:
@@ -92,9 +112,11 @@ def record(feature: str, model: str, usage: dict, now: float | None = None) -> N
         log.info("usage meter: %s", e)
 
 
-def _usd(row: dict, p: dict) -> float:
-    return ((row["in_text"] + row["in_image"]) * p["in_text"] + row["in_audio"] * p["in_audio"]
-            + row["out"] * p["out"]) / 1_000_000
+def _usd(row: dict, p: dict | None = None) -> float:
+    p = p or prices(row.get("model"), row.get("day"))
+    usd = ((row["in_text"] + row["in_image"]) * p["in_text"] + row["in_audio"] * p["in_audio"]
+           + row["out"] * p["out"]) / 1_000_000
+    return usd * (0.5 if str(row.get("feature", "")).endswith("_batch") else 1.0)
 
 
 def summary(days: int = 30) -> dict:
@@ -107,7 +129,7 @@ def summary(days: int = 30) -> dict:
     by_day: dict[str, dict] = {}
     by_feature: dict[str, dict] = {}
     for r in rows:
-        usd = _usd(r, p)
+        usd = _usd(r)
         d = by_day.setdefault(r["day"], {"day": r["day"], "calls": 0, "usd": 0.0, "features": {}})
         d["calls"] += r["calls"]
         d["usd"] += usd
@@ -131,7 +153,7 @@ def summary(days: int = 30) -> dict:
     total = round(sum(d["usd"] for d in by_day.values()), 4)
     full_days = [d for d in by_day.values() if d["day"] != today]
     return {
-        "days": days, "prices_per_million": p, "total_usd": total,
+        "days": days, "prices_per_million": p, "model_prices": MODEL_PRICES, "total_usd": total,
         "today_usd": by_day.get(today, {}).get("usd", 0.0),
         "avg_day_usd": round(sum(d["usd"] for d in full_days) / len(full_days), 4) if full_days else None,
         "by_feature": dict(sorted(by_feature.items(), key=lambda kv: -kv[1]["usd"])),

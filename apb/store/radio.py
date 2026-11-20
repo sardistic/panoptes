@@ -58,6 +58,8 @@ def _conn() -> sqlite3.Connection:
             priority REAL, status TEXT, loc_text TEXT, lat REAL, lon REAL, precision TEXT,
             calls TEXT, updated REAL, published INTEGER DEFAULT 0);
         CREATE INDEX IF NOT EXISTS idx_rth ON radio_threads(key, system, last_ts);
+        CREATE TABLE IF NOT EXISTS radio_stt_jobs (
+            name TEXT PRIMARY KEY, created REAL NOT NULL, model TEXT, meta TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
@@ -164,14 +166,37 @@ def add_recent(key: str, rows: list[tuple]) -> int:
     return len(rows)
 
 
-def candidates(since: float, limit: int = 4000) -> list[dict]:
-    """Recent calls nobody has tried to transcribe yet, newest first."""
+def candidates(since: float, limit: int = 4000, until: float | None = None) -> list[dict]:
+    """Recent calls nobody has tried to transcribe yet (or queued), newest first."""
     with _lock:
         rows = _conn().execute(
             "SELECT r.key, r.id, r.ts, r.system, r.talkgroup FROM radio_recent r "
             "LEFT JOIN radio_transcripts t ON t.key = r.key AND t.id = r.id "
-            "WHERE r.ts >= ? AND t.id IS NULL ORDER BY r.ts DESC LIMIT ?", (since, limit)).fetchall()
+            "WHERE r.ts >= ? AND r.ts < ? AND t.id IS NULL ORDER BY r.ts DESC LIMIT ?",
+            (since, until if until is not None else 9e18, limit)).fetchall()
     return [dict(r) for r in rows]
+
+
+def add_job(name: str, model: str, meta: list, now: float | None = None) -> None:
+    """A submitted batch transcription job and the calls in each of its requests."""
+    with _lock:
+        c = _conn()
+        c.execute("INSERT OR REPLACE INTO radio_stt_jobs VALUES (?,?,?,?)",
+                  (name, now or time.time(), model, json.dumps(meta)))
+        c.commit()
+
+
+def jobs() -> list[dict]:
+    with _lock:
+        rows = _conn().execute("SELECT * FROM radio_stt_jobs ORDER BY created").fetchall()
+    return [{**dict(r), "meta": json.loads(r["meta"])} for r in rows]
+
+
+def drop_job(name: str) -> None:
+    with _lock:
+        c = _conn()
+        c.execute("DELETE FROM radio_stt_jobs WHERE name = ?", (name,))
+        c.commit()
 
 
 def add_transcript(key: str, call_id: int, ts: float, system, talkgroup, status: str,

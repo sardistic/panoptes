@@ -47,6 +47,17 @@ BATCH = 8
 MAX_AGE = 480.0                  # a call older than eight minutes is no longer news
 MIN_SEC, MAX_SEC = 2.5, 90.0     # "copy" / "10-4" and long patches are not worth the budget
 TOK_PER_SEC = 32.0
+# The transcription model is pinned: "newest Flash" changes price under us with each
+# release. The backlog — calls the live pass did not take (older than MAX_AGE, under
+# MIN_WEIGHT, or over the live budget) — goes to the Batch API at half price, with its
+# own daily budget, and lands minutes to hours later.
+STT_MODEL = os.environ.get("APB_RADIO_STT_MODEL", "gemini-3.8-flash").strip()
+BATCH_EVERY = float(os.environ.get("APB_RADIO_STT_BATCH_EVERY", "600"))
+BACKLOG_AGE = 2 * 3600.0          # how far back the backlog reaches
+BACKLOG_MIN_WEIGHT = 0.3
+BACKLOG_PER_JOB = 160             # calls per batch job (20 requests of BATCH)
+BACKLOG_PER_INSTANCE = 24         # an Rdio instance's audio allowance is shared with live
+JOB_MAX_AGE = 26 * 3600.0         # the Batch API's 24 h target, plus slack
 
 _CENSUS = "https://geocoding.geo.census.gov/geocoder"
 _http = httpx.Client(timeout=12.0, headers={"User-Agent": "apb/0.1 (panoptes.run; radio geocoding)"})
@@ -55,7 +66,9 @@ _thread: threading.Thread | None = None
 _state_cache: dict[tuple, str | None] = {}
 _mime_label: dict[str, str] = {}             # learned: which mime label Gemini accepts
 _stats = {"runs": 0, "clips": 0, "batches": 0, "errors": 0, "budget_stops": 0,
-          "audio_tokens": 0, "located": 0, "incidents": 0, "last": 0.0, "last_error": None}
+          "audio_tokens": 0, "located": 0, "incidents": 0, "last": 0.0, "last_error": None,
+          "jobs_submitted": 0, "jobs_done": 0, "jobs_failed": 0, "backlog_clips": 0,
+          "backlog_budget_stops": 0, "last_batch": 0.0}
 
 TYPES = ("traffic", "medical", "fire", "assault", "robbery", "shots_fired", "domestic",
          "suspicious", "pursuit", "welfare", "other", "noise")
@@ -70,6 +83,14 @@ def daily_sec() -> int:
         return max(0, int(os.environ.get("APB_RADIO_STT_DAILY_SEC", "7200")))
     except ValueError:
         return 7200
+
+
+def batch_daily_sec() -> int:
+    """Audio seconds a day for the half-price backlog (0 turns it off)."""
+    try:
+        return max(0, int(os.environ.get("APB_RADIO_STT_BATCH_SEC", "14400")))
+    except ValueError:
+        return 14400
 
 
 # ── what matters ────────────────────────────────────────────────────────────
@@ -267,9 +288,9 @@ and talkgroup. Return ONLY a JSON array with one object per clip, in order:
  "municipality": the city or town named, or null,
  "state": two-letter US state (or Canadian province) code if the system or talkgroup names or the call make it clear, else null,
  "units": [unit names such as "Engine 5", "Medic 12"],
- "priority": 0.0 (routine) to 1.0 (active threat to life),
- "summary": one line, at most 140 characters}
-Redaction (apply to transcript, location_text and summary): replace people's names, house \
+ "priority": 0.0 (routine) to 1.0 (active threat to life)}
+For "tones" and "noise" give only "i" and "kind". Keep the JSON compact (no spaces or newlines).
+Redaction (apply to transcript and location_text): replace people's names, house \
 numbers beyond block level (write "1200 block of", not "1234"), phone numbers, licence \
 plates, dates of birth, and medical or victim details beyond the call type with \
 [REDACTED]. Do not invent anything not said; use null when unclear."""
@@ -503,46 +524,110 @@ def _incident(c: dict, res: dict, pt: tuple, state: str | None = None) -> dict:
             "at": when.isoformat(), "ts": c["ts"], "source": "radio_stt"}
 
 
-def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int:
-    """Pick, fetch, transcribe, store. Returns clips transcribed. Injectable for tests."""
-    from apb.context import explain
+def fetch_clips(picked: list[dict], fetch=None) -> list[dict]:
+    """Audio for picked calls, grouped per instance; out-of-range lengths are recorded as
+    skipped and missing audio as failed. Returns clips ready for build_parts()."""
     from apb.ingest import rdio
-    from apb.store import radio, snapshots, spend
-    now = now or time.time()
-    picked = pick(now)
-    if not picked:
-        return 0
+    from apb.store import radio
     fetch = fetch or rdio.fetch_calls
-    gen = gen or (lambda parts, max_tokens: explain.generate_usage(parts, max_tokens, feature="radio_stt"))
-    locate = locate or geocode
     clips: list[dict] = []
     by_key: dict[str, list[dict]] = {}
     for c in picked:
         by_key.setdefault(c["key"], []).append(c)
     for key, cs in by_key.items():
         inst = rdio.instance(key)
-        try:
-            got = fetch(inst, [c["id"] for c in cs])
-        except Exception as e:
-            _stats["errors"] += 1
-            log.info("radio stt: fetch %s: %s", key, str(e)[:100])
+        for i in range(0, len(cs), 10):               # fetch_calls takes ten at a time
+            part = cs[i:i + 10]
+            try:
+                got = fetch(inst, [c["id"] for c in part])
+            except Exception as e:
+                _stats["errors"] += 1
+                log.info("radio stt: fetch %s: %s", key, str(e)[:100])
+                break
+            if not got:
+                break                                  # over the instance's allowance: next run
+            for c in part:
+                if c["id"] not in got:
+                    radio.add_transcript(key, c["id"], c["ts"], c["system"], c["talkgroup"], "failed",
+                                         weight=c["weight"])
+                    continue
+                data, mime = got[c["id"]]
+                sec = est_seconds(data, mime)
+                if not MIN_SEC <= sec <= MAX_SEC:
+                    radio.add_transcript(key, c["id"], c["ts"], c["system"], c["talkgroup"], "skipped",
+                                         weight=c["weight"], seconds=sec)
+                    continue
+                clips.append({**c, "data": data, "mime": mime, "seconds": sec,
+                              "system_label": rdio._label(inst, c["system"]), "area": inst.get("place"),
+                              "inst": inst})
+    return clips
+
+
+def apply_reply(batch: list[dict], text: str, usage: dict, locate=None, budget: str = "radio_stt_sec",
+                need: int | None = None) -> int:
+    """Store the model's answers for one request's clips; returns how many were done."""
+    from apb.ingest import rdio
+    from apb.store import radio, snapshots, spend
+    locate = locate or geocode
+    _stats["batches"] += 1
+    tok = audio_tokens(usage)
+    _stats["audio_tokens"] += tok
+    if tok and need is not None:                       # charge what Gemini actually heard
+        spend.refund(budget, need - math.ceil(tok / TOK_PER_SEC))
+    results = parse_reply(text, len(batch))
+    for res in results.values():
+        for f in ("transcript", "location_text"):
+            if isinstance(res.get(f), str):
+                res[f] = blockify(res[f])
+    incidents = []
+    done = 0
+    for k, c in enumerate(batch):
+        res = results.get(k)
+        if not res:
+            radio.add_transcript(c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "failed",
+                                 weight=c["weight"], seconds=c["seconds"])
             continue
-        if not got:
-            continue                                   # over the instance's allowance: next run
-        for c in cs:
-            if c["id"] not in got:
-                radio.add_transcript(key, c["id"], c["ts"], c["system"], c["talkgroup"], "failed",
-                                     weight=c["weight"])
-                continue
-            data, mime = got[c["id"]]
-            sec = est_seconds(data, mime)
-            if not MIN_SEC <= sec <= MAX_SEC:
-                radio.add_transcript(key, c["id"], c["ts"], c["system"], c["talkgroup"], "skipped",
-                                     weight=c["weight"], seconds=sec)
-                continue
-            clips.append({**c, "data": data, "mime": mime, "seconds": sec,
-                          "system_label": rdio._label(inst, c["system"]), "area": inst.get("place"),
-                          "inst": inst})
+        kind = str(res.get("kind") or "unit")
+        pt = None
+        pl = {}
+        if kind == "dispatch" and res.get("incident_type") not in (None, "noise"):
+            pl = rdio.place_info(c["inst"], c["system_label"], c["system"])
+            pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), pl["loc"],
+                        pl["approx"], res.get("state") or pl.get("state"))
+        words = str(res.get("transcript") or "")
+        if kind in ("noise", "tones"):
+            res.setdefault("incident_type", "noise")
+        radio.add_transcript(
+            c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "done",
+            weight=c["weight"], tg_label=c["tg"]["label"], tag=c["tg"]["tag"], kind=kind,
+            incident_type=res.get("incident_type"), text=words[:1200],
+            summary=(words[:137] + "...") if len(words) > 140 else words,
+            location_text=(str(res["location_text"])[:160] if res.get("location_text") else None),
+            units=[str(u)[:30] for u in (res.get("units") or [])][:12],
+            priority=res.get("priority"), seconds=c["seconds"],
+            lat=pt[0] if pt else None, lon=pt[1] if pt else None)
+        done += 1
+        if pt:
+            _stats["located"] += 1
+            incidents.append(_incident(c, res, pt, res.get("state") or pl.get("state")))
+    if incidents:
+        snapshots.record(incidents)
+        _stats["incidents"] += len(incidents)
+    _stats["clips"] += done
+    return done
+
+
+def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int:
+    """Pick, fetch, transcribe, store. Returns clips transcribed. Injectable for tests."""
+    from apb.context import explain
+    from apb.store import spend
+    now = now or time.time()
+    picked = pick(now)
+    if not picked:
+        return 0
+    gen = gen or (lambda parts, max_tokens: explain.generate_usage(parts, max_tokens, feature="radio_stt",
+                                                                   model=STT_MODEL or None))
+    clips = fetch_clips(picked, fetch)
     done = 0
     for i in range(0, len(clips), BATCH):
         batch = clips[i:i + BATCH]
@@ -550,9 +635,9 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
         cap = daily_sec()
         if not spend.allow("radio_stt_sec", need, monthly_cap=cap * 31, daily_cap=cap):
             _stats["budget_stops"] += 1
-            break                                      # untried calls simply age out
+            break                                      # the backlog may take them later
         try:
-            text, usage = gen(build_parts(batch), max_tokens=220 * len(batch))
+            text, usage = gen(build_parts(batch), max_tokens=200 * len(batch))
         except Exception as e:
             _stats["errors"] += 1
             _stats["last_error"] = str(e)[:200]
@@ -565,49 +650,165 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
                     _mime_label[c["mime"]] = nxt
             log.info("radio stt: model: %s", str(e)[:160])
             continue                                   # these calls are retried while still fresh
-        _stats["batches"] += 1
-        tok = audio_tokens(usage)
-        _stats["audio_tokens"] += tok
-        if tok:                                        # charge what Gemini actually heard
-            spend.refund("radio_stt_sec", need - math.ceil(tok / TOK_PER_SEC))
-        results = parse_reply(text, len(batch))
-        for res in results.values():
-            for f in ("transcript", "location_text", "summary"):
-                if isinstance(res.get(f), str):
-                    res[f] = blockify(res[f])
-        incidents = []
-        for k, c in enumerate(batch):
-            res = results.get(k)
-            if not res:
-                radio.add_transcript(c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "failed",
-                                     weight=c["weight"], seconds=c["seconds"])
-                continue
-            kind = str(res.get("kind") or "unit")
-            pt = None
-            if kind == "dispatch" and res.get("incident_type") not in (None, "noise"):
-                pl = rdio.place_info(c["inst"], c["system_label"], c["system"])
-                pt = locate(res.get("location_text"), res.get("municipality"), c.get("area"), pl["loc"],
-                            pl["approx"], res.get("state") or pl.get("state"))
-            radio.add_transcript(
-                c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "done",
-                weight=c["weight"], tg_label=c["tg"]["label"], tag=c["tg"]["tag"], kind=kind,
-                incident_type=res.get("incident_type"), text=str(res.get("transcript") or "")[:1200],
-                summary=str(res.get("summary") or "")[:200],
-                location_text=(str(res["location_text"])[:160] if res.get("location_text") else None),
-                units=[str(u)[:30] for u in (res.get("units") or [])][:12],
-                priority=res.get("priority"), seconds=c["seconds"],
-                lat=pt[0] if pt else None, lon=pt[1] if pt else None)
-            done += 1
-            if pt:
-                _stats["located"] += 1
-                incidents.append(_incident(c, res, pt, res.get("state") or pl.get("state")))
-        if incidents:
-            snapshots.record(incidents)
-            _stats["incidents"] += len(incidents)
-    _stats["clips"] += done
+        done += apply_reply(batch, text, usage, locate, "radio_stt_sec", need)
     _stats["runs"] += 1
     _stats["last"] = now
     return done
+
+
+# ── the backlog, at half price ──────────────────────────────────────────────
+
+_GEN = "https://generativelanguage.googleapis.com/v1beta"
+_META_KEYS = ("key", "id", "ts", "system", "talkgroup", "weight", "seconds", "system_label", "area")
+
+
+def pick_backlog(now: float | None = None) -> list[dict]:
+    """Calls the live pass left: 8 min to 2 h old, not tried, worth something; best first."""
+    from apb.ingest import rdio
+    from apb.store import radio
+    now = now or time.time()
+    closed = {k for k, st in radio.states().items() if st.get("state") == "closed"}
+    out = []
+    for r in radio.candidates(now - BACKLOG_AGE, until=now - MAX_AGE):
+        inst = rdio.instance(r["key"])
+        if not inst or r["key"] in closed:
+            continue
+        tg = rdio.talkgroup(r["key"], r["system"], r["talkgroup"])
+        w, family = weight_for(r["key"], r["system"], r["talkgroup"], tg)
+        if w >= BACKLOG_MIN_WEIGHT:
+            out.append({**r, "weight": round(w, 3), "family": family, "tg": tg})
+    out.sort(key=lambda c: (-c["weight"], -c["ts"]))
+    per: dict[str, int] = {}
+    chosen = []
+    for c in out:
+        cap = 10 ** 6 if (rdio.instance(c["key"]) or {}).get("kind") == "stream" else BACKLOG_PER_INSTANCE
+        if per.get(c["key"], 0) >= cap:
+            continue
+        per[c["key"]] = per.get(c["key"], 0) + 1
+        chosen.append(c)
+        if len(chosen) >= BACKLOG_PER_JOB:
+            break
+    return chosen
+
+
+def _request(batch: list[dict]) -> dict:
+    return {"contents": [{"role": "user", "parts": build_parts(batch)}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200 * len(batch),
+                                 "thinkingConfig": {"thinkingBudget": 0}}}
+
+
+def submit_backlog(now: float | None = None, fetch=None, post=None) -> int:
+    """Send one Batch API job with the backlog's best calls. Returns calls queued."""
+    from apb.context import explain
+    from apb.store import radio, spend
+    now = now or time.time()
+    cap = batch_daily_sec()
+    if cap <= 0 or not STT_MODEL:
+        return 0
+    clips = fetch_clips(pick_backlog(now), fetch)
+    requests, meta, queued = [], [], 0
+    for i in range(0, len(clips), BATCH):
+        batch = clips[i:i + BATCH]
+        need = math.ceil(sum(c["seconds"] for c in batch))
+        if not spend.allow("radio_stt_batch_sec", need, monthly_cap=cap * 31, daily_cap=cap):
+            _stats["backlog_budget_stops"] += 1
+            break
+        requests.append({"request": _request(batch), "metadata": {"key": f"r{len(requests)}"}})
+        meta.append({"need": need, "clips": [{k: c.get(k) for k in _META_KEYS} for c in batch]})
+    if not requests:
+        return 0
+    body = {"batch": {"display_name": f"apb-radio-{int(now)}",
+                      "input_config": {"requests": {"requests": requests}}}}
+    try:
+        if post:
+            j = post(f"models/{STT_MODEL}:batchGenerateContent", body)
+        else:
+            r = explain._client.post(f"{_GEN}/models/{STT_MODEL}:batchGenerateContent",
+                                     params={"key": explain.api_key()}, json=body, timeout=120.0)
+            r.raise_for_status()
+            j = r.json()
+        name = j["name"]
+    except Exception as e:
+        _stats["errors"] += 1
+        _stats["last_error"] = f"batch submit: {str(e)[:160]}"
+        for m in meta:                                  # give the budget back; calls stay untried
+            spend.refund("radio_stt_batch_sec", m["need"])
+        return 0
+    radio.add_job(name, STT_MODEL, meta, now)
+    for m in meta:
+        for c in m["clips"]:
+            radio.add_transcript(c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "queued",
+                                 weight=c["weight"], seconds=c["seconds"])
+            queued += 1
+    _stats["jobs_submitted"] += 1
+    _stats["backlog_clips"] += queued
+    _stats["last_batch"] = now
+    return queued
+
+
+def _job_output(j: dict) -> list[dict] | None:
+    """The inlined responses of a finished job, wherever this API version puts them."""
+    for root in (j.get("metadata") or {}, j.get("response") or {}, j):
+        out = (root.get("output") or {}).get("inlinedResponses") or root.get("inlinedResponses")
+        if isinstance(out, dict):
+            out = out.get("inlinedResponses")
+        if isinstance(out, list):
+            return out
+    return None
+
+
+def poll_backlog(now: float | None = None, get=None, locate=None) -> int:
+    """Collect finished jobs and store their transcripts. Returns calls done."""
+    from apb.context import explain
+    from apb.ingest import rdio
+    from apb.store import radio, usage as usage_store
+    now = now or time.time()
+    done = 0
+    for job in radio.jobs():
+        try:
+            if get:
+                j = get(job["name"])
+            else:
+                r = explain._client.get(f"{_GEN}/{job['name']}", params={"key": explain.api_key()}, timeout=60.0)
+                r.raise_for_status()
+                j = r.json()
+        except Exception as e:
+            log.info("radio stt: batch poll %s: %s", job["name"], str(e)[:120])
+            continue
+        state = str((j.get("metadata") or {}).get("state") or j.get("state") or "")
+        if not j.get("done") and "SUCCEEDED" not in state:
+            if any(w in state for w in ("FAILED", "CANCELLED", "EXPIRED")) or now - job["created"] > JOB_MAX_AGE:
+                _fail_job(job)
+            continue
+        by_key = {}
+        for item in _job_output(j) or []:
+            by_key[str((item.get("metadata") or {}).get("key"))] = item
+        for n, m in enumerate(job["meta"]):
+            batch = []
+            for c in m["clips"]:
+                inst = rdio.instance(c["key"]) or {"key": c["key"], "labels": {}}
+                batch.append({**c, "inst": inst, "tg": rdio.talkgroup(c["key"], c["system"], c["talkgroup"])})
+            item = by_key.get(f"r{n}") or {}
+            resp = item.get("response") or {}
+            text = "".join(p.get("text", "") for cand in (resp.get("candidates") or [])[:1]
+                           for p in (cand.get("content") or {}).get("parts", []))
+            usage = resp.get("usageMetadata") or {}
+            if usage:
+                usage_store.record("radio_stt_batch", job.get("model") or STT_MODEL, usage)
+            done += apply_reply(batch, text, usage, locate, "radio_stt_batch_sec", m["need"])
+        radio.drop_job(job["name"])
+        _stats["jobs_done"] += 1
+    return done
+
+
+def _fail_job(job: dict) -> None:
+    from apb.store import radio
+    for m in job["meta"]:
+        for c in m["clips"]:
+            radio.add_transcript(c["key"], c["id"], c["ts"], c["system"], c["talkgroup"], "failed",
+                                 weight=c["weight"], seconds=c["seconds"])
+    radio.drop_job(job["name"])
+    _stats["jobs_failed"] += 1
 
 
 PROFILE_PROMPT = """You help place public-safety radio systems on a map. Given a radio \
@@ -705,6 +906,15 @@ def _loop() -> None:
             _stats["errors"] += 1
             _stats["last_error"] = str(e)[:200]
             log.warning("radio stt run failed: %s", e)
+        try:
+            poll_backlog()
+            if time.time() - _stats["last_batch"] >= BATCH_EVERY:
+                _stats["last_batch"] = time.time()
+                submit_backlog()
+        except Exception as e:
+            _stats["errors"] += 1
+            _stats["last_error"] = f"backlog: {str(e)[:180]}"
+            log.warning("radio stt backlog failed: %s", e)
         _stop.wait(EVERY)
 
 
@@ -765,5 +975,7 @@ def stop() -> None:
 def status() -> dict:
     from apb.store import radio, spend
     return {**_stats, "running": bool(_thread and _thread.is_alive()), "daily_sec": daily_sec(),
-            "used_sec": spend.used("radio_stt_sec"), "last_24h": radio.stt_stats(24.0),
+            "used_sec": spend.used("radio_stt_sec"), "model": STT_MODEL,
+            "batch_daily_sec": batch_daily_sec(), "batch_used_sec": spend.used("radio_stt_batch_sec"),
+            "jobs_pending": len(radio.jobs()), "last_24h": radio.stt_stats(24.0),
             "mime_labels": dict(_mime_label)}

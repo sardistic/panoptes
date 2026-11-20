@@ -779,3 +779,59 @@ def test_stream_calls_are_cut_stored_served_and_counted(db, monkeypatch, tmp_pat
     assert act and act[0]["calls"] == 1 and act[0]["system"] == "FDNY Manhattan"
     assert streams.prune(now + 7 * 3600) == 1 and streams.fetch(s["key"], [cid]) == {}
     streams._streams.clear()
+
+
+def test_model_prices_are_dated_per_model_and_batch_is_half():
+    from apb.store import usage
+    assert usage.prices("gemini-3.8-flash", "2026-11-20") == {"in_text": 0.75, "in_audio": 0.75, "out": 3.75}
+    assert usage.prices("gemini-3.8-flash", "2027-01-01")["out"] == 7.50
+    assert usage.prices("models/gemini-3.5-flash-lite", "2026-11-20")["in_audio"] == 0.30
+    assert usage.prices("something-else")["in_audio"] == 1.00
+    row = {"day": "2026-11-20", "model": "gemini-3.8-flash", "feature": "radio_stt",
+           "in_text": 0, "in_image": 0, "in_audio": 1_000_000, "out": 1_000_000}
+    assert usage._usd(row) == 4.50
+    assert usage._usd({**row, "feature": "radio_stt_batch"}) == 2.25
+
+
+def test_backlog_goes_to_the_batch_api_and_comes_back(db, monkeypatch):
+    from apb.context import radio_stt
+    from apb.store import radio, spend
+    now = time.time()
+    # one call the live pass left behind (20 min old), one too fresh for the backlog
+    radio.add_recent(db["key"], [(600, now - 1200, 1, 7), (601, now - 60, 1, 7)])
+    posted = []
+
+    def post(path, body):
+        posted.append((path, body))
+        return {"name": "batches/abc"}
+    n = radio_stt.submit_backlog(now, fetch=lambda inst, ids: {i: (MP3 * 3, "audio/mpeg") for i in ids}, post=post)
+    assert n == 1 and posted[0][0] == f"models/{radio_stt.STT_MODEL}:batchGenerateContent"
+    req = posted[0][1]["batch"]["input_config"]["requests"]["requests"]
+    assert len(req) == 1 and req[0]["metadata"] == {"key": "r0"}
+    assert "summary" not in req[0]["request"]["contents"][0]["parts"][0]["text"]
+    assert [c["id"] for c in radio.candidates(now - 7200)] == [601]          # 600 is queued
+    assert spend.used("radio_stt_batch_sec")["day"] >= 3
+    # still running: nothing changes
+    assert radio_stt.poll_backlog(now, get=lambda name: {"metadata": {"state": "BATCH_STATE_RUNNING"}}) == 0
+    reply = json.dumps([{"i": 1, "transcript": "Engine 12 respond 1200 block of Oak Ave", "kind": "dispatch",
+                         "incident_type": "fire", "location_text": "1200 block of Oak Ave", "priority": 0.5}])
+    done = {"done": True, "metadata": {"state": "BATCH_STATE_SUCCEEDED", "output": {"inlinedResponses": {
+        "inlinedResponses": [{"metadata": {"key": "r0"}, "response": {
+            "candidates": [{"content": {"parts": [{"text": reply}]}}],
+            "usageMetadata": {"promptTokenCount": 200, "candidatesTokenCount": 40,
+                              "promptTokensDetails": [{"modality": "AUDIO", "tokenCount": 96}]}}}]}}}}
+    assert radio_stt.poll_backlog(now + 300, get=lambda name: done, locate=lambda *a: None) == 1
+    t = radio.transcripts_for(db["key"], [600])[600]
+    assert t["status"] == "done" and t["kind"] == "dispatch" and t["summary"].startswith("Engine 12")
+    assert radio.jobs() == []
+
+
+def test_a_failed_or_stale_batch_job_marks_its_calls_failed(db):
+    from apb.context import radio_stt
+    from apb.store import radio
+    now = time.time()
+    radio.add_recent(db["key"], [(700, now - 1500, 1, 7)])
+    radio_stt.submit_backlog(now, fetch=lambda inst, ids: {i: (MP3 * 3, "audio/mpeg") for i in ids},
+                             post=lambda path, body: {"name": "batches/x"})
+    radio_stt.poll_backlog(now, get=lambda name: {"metadata": {"state": "BATCH_STATE_EXPIRED"}})
+    assert radio.transcripts_for(db["key"], [700])[700]["status"] == "failed" and radio.jobs() == []

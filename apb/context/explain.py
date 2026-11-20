@@ -317,8 +317,9 @@ def _meter(feature: str, model: str, usage: dict) -> None:
 
 
 def generate_usage(parts: list[dict], max_tokens: int = 800,
-                   feature: str = "other") -> tuple[str, dict]:
-    """generate(), plus the response's usageMetadata (token counts by modality)."""
+                   feature: str = "other", model: str | None = None) -> tuple[str, dict]:
+    """generate(), plus the response's usageMetadata (token counts by modality). A given
+    `model` is used alone (no fallback to a newer, possibly pricier one)."""
     key = api_key()
     if not key:
         raise RuntimeError("GEMINI_API_KEY is not configured")
@@ -326,7 +327,7 @@ def generate_usage(parts: list[dict], max_tokens: int = 800,
             "generationConfig": {"temperature": 0.1, "maxOutputTokens": max_tokens,
                                  "thinkingConfig": {"thinkingBudget": 0}}}
     r = None
-    for model in healthy_models(key)[:3]:
+    for model in ([model] if model else healthy_models(key)[:3]):
         try:
             r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body, timeout=60.0)
             if r.status_code == 400 and "thinking" in r.text.lower():

@@ -385,3 +385,25 @@ WARP: 4 streams, 2 min, 8 calls, no drops; Gemini transcripts were clean dispatc
 traffic ("Respond for Box 1664 … West 142nd Street … odor of gas"). ~1.5 Mbps and light
 CPU for 40 streams; transcription stays inside the existing daily STT budget.
 
+### 2026-11-20 — Transcription cost: pinned model, shorter replies, Batch API backlog
+
+Flash-Lite was sampled on 8 real stream clips against the live model (gemini-3.8-flash):
+3.5 Flash-Lite ~40% cheaper per request but lost or mangled the street in about half the
+clips ("Greenpoint Avenue" -> "Green St", "Dequindre" lost, Ambulance -> Engine) — the
+street is what places and links an incident, so it was not adopted. 3.1 Flash-Lite was
+worse; 2.5 Flash-Lite is closed to new users. The sample also showed output tokens are
+~2/3 of the bill and that "newest Flash" had silently become 3.8 Flash ($0.75 in / $3.75
+out now, $1.50 / $7.50 from 2027-01-01) while the meter still priced 2.5 Flash.
+
+Changes: (1) `APB_RADIO_STT_MODEL` pins the model (default gemini-3.8-flash; no fallback
+to another model); the usage meter prices per model and date (MODEL_PRICES) and charges
+`*_batch` features half. (2) The prompt drops the `summary` field (stored summary is now
+the transcript's first 140 chars) and asks for only `i`/`kind` on tones/noise, compact
+JSON. (3) Calls the live pass leaves (8 min - 2 h old, weight >= 0.3, or over the live
+budget) go to the Batch API every 10 min — up to 160 calls per job, own daily budget
+`APB_RADIO_STT_BATCH_SEC` (14400 s) — marked `queued` so nothing picks them twice;
+results come back through the same `apply_reply` as live. Jobs persist in
+radio_stt_jobs across restarts; failed / expired / >26 h jobs mark their calls failed.
+Verified the Batch REST shape on prod (results under metadata.output.inlinedResponses;
+a 1-request job finished in ~2 min).
+
