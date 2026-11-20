@@ -367,6 +367,38 @@ def block_address(loc: str | None) -> str | None:
     return None
 
 
+def address_variants(loc: str | None, addr: str) -> list[str]:
+    """A "600 block of Bannon St" is any of 600-699; the geocoder only matches numbers
+    inside a real address range, and the round number often is not one. Try a few."""
+    m = _BLOCK.match((loc or "").strip().rstrip("."))
+    if not m:
+        return [addr]
+    n, street = int(m.group(1)), m.group(2).strip()
+    nums = [n, n + 1, n + 50, n + 51] if n else [1, 2, 50, 51]
+    return [f"{x} {street}" for x in nums]
+
+
+_census_cache: dict[str, tuple[float, tuple | None]] = {}
+
+
+def _census_point(q: str) -> tuple[float, float] | None:
+    """One Census one-line lookup, remembered for 6 h (misses too). Raises on network errors."""
+    now = time.time()
+    hit = _census_cache.get(q)
+    if hit and now - hit[0] < 6 * 3600.0:
+        return hit[1]
+    r = _http.get(f"{_CENSUS}/locations/onelineaddress", params={
+        "address": q, "benchmark": "Public_AR_Current", "format": "json"})
+    r.raise_for_status()
+    matches = r.json().get("result", {}).get("addressMatches") or []
+    c = (matches[0].get("coordinates") or {}) if matches else {}
+    pt = (float(c["y"]), float(c["x"])) if c.get("x") is not None and c.get("y") is not None else None
+    if len(_census_cache) > 5000:
+        _census_cache.clear()
+    _census_cache[q] = (now, pt)
+    return pt
+
+
 def state_at(lat: float, lon: float) -> str | None:
     key = (round(lat, 1), round(lon, 1))
     if key in _state_cache:
@@ -419,21 +451,17 @@ def geocode(loc: str | None, municipality: str | None, area: str | None,
     if not state or state not in _US:
         return None
     city = (municipality or city or "").strip()
-    q = ", ".join(x for x in (addr, city, state) if x)
-    try:
-        r = _http.get(f"{_CENSUS}/locations/onelineaddress", params={
-            "address": q, "benchmark": "Public_AR_Current", "format": "json"})
-        r.raise_for_status()
-        matches = r.json().get("result", {}).get("addressMatches") or []
-    except (httpx.HTTPError, ValueError) as e:
-        log.info("radio stt: geocode failed: %s", e)
+    pt = None
+    for a in address_variants(loc, addr):
+        try:
+            pt = _census_point(", ".join(x for x in (a, city, state) if x))
+        except (httpx.HTTPError, ValueError) as e:
+            log.info("radio stt: geocode failed: %s", e)
+            return None
+        if pt:
+            break
+    if not pt:
         return None
-    if not matches:
-        return None
-    c = matches[0].get("coordinates") or {}
-    if c.get("x") is None or c.get("y") is None:
-        return None
-    pt = (float(c["y"]), float(c["x"]))
     if from_hint and approx:
         return pt
     if not near:

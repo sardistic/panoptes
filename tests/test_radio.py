@@ -25,6 +25,13 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setenv("APB_RDIO_PROXY", "socks5h://proxy.test:1080")
     rdio._cfg.clear()
     rdio._cal_hits.clear()
+    import httpx as _hx
+    from apb.context import roads as _roads
+
+    def _offline(*a, **k):
+        raise _hx.ConnectError("no network in tests")
+    monkeypatch.setattr(_roads, "_fetch", _offline)
+    monkeypatch.setattr(radio_stt, "_census_cache", {})
     radio_stt._mime_label.clear()
     inst = {"host": "scan.example.org", "port": None, "scheme": "wss", "place": "Essex, MD",
             "loc": (39.31, -76.47), "labels": {1: "Baltimore County"}}
@@ -567,7 +574,7 @@ def test_calls_are_linked_into_threads_placed_and_sent_to_fusion(db, monkeypatch
 
 def test_split_and_road_keys():
     from apb.context.radio_place import split_where
-    from apb.context.roads import name_key, way_keys
+    from apb.context.roads import name_key, tiger_key
     assert split_where("NC 280 at Deep Woods Dr") == ("NC 280", "Deep Woods Dr")
     assert split_where("Main St and 5th Ave") == ("Main St", "5th Ave")
     assert split_where("1200 block of Oak Ave") is None
@@ -578,56 +585,58 @@ def test_split_and_road_keys():
     assert name_key("North Main St.") == "n:main"
     assert name_key("5th Ave") == "n:5th"
     assert name_key("Dr") is None
-    assert way_keys({"name": "Asheville Highway", "ref": "NC 280;US 64"}) == {"n:asheville", "r:280", "r:64"}
+    assert tiger_key({"BASENAME": "280", "RTTYP": "S"}) == "r:280"
+    assert tiger_key({"BASENAME": "Deep Woods", "RTTYP": "M"}) == "n:deep woods"
 
 
-def _way(wid, tags, pts):
-    return {"type": "way", "id": wid, "tags": tags, "nodes": [p[0] for p in pts],
-            "geometry": [{"lat": p[1], "lon": p[2]} for p in pts]}
-
-
-def test_junction_index_finds_where_two_roads_meet(db):
-    from apb.context import roads
-    tile = roads.tile_of(35.43, -82.54)
-    els = [_way(1, {"ref": "NC 280", "name": "Boylston Highway"},
-                [(10, 35.421, -82.541), (11, 35.432, -82.543), (12, 35.445, -82.546)]),
-           _way(2, {"name": "Deep Woods Drive"}, [(11, 35.432, -82.543), (13, 35.433, -82.55)]),
-           _way(3, {"ref": "NC 280", "name": "Boylston Highway"}, [(12, 35.445, -82.546), (14, 35.46, -82.55)]),
-           _way(4, {"highway": "footway"}, [(13, 35.433, -82.55)])]
-    rows = roads.junctions_from(els, tile)
-    assert {(r[0], r[1], r[2]) for r in rows} == {("n:deep woods", "r:280", 11), ("n:boylston", "n:deep woods", 11)}
-    # nothing indexed yet: the lookup misses and queues the tiles it needs
-    assert roads.cross("NC 280", "Deep Woods", (35.40, -82.50), 10000) is None
-    assert tile in roads.want([tile])
+def _tiger(roads_by_layer):
+    """A fake TIGERweb: {layer: [(BASENAME, RTTYP, [[(lon, lat), ...], ...]), ...]}."""
     asked = []
-    assert roads.fetch_next(fetch=lambda q, url: asked.append(q) or {"elements": els})
-    assert asked and "out body geom" in asked[0]
-    assert roads.cross("NC 280", "Deep Woods Dr", (35.40, -82.50), 10000) == (35.432, -82.543)
-    assert roads.cross("Deep Woods", "Boylston Hwy", (35.40, -82.50), 10000) == (35.432, -82.543)
-    assert roads.cross("NC 280", "Deep Woods", (36.40, -82.50), 10000) is None      # too far away
-    assert roads.status()["tiles"].get("ok", 0) >= 1
+
+    def fetch(layer, params):
+        asked.append((layer, params["where"]))
+        return {"features": [{"attributes": {"BASENAME": n, "RTTYP": t}, "geometry": {"paths": paths}}
+                             for n, t, paths in roads_by_layer.get(layer, [])]}
+    return fetch, asked
 
 
-def test_busy_overpass_backs_off_and_retries_another_mirror(db, monkeypatch):
+# NC 280 runs north-south through (-82.543, 35.432); Deep Woods Dr runs east from it (a T)
+_NC280 = ("280", "S", [[(-82.541, 35.421), (-82.543, 35.432), (-82.546, 35.445)]])
+_DEEPWOODS = ("Deep Woods", "M", [[(-82.543, 35.432), (-82.55, 35.433)]])
+_ELM = ("Elm", "M", [[(-82.546, 35.42), (-82.547, 35.44)]])
+
+
+def test_crossing_found_from_tiger_road_lines_and_cached(db):
+    from apb.context import roads
+    fetch, asked = _tiger({2: [], 6: [_NC280], 8: [_DEEPWOODS]})
+    pt = roads.cross("NC 280", "Deep Woods Dr", (35.40, -82.50), 10000, fetch=fetch)
+    assert pt is not None and abs(pt[0] - 35.432) < 1e-4 and abs(pt[1] + 82.543) < 1e-4
+    assert len(asked) == 3 and "BASENAME = '280'" in asked[0][1] and "UPPER(BASENAME) = 'DEEP WOODS'" in asked[0][1]
+    assert roads.cross("Deep Woods", "Highway 280", (35.40, -82.50), 10000, fetch=fetch) == pt
+    assert len(asked) == 3                                           # second answer came from the cache
+    # two roads that cross mid-segment (an X, not a T)
+    fetch2, _ = _tiger({8: [_DEEPWOODS, _ELM]})
+    x = roads.cross("Elm St", "Deep Woods", (35.40, -82.50), 10000, fetch=fetch2)
+    assert x is not None and abs(x[0] - 35.4325) < 0.002
+    # roads that do not meet, and a crossing outside the radius
+    fetch3, _ = _tiger({8: [_DEEPWOODS, ("Oak", "M", [[(-82.6, 35.5), (-82.61, 35.51)]])]})
+    assert roads.cross("Oak Ave", "Deep Woods", (35.40, -82.50), 10000, fetch=fetch3) is None
+    assert roads.cross("NC 280", "Deep Woods", (36.40, -82.50), 10000, fetch=fetch) is None
+
+
+def test_tiger_failures_are_not_cached(db):
     import httpx
     from apb.context import roads
-    monkeypatch.setenv("APB_OVERPASS_URLS", "https://a.example/api,https://b.example/api")
-    tile = roads.tile_of(38.58, -121.49)
-    roads.want([tile], now=1000.0)
-    used = []
 
-    def busy(q, url):
-        used.append(url)
-        raise httpx.HTTPError("502 at capacity")
-    import pytest
-    with pytest.raises(httpx.HTTPError):
-        roads.fetch_next(now=1000.0, fetch=busy)
-    assert not roads.fetch_next(now=1001.0, fetch=busy)              # backing off
-    assert roads.fetch_next(now=1000.0 + 3600, fetch=lambda q, url: used.append(url) or {"elements": []})
-    assert used == ["https://a.example/api", "https://b.example/api"]
+    def down(layer, params):
+        raise httpx.ConnectError("down")
+    assert roads.cross("NC 280", "Deep Woods", (35.40, -82.50), 10000, fetch=down) is None
+    fetch, asked = _tiger({6: [_NC280], 8: [_DEEPWOODS]})
+    assert roads.cross("NC 280", "Deep Woods", (35.40, -82.50), 10000, fetch=fetch) is not None
+    assert asked
 
 
-def test_unplaced_incident_is_re_placed_once_its_roads_are_indexed(db, monkeypatch):
+def test_unplaced_incident_is_re_placed_when_its_roads_resolve(db, monkeypatch):
     from apb.context import radio_areas, radio_place, roads
     from apb.store import radio, snapshots
     now = time.time()
@@ -637,13 +646,15 @@ def test_unplaced_incident_is_re_placed_once_its_roads_are_indexed(db, monkeypat
                        "activity": "Two vehicles.", "area": "Fletcher", "state": "NC", "priority": 0.5,
                        "status": "active", "loc_text": "NC 280 at Deep Woods", "lat": 35.40, "lon": -82.50,
                        "precision": "town", "calls": [31], "published": 0})
-    assert radio_areas.replace_pending(now) == 0                     # tiles queued, not in yet
-    tile = roads.tile_of(35.43, -82.54)
-    roads.store_tile(tile, [_way(1, {"ref": "NC 280"}, [(11, 35.432, -82.543), (12, 35.44, -82.54)]),
-                            _way(2, {"name": "Deep Woods Dr"}, [(11, 35.432, -82.543)])])
+    fetch, _ = _tiger({6: [_NC280], 8: [_DEEPWOODS]})
+    real = roads.cross
+    monkeypatch.setattr(roads, "cross", lambda *a, **k: None)          # TIGERweb unreachable
+    assert radio_areas.replace_pending(now) == 0
+    monkeypatch.setattr(roads, "cross", lambda *a, **k: real(*a, **{**k, "fetch": fetch}))
     assert radio_areas.replace_pending(now) == 1
     t = radio_areas.public_threads()[0]
-    assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == (35.43, -82.55)
+    from apb.context.radio_stt import coarse
+    assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == coarse((35.432, -82.543))
     assert [r["call_id"] for r in snapshots.query(1.0)] == ["rthrabc123def456"]
     assert radio_areas.replace_pending(now) == 0                     # done once
 
@@ -678,3 +689,33 @@ def test_focus_instances_are_polled_every_minute(db, monkeypatch):
     monkeypatch.setenv("APB_RADIO_FOCUS", f"{db['key']}:1")
     assert rdio.every_for(db["key"]) == min(rdio.EVERY, rdio.FOCUS_EVERY)
     assert rdio.every_for("0123456789") == rdio.EVERY
+
+
+def test_more_spoken_places_resolve_to_roads():
+    from apb.context.radio_place import one_street, split_where
+    from apb.context.radio_stt import address_variants
+    assert split_where("Westbound US 50 east of Highway 99") == ("US 50", "Highway 99")
+    assert split_where("I-26 Westbound and I-40 ramp") == ("I-26", "I-40")
+    assert split_where("southbound Interstate 5 north of Laguna Boulevard") == ("Interstate 5", "Laguna Boulevard")
+    assert split_where("Main St between 5th Ave and 6th Ave") == ("Main St", "5th Ave")
+    assert one_street("600 block of Bannon Street") == "Bannon Street"
+    assert one_street("West Street") == "West Street"
+    assert one_street("Briarwood") is None and one_street("NC 280 at Deep Woods") is None
+    assert address_variants("600 block of Bannon St", "600 Bannon St") == [
+        "600 Bannon St", "601 Bannon St", "650 Bannon St", "651 Bannon St"]
+    assert address_variants("0 block of Ray St", "0 Ray St")[0] == "1 Ray St"
+    assert address_variants("123 Main St", "123 Main St") == ["123 Main St"]
+
+
+def test_a_short_street_places_an_incident_a_long_one_does_not(db):
+    from apb.context import radio_place, roads
+    short = ("Bannon", "M", [[(-121.495, 38.590), (-121.488, 38.591)]])          # ~600 m
+    long_ = ("Central Florida", "M", [[(-121.60, 38.50), (-121.40, 38.65)]])      # ~24 km
+    fetch, _ = _tiger({8: [short, long_]})
+    assert roads.street("Bannon Street", (38.58, -121.49), 10000, fetch=fetch) is not None
+    assert roads.street("Central Florida Parkway", (38.58, -121.49), 10000, fetch=fetch) is None
+    pt, prec = radio_place.place("600 block of Bannon Street", "Sacramento", "CA", [], None, None, False,
+                                 geocode=lambda *a: None,
+                                 streeter=lambda n, an, r: roads.street(n, an, r, fetch=fetch))
+    assert prec == "street" and abs(pt[0] - 38.5905) < 0.001
+

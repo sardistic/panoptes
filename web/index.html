@@ -2754,7 +2754,7 @@ function drawRadio(){
 // incidents heard on the radio: linked calls of one event, on the ~2 km cell their
 // place resolved to. A downward chevron (a pin, angular); dashed when only the town is
 // known; red when urgent; bigger with more calls. Click for the call timeline.
-const PRECISION={address:'from a block address',intersection:'from an intersection',town:'town only'};
+const PRECISION={address:'from a block address',intersection:'from an intersection',street:'from the street named',town:'town only'};
 function drawRadioThreads(b){
   radioThreads.forEach(t=>{
     if(t.lat==null||!b.contains([t.lat,t.lon])) return;

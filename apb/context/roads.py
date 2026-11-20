@@ -1,21 +1,17 @@
-"""Local road-junction index: where two named roads meet, without a live map query.
+"""Where two named roads meet — for placing radio incidents like "NC 280 at Deep Woods".
 
-Placing a radio incident by "NC 280 at Deep Woods" needs the point where those two roads
-cross. Asking a public Overpass server per incident proved unreliable (every mirror timed
-out or answered "at capacity" on 2026-11-19), so this keeps its own index instead:
+Source: the Census Bureau's TIGERweb road layers (keyless ArcGIS REST, US-wide, answers
+in well under a second). Public Overpass was tried first and dropped: on 2026-11-19 every
+mirror timed out or refused prod (406 / "at capacity"), per incident and per tile alike.
 
-  * the map is cut into 0.1-degree tiles; a tile is fetched once (one Overpass query:
-    named / numbered roads with their node ids and coordinates) when an incident first
-    needs it, and refreshed after 90 days;
-  * only junctions are kept — nodes shared by two differently named roads — as
-    (road key a, road key b, lat, lon) rows in state/roads.sqlite next to the main DB;
-  * road keys are normalised the same way for OSM names and spoken names:
-    "Deep Woods Drive" / "Deep Woods Dr" -> "n:deep woods", ref "NC 280;US 64" / "NC 280"
-    -> "r:280" / "r:64".
-
-Tiles download in the background, one request at a time, with backoff and mirror rotation;
-until a tile is in, lookups there miss and the incident falls back to its town (and is
-re-placed on a later pass). Nothing here is published — callers publish a ~2 km cell.
+A lookup asks TIGERweb for both roads inside the search box around the anchor (the
+town, or the system's location), computes where their centre lines cross, and keeps the
+crossing nearest the anchor. Answers — including "no crossing" — are cached in
+state/roads.sqlite (hits 90 days, misses 7 days); network failures are not cached, so the
+incident is simply retried on a later pass. Spoken names and TIGER names are reduced to
+the same key: "Deep Woods Dr" / BASENAME "Deep Woods" -> "n:deep woods"; "NC 280" /
+BASENAME "280" on a state route -> "r:280". Nothing here is published — callers publish
+a ~2 km cell.
 """
 from __future__ import annotations
 
@@ -31,17 +27,17 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-TILE = 0.1
-MAX_AGE = 90 * 86400.0
-_HW = ("^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|"
-       "service|road)(_link)?$")
+TIGER = os.environ.get("APB_TIGERWEB_URL",
+                       "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer")
+LAYERS = (2, 6, 8)              # primary roads, secondary roads (finest scale), local roads
+HIT_TTL = 90 * 86400.0
+MISS_TTL = 7 * 86400.0
+_ROUTE_TYPES = {"I", "U", "S", "C", "O"}
 _lock = threading.RLock()
 _conn: sqlite3.Connection | None = None
 _conn_path = None
-_stop = threading.Event()
-_wake = threading.Event()
-_thread: threading.Thread | None = None
-_stats = {"fetched": 0, "errors": 0, "junctions": 0, "last_error": None, "last": 0.0}
+_stats = {"lookups": 0, "cached": 0, "found": 0, "errors": 0, "last_error": None}
+_http = httpx.Client(timeout=20.0, headers={"User-Agent": "apb/0.1 (panoptes.run; radio placement)"})
 
 _SUFFIX = re.compile(r"\s+(?:road|rd|street|st|avenue|ave|av|drive|dr|lane|ln|court|ct|cove|cv|"
                      r"boulevard|blvd|way|place|pl|circle|cir|terrace|ter|trail|trl|loop|parkway|"
@@ -51,18 +47,8 @@ _ROUTE = re.compile(r"^(?:(?:NC|SC|VA|GA|TN|US|SR|CR|I|IH|Interstate|Highway|Hwy
                     r"State Road|State Highway|County Road|[A-Z]{2})\s*-?\s*)(\d{1,4}[A-Z]?)\b", re.I)
 
 
-def mirrors() -> list[str]:
-    env = os.environ.get("APB_OVERPASS_URLS")
-    if env:
-        return [u.strip() for u in env.split(",") if u.strip()]
-    from apb.context import facts
-    out = [facts.OVERPASS, "https://overpass-api.de/api/interpreter",
-           "https://overpass.private.coffee/api/interpreter"]
-    return list(dict.fromkeys(out))
-
-
 def name_key(name: str | None) -> str | None:
-    """A spoken or mapped road name -> its index key, or None if too vague."""
+    """A spoken or mapped road name -> its lookup key, or None if too vague."""
     s = re.sub(r"^the\s+", "", str(name or "").strip(), flags=re.I)
     m = _ROUTE.match(s)
     if m:
@@ -70,21 +56,28 @@ def name_key(name: str | None) -> str | None:
     s = _DIR.sub("", _SUFFIX.sub("", s.replace(".", "")).strip())
     s = re.sub(r"[^a-z0-9 ]+", " ", s.lower())
     s = re.sub(r"\s+", " ", s).strip()
-    if len(s) < 3 or not re.search(r"[a-z0-9]{3}|\d", s):
+    if len(s) < 3 and not re.fullmatch(r"\d+(st|nd|rd|th)?", s):
+        return None
+    if not re.search(r"[a-z0-9]{3}|\d", s):
         return None
     return "n:" + s
 
 
-def way_keys(tags: dict) -> set[str]:
-    out = set()
-    k = name_key(tags.get("name"))
-    if k:
-        out.add(k)
-    for ref in re.split(r"[;,]", str(tags.get("ref") or "")):
-        m = re.search(r"(\d{1,4}[A-Za-z]?)\b", ref)
-        if m:
-            out.add("r:" + m.group(1).lower())
-    return out
+def tiger_key(attrs: dict) -> str | None:
+    """The key of one TIGERweb road feature."""
+    base = str(attrs.get("BASENAME") or "").strip()
+    if not base:
+        return None
+    if str(attrs.get("RTTYP") or "").upper() in _ROUTE_TYPES and re.fullmatch(r"\d{1,4}[A-Za-z]?", base):
+        return "r:" + base.lower()
+    return name_key(base)
+
+
+def _where(key: str) -> str:
+    val = key[2:].upper().replace("'", "''")
+    if key.startswith("r:"):
+        return f"(BASENAME = '{val}' AND RTTYP IN ('I','U','S','C','O'))"
+    return f"(UPPER(BASENAME) = '{val}')"
 
 
 def _db() -> sqlite3.Connection:
@@ -97,204 +90,175 @@ def _db() -> sqlite3.Connection:
             _conn = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
             _conn_path = path
             _conn.executescript("""
-            PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS road_tiles (
-                ty INTEGER NOT NULL, tx INTEGER NOT NULL, status TEXT NOT NULL, wanted REAL,
-                fetched REAL, tries INTEGER DEFAULT 0, next_try REAL DEFAULT 0, junctions INTEGER,
-                PRIMARY KEY (ty, tx));
-            CREATE TABLE IF NOT EXISTS road_junctions (
-                a TEXT NOT NULL, b TEXT NOT NULL, node INTEGER NOT NULL, lat REAL, lon REAL,
-                ty INTEGER, tx INTEGER, PRIMARY KEY (a, b, node)) WITHOUT ROWID;
-            CREATE INDEX IF NOT EXISTS idx_rj_tile ON road_junctions(ty, tx);
+            CREATE TABLE IF NOT EXISTS road_cross (
+                a TEXT NOT NULL, b TEXT NOT NULL, cell TEXT NOT NULL, radius INTEGER NOT NULL,
+                lat REAL, lon REAL, ts REAL NOT NULL, PRIMARY KEY (a, b, cell, radius));
             """)
         return _conn
 
 
-def tile_of(lat: float, lon: float) -> tuple[int, int]:
-    return math.floor(lat / TILE), math.floor(lon / TILE)
+def _xy(lat0: float, lat: float, lon: float, lon0: float) -> tuple[float, float]:
+    return (lon - lon0) * 111_320.0 * math.cos(math.radians(lat0)), (lat - lat0) * 110_574.0
 
 
-def tiles_around(anchor: tuple, radius_m: float) -> list[tuple[int, int]]:
-    lat, lon = anchor
-    dlat = radius_m / 111_000.0
-    dlon = dlat / max(0.2, math.cos(math.radians(lat)))
-    y0, x0 = tile_of(lat - dlat, lon - dlon)
-    y1, x1 = tile_of(lat + dlat, lon + dlon)
-    return [(y, x) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)]
+def crossings(paths_a: list, paths_b: list, anchor: tuple) -> list[tuple[float, float]]:
+    """Points (lat, lon) where any segment of a meets any segment of b (or touches within 12 m)."""
+    lat0, lon0 = anchor
 
-
-def want(tiles: list[tuple[int, int]], now: float | None = None) -> list[tuple[int, int]]:
-    """Queue tiles that are missing or stale; returns the ones not loaded yet."""
-    now = now or time.time()
-    missing = []
-    with _lock:
-        c = _db()
-        for ty, tx in tiles:
-            row = c.execute("SELECT status, fetched FROM road_tiles WHERE ty=? AND tx=?", (ty, tx)).fetchone()
-            if row is None:
-                c.execute("INSERT INTO road_tiles (ty, tx, status, wanted) VALUES (?,?,'want',?)", (ty, tx, now))
-                missing.append((ty, tx))
-            else:
-                c.execute("UPDATE road_tiles SET wanted=? WHERE ty=? AND tx=?", (now, ty, tx))
-                if row[0] != "ok":
-                    missing.append((ty, tx))
-                elif (row[1] or 0) < now - MAX_AGE:
-                    c.execute("UPDATE road_tiles SET status='stale' WHERE ty=? AND tx=?", (ty, tx))
-        c.commit()
-    if missing:
-        _wake.set()
-    return missing
-
-
-def junctions_from(elements: list[dict], tile: tuple[int, int]) -> list[tuple]:
-    """Overpass `out body geom` ways -> (a, b, node, lat, lon) rows for junction nodes in tile."""
-    at: dict[int, list] = {}
-    for w in elements:
-        if w.get("type") != "way":
-            continue
-        keys = way_keys(w.get("tags") or {})
-        geo = w.get("geometry") or []
-        if not keys or len(geo) != len(w.get("nodes") or []):
-            continue
-        for nid, g in zip(w["nodes"], geo):
-            if not g or tile_of(g["lat"], g["lon"]) != tile:
+    def segs(paths):
+        out = []
+        for p in paths:
+            pts = [_xy(lat0, y, x, lon0) for x, y in p]
+            out.extend(zip(pts, pts[1:]))
+        return out
+    sa, sb = segs(paths_a), segs(paths_b)
+    hits = []
+    for (p1, p2) in sa:
+        minx, maxx = min(p1[0], p2[0]) - 12, max(p1[0], p2[0]) + 12
+        miny, maxy = min(p1[1], p2[1]) - 12, max(p1[1], p2[1]) + 12
+        for (q1, q2) in sb:
+            if max(q1[0], q2[0]) < minx or min(q1[0], q2[0]) > maxx or \
+               max(q1[1], q2[1]) < miny or min(q1[1], q2[1]) > maxy:
                 continue
-            ent = at.setdefault(nid, [g["lat"], g["lon"], []])
-            if keys not in ent[2]:
-                ent[2].append(keys)
-    out = []
-    for nid, (lat, lon, sets) in at.items():
-        if len(sets) < 2:
-            continue
-        pairs = set()
-        for i, ka in enumerate(sets):
-            for kb in sets[i + 1:]:
-                for a in ka:
-                    for b in kb:
-                        if a != b:
-                            pairs.add((min(a, b), max(a, b)))
-        out.extend((a, b, nid, round(lat, 6), round(lon, 6)) for a, b in pairs)
-    return out
+            pt = _seg_meet(p1, p2, q1, q2)
+            if pt:
+                hits.append((lat0 + pt[1] / 110_574.0,
+                             lon0 + pt[0] / (111_320.0 * math.cos(math.radians(lat0)))))
+    return hits
 
 
-def store_tile(tile: tuple[int, int], elements: list[dict], now: float | None = None) -> int:
-    rows = junctions_from(elements, tile)
-    with _lock:
-        c = _db()
-        c.execute("DELETE FROM road_junctions WHERE ty=? AND tx=?", tile)
-        c.executemany("INSERT OR IGNORE INTO road_junctions (a, b, node, lat, lon, ty, tx) VALUES (?,?,?,?,?,?,?)",
-                      [(*r, *tile) for r in rows])
-        c.execute("INSERT INTO road_tiles (ty, tx, status, wanted, fetched, tries, next_try, junctions) "
-                  "VALUES (?,?,'ok',?,?,0,0,?) ON CONFLICT(ty, tx) DO UPDATE SET status='ok', "
-                  "fetched=excluded.fetched, tries=0, next_try=0, junctions=excluded.junctions",
-                  (*tile, now or time.time(), now or time.time(), len(rows)))
-        c.commit()
-    return len(rows)
+def _seg_meet(p1, p2, q1, q2, tol: float = 12.0):
+    rx, ry = p2[0] - p1[0], p2[1] - p1[1]
+    sx, sy = q2[0] - q1[0], q2[1] - q1[1]
+    den = rx * sy - ry * sx
+    if abs(den) > 1e-9:
+        t = ((q1[0] - p1[0]) * sy - (q1[1] - p1[1]) * sx) / den
+        u = ((q1[0] - p1[0]) * ry - (q1[1] - p1[1]) * rx) / den
+        if -1e-9 <= t <= 1 + 1e-9 and -1e-9 <= u <= 1 + 1e-9:
+            return p1[0] + t * rx, p1[1] + t * ry
+    for a in (p1, p2):                                 # end points that touch (T-junctions)
+        for b in (q1, q2):
+            if math.hypot(a[0] - b[0], a[1] - b[1]) <= tol:
+                return (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+    return None
 
 
-def _query(tile: tuple[int, int]) -> str:
-    s, w = tile[0] * TILE, tile[1] * TILE
-    bb = f"({s:.4f},{w:.4f},{s + TILE:.4f},{w + TILE:.4f})"
-    return (f'[out:json][timeout:120];(way["highway"~"{_HW}"]["name"]{bb};'
-            f'way["highway"~"{_HW}"]["ref"]{bb};);out body geom qt;')
+def _fetch(layer: int, params: dict) -> dict:
+    r = _http.get(f"{TIGER}/{layer}/query", params=params)
+    r.raise_for_status()
+    j = r.json()
+    if j.get("error"):
+        raise ValueError(str(j["error"])[:120])
+    return j
 
 
-_http = httpx.Client(timeout=150.0, headers={"User-Agent": "apb/0.1 (panoptes.run; road junction index)"})
-
-
-def fetch_next(now: float | None = None, fetch=None) -> bool:
-    """Download the most recently wanted due tile. True if one was attempted."""
-    now = now or time.time()
-    with _lock:
-        row = _db().execute(
-            "SELECT ty, tx, tries FROM road_tiles WHERE status IN ('want','error','stale') AND next_try <= ? "
-            "ORDER BY wanted DESC LIMIT 1", (now,)).fetchone()
-    if not row:
-        return False
-    tile, tries = (row[0], row[1]), row[2] or 0
-    urls = mirrors()
-    url = urls[tries % len(urls)]
-    try:
-        if fetch:
-            data = fetch(_query(tile), url)
-        else:
-            r = _http.post(url, data={"data": _query(tile)}, headers={"Accept": "application/json"})
-            r.raise_for_status()
-            data = r.json()
-        if (data or {}).get("remark") and "error" in str(data["remark"]).lower():
-            raise ValueError(str(data["remark"])[:120])
-        n = store_tile(tile, (data or {}).get("elements") or [], now)
-        _stats["fetched"] += 1
-        _stats["junctions"] += n
-        _stats["last"] = now
-    except (httpx.HTTPError, ValueError) as e:
-        _stats["errors"] += 1
-        _stats["last_error"] = f"{url.split('/')[2]}: {str(e)[:120]}"
-        with _lock:
-            c = _db()
-            c.execute("UPDATE road_tiles SET status=CASE status WHEN 'stale' THEN 'stale' ELSE 'error' END, "
-                      "tries=tries+1, next_try=? WHERE ty=? AND tx=?",
-                      (now + min(6 * 3600.0, 120.0 * 2 ** min(tries, 8)), *tile))
-            c.commit()
-        raise
-    return True
-
-
-def cross(a: str, b: str, anchor: tuple, radius_m: float, now: float | None = None) -> tuple | None:
-    """(lat, lon) of the junction of roads a and b nearest anchor within radius, from the
-    local index. Queues the tiles it needs; None until they are in."""
+def cross(a: str, b: str, anchor: tuple, radius_m: float, now: float | None = None, fetch=None) -> tuple | None:
+    """(lat, lon) where roads a and b meet nearest anchor within radius_m, or None."""
     ka, kb = name_key(a), name_key(b)
     if not ka or not kb or ka == kb or not anchor:
         return None
-    want(tiles_around(anchor, radius_m), now)
+    now = now or time.time()
+    ka, kb = min(ka, kb), max(ka, kb)
     lat, lon = anchor
-    dlat = radius_m / 111_000.0
-    dlon = dlat / max(0.2, math.cos(math.radians(lat)))
+    cell, rad = f"{lat:.2f},{lon:.2f}", int(radius_m)
     with _lock:
-        rows = _db().execute(
-            "SELECT lat, lon FROM road_junctions WHERE a=? AND b=? AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
-            (min(ka, kb), max(ka, kb), lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
-    if not rows:
+        row = _db().execute("SELECT lat, lon, ts FROM road_cross WHERE a=? AND b=? AND cell=? AND radius=?",
+                            (ka, kb, cell, rad)).fetchone()
+    if row and now - row[2] < (HIT_TTL if row[0] is not None else MISS_TTL):
+        _stats["cached"] += 1
+        return (row[0], row[1]) if row[0] is not None else None
+    _stats["lookups"] += 1
+    dlat = radius_m / 110_574.0
+    dlon = radius_m / (111_320.0 * max(0.2, math.cos(math.radians(lat))))
+    params = {"where": f"{_where(ka)} OR {_where(kb)}",
+              "geometry": f"{lon - dlon:.5f},{lat - dlat:.5f},{lon + dlon:.5f},{lat + dlat:.5f}",
+              "geometryType": "esriGeometryEnvelope", "inSR": 4326, "outSR": 4326,
+              "spatialRel": "esriSpatialRelIntersects", "outFields": "BASENAME,RTTYP",
+              "returnGeometry": "true", "f": "json"}
+    paths: dict[str, list] = {ka: [], kb: []}
+    try:
+        for layer in LAYERS:
+            for f in (fetch or _fetch)(layer, params).get("features") or []:
+                k = tiger_key(f.get("attributes") or {})
+                if k in paths:
+                    paths[k].extend((f.get("geometry") or {}).get("paths") or [])
+    except (httpx.HTTPError, ValueError) as e:
+        _stats["errors"] += 1
+        _stats["last_error"] = str(e)[:160]
+        log.info("roads: tigerweb: %s", str(e)[:160])
+        return None                                    # not cached: retried on a later pass
+    best = None
+    if paths[ka] and paths[kb]:
+        pts = crossings(paths[ka], paths[kb], anchor)
+        near = [(math.hypot(*_xy(lat, p[0], p[1], lon)), p) for p in pts]
+        near = [x for x in near if x[0] <= radius_m]
+        if near:
+            best = min(near)[1]
+            best = (round(best[0], 6), round(best[1], 6))
+    with _lock:
+        c = _db()
+        c.execute("INSERT OR REPLACE INTO road_cross VALUES (?,?,?,?,?,?,?)",
+                  (ka, kb, cell, rad, best[0] if best else None, best[1] if best else None, now))
+        c.commit()
+    if best:
+        _stats["found"] += 1
+    return best
+
+
+STREET_SPAN_M = 3000.0          # a street placed alone must fit in about one 2 km cell
+
+
+def street(name: str, anchor: tuple, radius_m: float, now: float | None = None, fetch=None) -> tuple | None:
+    """The middle of a named street near anchor, when its stretch inside the search box is
+    short enough to stand for one place (<= STREET_SPAN_M across); else None."""
+    k = name_key(name)
+    if not k or k.startswith("r:") or not anchor:
         return None
-    best = min(rows, key=lambda p: math.hypot(p[0] - lat, (p[1] - lon) * math.cos(math.radians(lat))))
-    if math.hypot(best[0] - lat, (best[1] - lon) * math.cos(math.radians(lat))) * 111_000.0 > radius_m:
+    now = now or time.time()
+    lat, lon = anchor
+    cell, rad = f"{lat:.2f},{lon:.2f}", int(radius_m)
+    with _lock:
+        row = _db().execute("SELECT lat, lon, ts FROM road_cross WHERE a=? AND b='#street' AND cell=? AND radius=?",
+                            (k, cell, rad)).fetchone()
+    if row and now - row[2] < (HIT_TTL if row[0] is not None else MISS_TTL):
+        _stats["cached"] += 1
+        return (row[0], row[1]) if row[0] is not None else None
+    _stats["lookups"] += 1
+    dlat = radius_m / 110_574.0
+    dlon = radius_m / (111_320.0 * max(0.2, math.cos(math.radians(lat))))
+    params = {"where": _where(k),
+              "geometry": f"{lon - dlon:.5f},{lat - dlat:.5f},{lon + dlon:.5f},{lat + dlat:.5f}",
+              "geometryType": "esriGeometryEnvelope", "inSR": 4326, "outSR": 4326,
+              "spatialRel": "esriSpatialRelIntersects", "outFields": "BASENAME,RTTYP",
+              "returnGeometry": "true", "f": "json"}
+    pts = []
+    try:
+        for layer in LAYERS:
+            for f in (fetch or _fetch)(layer, params).get("features") or []:
+                if tiger_key(f.get("attributes") or {}) == k:
+                    for p in (f.get("geometry") or {}).get("paths") or []:
+                        pts.extend((y, x) for x, y in p
+                                   if abs(y - lat) <= dlat and abs(x - lon) <= dlon)
+    except (httpx.HTTPError, ValueError) as e:
+        _stats["errors"] += 1
+        _stats["last_error"] = str(e)[:160]
         return None
-    return float(best[0]), float(best[1])
-
-
-def _loop() -> None:
-    while not _stop.is_set():
-        try:
-            did = fetch_next()
-            _stop.wait(4.0 if did else 0.0)
-        except Exception as e:
-            log.info("roads: tile fetch: %s", str(e)[:160])
-            _stop.wait(60.0)                       # a busy server: back off before the next tile
-            continue
-        if not did:
-            _wake.clear()
-            _wake.wait(600.0)
-
-
-def start() -> bool:
-    global _thread
-    if _thread or os.environ.get("APB_ROADS_OFF", "").lower() in ("1", "true", "yes"):
-        return False
-    _stop.clear()
-    _thread = threading.Thread(target=_loop, daemon=True, name="road-tiles")
-    _thread.start()
-    return True
-
-
-def stop() -> None:
-    _stop.set()
-    _wake.set()
+    best = None
+    if pts:
+        y0, y1 = min(p[0] for p in pts), max(p[0] for p in pts)
+        x0, x1 = min(p[1] for p in pts), max(p[1] for p in pts)
+        span = math.hypot(*_xy(y0, y1, x1, x0))
+        if span <= STREET_SPAN_M:
+            best = (round((y0 + y1) / 2, 6), round((x0 + x1) / 2, 6))
+    with _lock:
+        c = _db()
+        c.execute("INSERT OR REPLACE INTO road_cross VALUES (?,?,?,?,?,?,?)",
+                  (k, "#street", cell, rad, best[0] if best else None, best[1] if best else None, now))
+        c.commit()
+    if best:
+        _stats["found"] += 1
+    return best
 
 
 def status() -> dict:
-    try:
-        with _lock:
-            tiles = dict(_db().execute("SELECT status, COUNT(*) FROM road_tiles GROUP BY status").fetchall())
-    except sqlite3.Error:
-        tiles = {}
-    return {**_stats, "tiles": tiles, "running": bool(_thread and _thread.is_alive())}
+    return dict(_stats)

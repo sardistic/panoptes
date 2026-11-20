@@ -298,16 +298,16 @@ def link(key: str, system: int, incidents: list[dict], rows: list[dict], labels:
             t["priority"] = t.get("priority") or 0.3
         t["status"] = "cleared" if str(inc.get("status") or "").lower() == "cleared" else "active"
         where = blockify(str(inc.get("where") or "").strip()[:160]) or None
-        if where != t.get("loc_text") or t.get("precision") not in ("address", "intersection"):
+        if where != t.get("loc_text") or t.get("precision") not in ("address", "intersection", "street"):
             located = [r for r in radio.transcripts_for(key, t["calls"]).values() if r.get("lat") is not None]
             pt, prec = placer(where, town, t["state"], located, inst.get("place"), pl.get("loc"),
                               bool(pl.get("approx")))
-            rank = {"address": 3, "intersection": 2, "town": 1, None: 0}
+            rank = RANK
             if pt and rank[prec] >= rank.get(t.get("precision"), 0):
                 cell = coarse(pt)
                 t["lat"], t["lon"], t["precision"] = cell[0], cell[1], prec
             t["loc_text"] = where or t.get("loc_text")
-            if pt and prec in ("address", "intersection") and not t.get("published"):
+            if pt and prec in PLACED and not t.get("published"):
                 if not located:                    # a located call already made its own incident
                     _to_fusion(t, now)
                 t["published"] = 1
@@ -352,13 +352,15 @@ def public_threads(max_age_sec: float = 10800.0) -> list[dict]:
     return out
 
 
+RANK = {"address": 4, "intersection": 3, "street": 2, "town": 1, None: 0}
+PLACED = ("address", "intersection", "street")    # precise enough for fusion
 REPLACE_SEC = 6 * 3600.0                           # how long an unplaced incident keeps being retried
 
 
 def replace_pending(now: float | None = None, placer=None) -> int:
-    """Re-place incidents still at town level (or unplaced) whose place names two roads:
-    their junction may be in the local road index by now. No model calls, no geocoder
-    (the address lookup already ran when the thread was written). Returns threads moved."""
+    """Re-place incidents still at town level (or unplaced): a road lookup or the address
+    geocoder may answer now that it did not before (both cache, so a steady miss costs
+    nothing). No model calls. Returns threads moved."""
     from apb.context import radio_place
     from apb.context.radio_stt import coarse
     from apb.ingest import rdio
@@ -367,18 +369,18 @@ def replace_pending(now: float | None = None, placer=None) -> int:
     placer = placer or radio_place.place
     moved = 0
     for t in radio.threads(REPLACE_SEC):
-        if t.get("precision") in ("address", "intersection") or not radio_place.split_where(t.get("loc_text")):
+        if RANK.get(t.get("precision"), 0) >= RANK["street"] or not t.get("loc_text"):
             continue
         inst = rdio.instance(t["key"]) or {}
         pl = rdio.place_info(inst, rdio._label(inst, t["system"]), t["system"]) if inst else {}
         town = t.get("area") if t.get("area") not in (None, "unknown") else None
         try:
             pt, prec = placer(t["loc_text"], town, t.get("state"), [], inst.get("place"), pl.get("loc"),
-                              bool(pl.get("approx")), geocode=lambda *a: None)
+                              bool(pl.get("approx")))
         except Exception as e:
             log.info("radio areas: re-place %s: %s", t["tid"], str(e)[:120])
             continue
-        if not pt or prec != "intersection":
+        if not pt or RANK.get(prec, 0) <= RANK.get(t.get("precision"), 0) or prec not in PLACED:
             continue
         t["lat"], t["lon"] = coarse(pt)
         t["precision"] = prec
@@ -452,16 +454,12 @@ def start() -> bool:
     _stop.clear()
     _thread = threading.Thread(target=_loop, daemon=True, name="radio-areas")
     _thread.start()
-    from apb.context import roads
-    roads.start()                                      # junction tiles for intersection placement
     log.info("radio areas: on, every %d s, %d summaries a day max", EVERY, daily_cap())
     return True
 
 
 def stop() -> None:
     _stop.set()
-    from apb.context import roads
-    roads.stop()
 
 
 def status() -> dict:
