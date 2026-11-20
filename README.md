@@ -225,10 +225,11 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   cleared), continues open ones, and places each by block address (Census), road
   intersection or town — published as a ~2 km cell with the precision word
   (`apb/context/radio_place.py`, `/live/radio/threads`, chevron markers with a call
-  timeline). Placed threads feed fusion. Intersections come from a local junction index
-  (`apb/context/roads.py`, `state/roads.sqlite`): 0.1° tiles of named roads fetched from
-  Overpass once when first needed (one at a time, backoff, mirror rotation, 90-day
-  refresh); unplaced threads are re-placed for 6 h as tiles arrive.
+  timeline). Placed threads feed fusion. Intersections and single short streets come from
+  the Census TIGERweb road layers (`apb/context/roads.py`, keyless; answers cached in
+  `state/roads.sqlite`); block addresses try numbers inside the block (600 → 601, 650,
+  651). Precision: address > intersection > street > town. Threads still at town level
+  are re-placed every pass for 6 h.
 - **Live indicators:** `/live/radio/feed?since=<now of the last reply>` returns calls the
   lane newly saw (system, talkgroup, weight), newly transcribed calls (cleaned line, ~2 km
   cell) and threads just written. The map polls it every 5 s: each call pings its antenna,
