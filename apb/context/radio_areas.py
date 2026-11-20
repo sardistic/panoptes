@@ -352,6 +352,45 @@ def public_threads(max_age_sec: float = 10800.0) -> list[dict]:
     return out
 
 
+REPLACE_SEC = 6 * 3600.0                           # how long an unplaced incident keeps being retried
+
+
+def replace_pending(now: float | None = None, placer=None) -> int:
+    """Re-place incidents still at town level (or unplaced) whose place names two roads:
+    their junction may be in the local road index by now. No model calls, no geocoder
+    (the address lookup already ran when the thread was written). Returns threads moved."""
+    from apb.context import radio_place
+    from apb.context.radio_stt import coarse
+    from apb.ingest import rdio
+    from apb.store import radio
+    now = now or time.time()
+    placer = placer or radio_place.place
+    moved = 0
+    for t in radio.threads(REPLACE_SEC):
+        if t.get("precision") in ("address", "intersection") or not radio_place.split_where(t.get("loc_text")):
+            continue
+        inst = rdio.instance(t["key"]) or {}
+        pl = rdio.place_info(inst, rdio._label(inst, t["system"]), t["system"]) if inst else {}
+        town = t.get("area") if t.get("area") not in (None, "unknown") else None
+        try:
+            pt, prec = placer(t["loc_text"], town, t.get("state"), [], inst.get("place"), pl.get("loc"),
+                              bool(pl.get("approx")), geocode=lambda *a: None)
+        except Exception as e:
+            log.info("radio areas: re-place %s: %s", t["tid"], str(e)[:120])
+            continue
+        if not pt or prec != "intersection":
+            continue
+        t["lat"], t["lon"] = coarse(pt)
+        t["precision"] = prec
+        if not t.get("published"):
+            _to_fusion(t, now)
+            t["published"] = 1
+        radio.save_thread(t)
+        moved += 1
+    _stats["replaced"] = _stats.get("replaced", 0) + moved
+    return moved
+
+
 def run_once(now: float | None = None, gen=None) -> int:
     from apb.store import spend
     done = 0
@@ -367,6 +406,10 @@ def run_once(now: float | None = None, gen=None) -> int:
             _stats["errors"] += 1
             _stats["last_error"] = str(e)[:200]
             log.info("radio areas: %s/%s: %s", key, system, str(e)[:160])
+    try:
+        replace_pending(now)
+    except Exception as e:
+        log.info("radio areas: re-place: %s", str(e)[:160])
     _stats["summaries"] += done
     _stats["runs"] += 1
     _stats["last"] = now or time.time()
@@ -409,16 +452,21 @@ def start() -> bool:
     _stop.clear()
     _thread = threading.Thread(target=_loop, daemon=True, name="radio-areas")
     _thread.start()
+    from apb.context import roads
+    roads.start()                                      # junction tiles for intersection placement
     log.info("radio areas: on, every %d s, %d summaries a day max", EVERY, daily_cap())
     return True
 
 
 def stop() -> None:
     _stop.set()
+    from apb.context import roads
+    roads.stop()
 
 
 def status() -> dict:
     from apb.context.radio_stt import focus
     from apb.store import spend
     return {**_stats, "running": bool(_thread and _thread.is_alive()), "daily_cap": daily_cap(),
-            "used": spend.used("radio_area_calls"), "focus": sorted(f"{k}:{s}" for k, s in focus())}
+            "used": spend.used("radio_area_calls"), "focus": sorted(f"{k}:{s}" for k, s in focus()),
+            "roads": __import__("apb.context.roads", fromlist=["status"]).status()}

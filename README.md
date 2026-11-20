@@ -223,9 +223,12 @@ always through the egress proxy (`APB_RDIO_PROXY`; it refuses to start without o
   counted as the same sensor as radio activity). `/live/radio/transcripts`.
 - **Incident threads:** the same call links calls into incidents (dispatch + updates +
   cleared), continues open ones, and places each by block address (Census), road
-  intersection (Overpass) or town — published as a ~2 km cell with the precision word
+  intersection or town — published as a ~2 km cell with the precision word
   (`apb/context/radio_place.py`, `/live/radio/threads`, chevron markers with a call
-  timeline). Placed threads feed fusion.
+  timeline). Placed threads feed fusion. Intersections come from a local junction index
+  (`apb/context/roads.py`, `state/roads.sqlite`): 0.1° tiles of named roads fetched from
+  Overpass once when first needed (one at a time, backoff, mirror rotation, 90-day
+  refresh); unplaced threads are re-placed for 6 h as tiles arrive.
 - **Area context:** every 15 min, each system with 3+ transcribed calls in the last hour
   gets one text-only Gemini call that groups them by town / county / road and writes one
   line of activity per area (`apb/context/radio_areas.py`, `/live/radio/areas`, shown in

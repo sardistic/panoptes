@@ -538,7 +538,7 @@ def test_calls_are_linked_into_threads_placed_and_sent_to_fusion(db, monkeypatch
     assert len(th) == 1 and [c["id"] for c in th[0]["calls"]] == [21, 22]
     t = th[0]
     assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == (35.43, -82.55)
-    assert placed == [("NC 280", "Deep Woods", 15000)]
+    assert placed == [("NC 280", "Deep Woods", 10000)]
     assert "Trooper 4" not in json.dumps(th) and "Deep Woods" not in t["title"] + t["area"]
     assert "loc_text" not in t and "where" not in t
     rows = snapshots.query(1.0)
@@ -565,12 +565,84 @@ def test_calls_are_linked_into_threads_placed_and_sent_to_fusion(db, monkeypatch
     assert {c["id"]: c.get("thread") for c in calls}[24] == th[0]["id"]
 
 
-def test_split_and_road_filters():
-    from apb.context.radio_place import road_filter, split_where
+def test_split_and_road_keys():
+    from apb.context.radio_place import split_where
+    from apb.context.roads import name_key, way_keys
     assert split_where("NC 280 at Deep Woods Dr") == ("NC 280", "Deep Woods Dr")
     assert split_where("Main St and 5th Ave") == ("Main St", "5th Ave")
     assert split_where("1200 block of Oak Ave") is None
     assert split_where("the mall") is None
-    assert road_filter("NC 280") == '["ref"~"(^|[^0-9])280($|[^0-9])",i]'
-    assert road_filter("Deep Woods Dr") == '["name"~"^(north |south |east |west |n |s |e |w )?Deep Woods",i]'
-    assert road_filter("I-26") == '["ref"~"(^|[^0-9])26($|[^0-9])",i]'
+    assert name_key("NC 280") == name_key("NC-280") == "r:280"
+    assert name_key("I-26") == name_key("Interstate 26") == "r:26"
+    assert name_key("Deep Woods Dr") == name_key("Deep Woods Drive") == "n:deep woods"
+    assert name_key("North Main St.") == "n:main"
+    assert name_key("5th Ave") == "n:5th"
+    assert name_key("Dr") is None
+    assert way_keys({"name": "Asheville Highway", "ref": "NC 280;US 64"}) == {"n:asheville", "r:280", "r:64"}
+
+
+def _way(wid, tags, pts):
+    return {"type": "way", "id": wid, "tags": tags, "nodes": [p[0] for p in pts],
+            "geometry": [{"lat": p[1], "lon": p[2]} for p in pts]}
+
+
+def test_junction_index_finds_where_two_roads_meet(db):
+    from apb.context import roads
+    tile = roads.tile_of(35.43, -82.54)
+    els = [_way(1, {"ref": "NC 280", "name": "Boylston Highway"},
+                [(10, 35.421, -82.541), (11, 35.432, -82.543), (12, 35.445, -82.546)]),
+           _way(2, {"name": "Deep Woods Drive"}, [(11, 35.432, -82.543), (13, 35.433, -82.55)]),
+           _way(3, {"ref": "NC 280", "name": "Boylston Highway"}, [(12, 35.445, -82.546), (14, 35.46, -82.55)]),
+           _way(4, {"highway": "footway"}, [(13, 35.433, -82.55)])]
+    rows = roads.junctions_from(els, tile)
+    assert {(r[0], r[1], r[2]) for r in rows} == {("n:deep woods", "r:280", 11), ("n:boylston", "n:deep woods", 11)}
+    # nothing indexed yet: the lookup misses and queues the tiles it needs
+    assert roads.cross("NC 280", "Deep Woods", (35.40, -82.50), 10000) is None
+    assert tile in roads.want([tile])
+    asked = []
+    assert roads.fetch_next(fetch=lambda q, url: asked.append(q) or {"elements": els})
+    assert asked and "out body geom" in asked[0]
+    assert roads.cross("NC 280", "Deep Woods Dr", (35.40, -82.50), 10000) == (35.432, -82.543)
+    assert roads.cross("Deep Woods", "Boylston Hwy", (35.40, -82.50), 10000) == (35.432, -82.543)
+    assert roads.cross("NC 280", "Deep Woods", (36.40, -82.50), 10000) is None      # too far away
+    assert roads.status()["tiles"].get("ok", 0) >= 1
+
+
+def test_busy_overpass_backs_off_and_retries_another_mirror(db, monkeypatch):
+    import httpx
+    from apb.context import roads
+    monkeypatch.setenv("APB_OVERPASS_URLS", "https://a.example/api,https://b.example/api")
+    tile = roads.tile_of(38.58, -121.49)
+    roads.want([tile], now=1000.0)
+    used = []
+
+    def busy(q, url):
+        used.append(url)
+        raise httpx.HTTPError("502 at capacity")
+    import pytest
+    with pytest.raises(httpx.HTTPError):
+        roads.fetch_next(now=1000.0, fetch=busy)
+    assert not roads.fetch_next(now=1001.0, fetch=busy)              # backing off
+    assert roads.fetch_next(now=1000.0 + 3600, fetch=lambda q, url: used.append(url) or {"elements": []})
+    assert used == ["https://a.example/api", "https://b.example/api"]
+
+
+def test_unplaced_incident_is_re_placed_once_its_roads_are_indexed(db, monkeypatch):
+    from apb.context import radio_areas, radio_place, roads
+    from apb.store import radio, snapshots
+    now = time.time()
+    monkeypatch.setattr(radio_place, "town_point", lambda town, near, max_km=250.0: (35.40, -82.50))
+    radio.save_thread({"tid": "abc123def456", "key": db["key"], "system": 1, "first_ts": now - 300,
+                       "last_ts": now - 200, "type": "traffic", "title": "Crash on NC 280",
+                       "activity": "Two vehicles.", "area": "Fletcher", "state": "NC", "priority": 0.5,
+                       "status": "active", "loc_text": "NC 280 at Deep Woods", "lat": 35.40, "lon": -82.50,
+                       "precision": "town", "calls": [31], "published": 0})
+    assert radio_areas.replace_pending(now) == 0                     # tiles queued, not in yet
+    tile = roads.tile_of(35.43, -82.54)
+    roads.store_tile(tile, [_way(1, {"ref": "NC 280"}, [(11, 35.432, -82.543), (12, 35.44, -82.54)]),
+                            _way(2, {"name": "Deep Woods Dr"}, [(11, 35.432, -82.543)])])
+    assert radio_areas.replace_pending(now) == 1
+    t = radio_areas.public_threads()[0]
+    assert t["precision"] == "intersection" and (t["lat"], t["lon"]) == (35.43, -82.55)
+    assert [r["call_id"] for r in snapshots.query(1.0)] == ["rthrabc123def456"]
+    assert radio_areas.replace_pending(now) == 0                     # done once

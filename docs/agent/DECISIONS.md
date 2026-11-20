@@ -294,3 +294,18 @@ published as the ~2 km cell plus the precision word. The place text stays intern
 Threads placed by address or intersection go to fusion (metro `radio_<key>`, call_id
 `rthr<tid>`) unless a call already did. Cleaned per-call lines are now published
 (`clean()`: no house/block numbers, unit numbers, conditions or [REDACTED] markers).
+
+### 2026-11-19 — Intersections from a local junction index, not live Overpass
+
+The first prod run of incident threads placed nothing by intersection: every public
+Overpass mirror (kumi, overpass-api.de, private.coffee) timed out at 40 s or answered
+"at capacity" for the per-incident name-regex query. Now `apb/context/roads.py` keeps
+its own index: 0.1° tiles of named/ref'd roads (`out body geom`, one query per tile)
+fetched when an incident first needs them, reduced to junction rows (road key a, road
+key b, lat, lon) in `state/roads.sqlite`. Spoken and mapped names normalise to the same
+key ("Deep Woods Dr" / "Deep Woods Drive" -> `n:deep woods`, "NC 280" / ref "NC 280;US 64"
+-> `r:280`). Lookups are local and instant; tiles download one at a time with backoff
+and mirror rotation, refreshed after 90 days. Threads still at town level are re-placed
+for 6 h as tiles arrive (no model or geocoder calls). Rejected: Geofabrik state
+extracts (GBs per state; a node-location index needs more than the 1 GB container).
+Search radius: 10 km around the town, 20 km around a known system location.
