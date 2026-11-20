@@ -267,7 +267,11 @@ def talkgroup(key: str, system, tg) -> dict:
 
 
 def instance(key: str) -> dict | None:
-    return next((i for i in _instances if i["key"] == key), None)
+    hit = next((i for i in _instances if i["key"] == key), None)
+    if hit is None:                                    # a listened Icecast stream (streams lane)
+        from apb.ingest import streams
+        hit = next((i for i in streams.instances() if i["key"] == key), None)
+    return hit
 
 
 def parse_ts(v) -> float | None:
@@ -411,6 +415,9 @@ def fetch_calls(inst: dict, ids: list[int]) -> dict:
     ids = list(dict.fromkeys(int(i) for i in ids))[:10]
     if not ids:
         return {}
+    if inst.get("kind") == "stream":                   # cut and stored by the streams lane
+        from apb.ingest import streams
+        return streams.fetch(inst["key"], ids)
     if not proxy() and os.environ.get("APB_RDIO_DIRECT", "") != "1":
         return {}
     if not proxy_ok():
@@ -581,7 +588,8 @@ def _label(inst: dict, system) -> str:
 def activity(max_age_sec: float = 1800.0) -> list[dict]:
     """Latest count per system with its label, place and surprise — for the API."""
     from apb.store import radio
-    by_key = {i["key"]: i for i in _instances}
+    from apb.ingest import streams
+    by_key = {i["key"]: i for i in _instances + streams.instances()}
     out = []
     for r in radio.latest(max_age_sec):
         inst = by_key.get(r["key"])

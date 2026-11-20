@@ -312,6 +312,8 @@ def _startup() -> None:
                 radio_stt.start()          # transcribes the calls that matter, on a budget
                 from apb.context import radio_areas
                 radio_areas.start()        # what is going on where, from those transcripts
+                from apb.ingest import streams
+                streams.start()            # public scanner audio streams, cut into calls
         except Exception as e:
             log.warning("rdio lane disabled: %s", e)
 
@@ -347,6 +349,7 @@ async def _lifespan(app: FastAPI):
         __import__("apb.ingest.rdio", fromlist=["stop"]).stop()
         __import__("apb.context.radio_stt", fromlist=["stop"]).stop()
         __import__("apb.context.radio_areas", fromlist=["stop"]).stop()
+        __import__("apb.ingest.streams", fromlist=["stop"]).stop()
         maritime_store.stop()
         if _poller_thread and _poller_thread.is_alive():
             _poller_thread.join(timeout=5.0)

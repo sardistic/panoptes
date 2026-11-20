@@ -719,3 +719,63 @@ def test_a_short_street_places_an_incident_a_long_one_does_not(db):
                                  streeter=lambda n, an, r: roads.street(n, an, r, fetch=fetch))
     assert prec == "street" and abs(pt[0] - 38.5905) < 0.001
 
+
+
+_YP = """<directory>
+<entry><server_name>FDNY Manhattan</server_name><listen_url>http://s.example/fdnym</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
+<entry><server_name>FDNY Manhattan</server_name><listen_url>http://t.example/fdnym</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
+<entry><server_name>Maricopa County - Police &amp; DPS</server_name><listen_url>https://s.example/mcso</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
+<entry><server_name>146.88 WB8CRS Repeater</server_name><listen_url>http://s.example/ham</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
+<entry><server_name>Fire Hits FM</server_name><listen_url>http://s.example/hits</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>128</bitrate><genre>Pop Hits</genre></entry>
+<entry><server_name>Charlotte Fire</server_name><listen_url>http://s.example/clt.ogg</listen_url>
+ <server_type>application/ogg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
+</directory>"""
+
+
+def test_stream_directory_keeps_public_safety_mp3_streams_once():
+    from apb.ingest import streams
+    got = streams.parse_yp(_YP)
+    assert [s["name"] for s in got] == ["FDNY Manhattan", "Maricopa County - Police & DPS"]
+    assert got[0]["tag"] == "Fire Dispatch" and got[1]["tag"] == "Law Dispatch"
+    assert got[0]["key"] == streams.key_of("http://s.example/fdnym") and len(got[0]["key"]) == 10
+
+
+def test_stream_calls_are_cut_stored_served_and_counted(db, monkeypatch, tmp_path):
+    import array
+    import math
+    import random
+    from fastapi.testclient import TestClient
+    from apb.api.main import app
+    from apb.ingest import rdio, streams
+    from apb.store import radio
+    monkeypatch.setenv("APB_STREAMS_LIST", str(tmp_path / "streams.json"))
+    assert streams.discover(fetch=lambda: _YP) == 2
+    monkeypatch.setenv("APB_STREAMS_MAX", "1")
+    s = streams.choose()[0]
+    assert rdio.instance(s["key"])["kind"] == "stream" and rdio._label(rdio.instance(s["key"]), 1) == "FDNY Manhattan"
+    assert rdio.talkgroup(s["key"], 1, 0)["tag"] == "Fire Dispatch"
+    # the cutter finds one transmission in noise
+    rnd = random.Random(1)
+    cut = streams.Cutter()
+    pcm = array.array("h", [int(rnd.gauss(0, 60)) for _ in range(16000)]
+                      + [int(3000 * math.sin(i * .3)) for i in range(24000)]
+                      + [int(rnd.gauss(0, 60)) for _ in range(24000)])
+    calls = cut.feed(pcm)
+    assert len(calls) == 1 and 1.0 < calls[0][0] < 2.0 and 4.5 < calls[0][1] < 5.5
+    now = time.time()
+    cid = streams.save_call(s, now - 30, b"\xff\xfbMP3DATA", now=now)
+    assert radio.has_call(s["key"], cid)
+    assert rdio.fetch_calls(rdio.instance(s["key"]), [cid]) == {cid: (b"\xff\xfbMP3DATA", "audio/mpeg")}
+    r = TestClient(app).get(f"/live/radio/audio/{s['key']}/{cid}")
+    assert r.status_code == 200 and r.content == b"\xff\xfbMP3DATA"
+    streams._live[s["key"]]["since"] = now - 700
+    streams.record_counts(now)
+    act = [a for a in rdio.activity(3600) if a["id"] == f"{s['key']}:1"]
+    assert act and act[0]["calls"] == 1 and act[0]["system"] == "FDNY Manhattan"
+    assert streams.prune(now + 7 * 3600) == 1 and streams.fetch(s["key"], [cid]) == {}
+    streams._streams.clear()

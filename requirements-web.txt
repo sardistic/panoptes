@@ -13,4 +13,5 @@ pydantic-settings==2.10.1
 psycopg[binary]==3.2.9      # optional shared runtime state (APB_STATE_DATABASE_URL)
 
 websockets==15.0.1           # Bluesky firehose; rdio lane (needs >=15 for proxy support)
+miniaudio==1.61                # streams lane: decode scanner MP3 streams to find calls
 python-socks[asyncio]==2.7.1 # rdio lane: websocket connections through the egress SOCKS proxy
