@@ -323,3 +323,22 @@ over one poll interval and capped at 8 pings per system so it reads as activity,
 flash. Transcription is one Gemini reply per clip; the typing effect is presentation
 only. Lines are `clean()`ed exactly like `/calls`.
 
+### 2026-11-19 — Roads from Census TIGERweb; block numbers that exist; street precision
+
+Supersedes the Overpass tile index above, which never fetched a tile on prod: kumi and
+private.coffee timed out or 502'd, and overpass-api.de answered 406 or hung (even a
+one-node query). TIGERweb's Transportation MapServer (layers 2 primary, 6 secondary,
+8 local; fields BASENAME, RTTYP) answers in ~0.2 s from prod. A lookup asks for both
+roads in the search box, intersects the centre lines (plus 12 m end-point touches for
+T-junctions) and caches the answer (hits 90 d, misses 7 d; errors not cached). US only
+— the Toronto systems stay town-level.
+
+Most town-level threads were block addresses the Census geocoder rejected: "600 block of
+Bannon St" became "600 Bannon St", outside every address range, while "601" matches.
+`address_variants` now tries n, n+1, n+50, n+51 (0-block -> 1, 2, 50, 51) and Census
+answers are cached 6 h. New precision `street` (between intersection and town): one named
+road whose stretch in the search box spans <= 3 km. `split_where` drops travel words
+(westbound, ramp, exit) and also splits on "east of" / "between". Dry run on a copy of
+prod data moved 6 of ~40 unplaced threads on the first pass; Census had transient
+timeouts there, which the 6 h retry covers.
+
