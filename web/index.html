@@ -104,33 +104,39 @@
   .dot{width:7px;height:7px;border-radius:0;background:var(--red);
     box-shadow:none;animation:pulse 1.7s steps(1) infinite}
   @keyframes pulse{0%,55%{opacity:1}56%,100%{opacity:.3}}
-  label.ctl{display:flex;flex-direction:column;gap:4px;
+  .ctl{display:flex;flex-direction:column;gap:4px;
     font:600 8.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   select,button{font-family:var(--font);background:var(--panel-2);color:var(--txt-2);
     border:1px solid var(--line-2);border-radius:3px;padding:0 10px;height:26px;
     font-size:11px;font-weight:500;letter-spacing:.02em;cursor:pointer}
   #window{font-family:var(--mono)}
   button:hover,select:hover{border-color:var(--line-3);color:var(--txt)}
-  select:focus-visible,button:focus-visible,.row:focus-visible,.hchip:focus-visible,.hglbl:focus-visible{
+  select:focus-visible,button:focus-visible,.row:focus-visible{
     outline:2px solid var(--amber);outline-offset:2px}
   button.on{color:var(--txt);border-color:var(--line-3);background:var(--raise)}
   .segwrap{display:flex;gap:6px}
-  /* own deck, right of the side panel; single row that scrolls instead of wrapping */
-  #hazFilter{top:var(--deck-top);left:352px;right:16px;padding:8px 12px;
-    gap:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
-  #hazFilter::-webkit-scrollbar{height:6px}
-  #hazFilter::-webkit-scrollbar-thumb{background:var(--line-3);border-radius:3px}
-  .hazfilter{display:flex}
-  .hgrp{display:flex;gap:4px;align-items:center;padding-right:8px;border-right:1px solid var(--line-2);flex:0 0 auto}
-  .hgrp:last-child{border-right:none}
-  .hglbl{font:700 8px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;
-    color:var(--dim);cursor:pointer;margin-right:2px;white-space:nowrap}
-  .hglbl:hover{color:var(--txt-2)}
-  .hazfilter .hchip{font:600 9px/1 var(--font);letter-spacing:.1em;text-transform:uppercase;
-    padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;cursor:pointer;flex:0 0 auto;
-    color:var(--dim);background:var(--panel-2);display:flex;align-items:center;gap:5px;opacity:.45;white-space:nowrap}
-  .hazfilter .hchip.on{opacity:1;color:var(--txt-2);border-color:var(--line-3)}
-  .hazfilter .hchip i{width:7px;height:2px;background:var(--hcc);display:inline-block}
+  /* layers: one button per domain; a domain opens its panel of layers */
+  .domains{display:flex;gap:4px;flex-wrap:wrap}
+  .domains button{display:flex;align-items:center;gap:0;text-transform:uppercase;letter-spacing:.08em;font-size:10px;font-weight:600;padding:0 9px}
+  .domains button .cnt{font:600 9px/1 var(--mono);color:var(--amber);margin-left:5px;letter-spacing:0}
+  .domains button.open{border-color:var(--amber);color:var(--txt)}
+  .domains button.some .led{background:var(--amber)}
+  .domains button.on .led,.domains button.all .led{background:var(--red)}
+  #layerPop{position:fixed;z-index:1200;width:300px;max-height:min(70vh,520px);overflow:auto;padding:8px 0 6px}
+  #layerPop[hidden]{display:none}
+  #layerPop .lp-h{display:flex;align-items:center;justify-content:space-between;padding:2px 12px 8px;
+    border-bottom:1px solid var(--line);font:700 9px/1 var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--txt)}
+  #layerPop .lp-h button{height:20px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:0 8px}
+  #layerPop .lp-sub{padding:9px 12px 3px;font:600 8px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer)}
+  #layerPop .li{display:grid;grid-template-columns:12px 10px 1fr;column-gap:6px;align-items:center;width:100%;height:auto;
+    border:0;border-radius:0;background:none;padding:6px 12px;text-align:left;color:var(--dim)}
+  #layerPop .li:hover{background:rgba(120,140,165,.06);color:var(--txt-2)}
+  #layerPop .li.on{color:var(--txt)}
+  #layerPop .li .led{margin:0}
+  #layerPop .li .sw{width:9px;height:2px;background:var(--hcc,transparent)}
+  #layerPop .li .nm{font:600 10.5px/1.2 var(--font);letter-spacing:.04em}
+  #layerPop .li .ds{grid-column:3;font:400 9.5px/1.35 var(--font);color:var(--dimmer);margin-top:2px}
+  #layerPop .li.on .ds{color:var(--dim)}
   .led{width:6px;height:6px;border-radius:0;background:var(--dimmer);display:inline-block;
     margin-right:6px;vertical-align:middle}
   button.on .led{background:var(--red)}
@@ -263,7 +269,6 @@
     animation:surgepulse 2.8s ease-in-out infinite}
   @keyframes surgepulse{0%,100%{transform:rotate(45deg) scale(.72);opacity:.42}50%{transform:rotate(45deg) scale(1.15);opacity:.88}}
 
-  button#hazardsBtn.on .led{background:#37c0d8}
   button#warningsBtn.on .led{background:#d98a2b}
   button#envBtn.on .led{background:#718b88}
   button#goesBtn.on .led{background:#7fb8e0}
@@ -426,11 +431,11 @@
     #top .sub,#footer,#envReadout{display:none}
     .pills .slot{width:170px;flex-basis:170px}
     #top .ctl{flex:1 1 42%;min-width:130px}
-    #top .ctl:has(.segwrap){flex-basis:100%}
-    .segwrap{flex-wrap:wrap}
+    #top .ctl:has(.domains){flex-basis:100%}
+    .domains{flex-wrap:wrap}
     #top select{width:100%;max-width:none}
     #side{left:8px;right:8px;bottom:8px;top:auto;width:auto;height:34vh;max-height:310px}
-    #hazFilter{left:8px;right:8px;top:calc(31vh + 18px);max-height:18vh;overflow:auto}
+    #layerPop{left:8px!important;right:8px;width:auto}
     .leaflet-top.leaflet-right{top:35vh;right:8px}
     .leaflet-control-attribution{margin:0 0 calc(34vh + 14px) 8px!important;font-size:7px!important}
   }
@@ -474,8 +479,10 @@
     margin-top:5px;cursor:pointer;animation:rbubin .3s ease-out}
   #radioTicker .tl b{color:#bfeee9;font-weight:600;text-transform:capitalize}
   #radioTicker .tl.hot b{color:#ff6a50}
-  #radioTicker .tl .m{display:block;font:500 9px/1.2 var(--mono);color:var(--dim)}
-  #radioTicker.min .tl{display:none}
+  #radioTicker .tl .m{display:block;font:500 9px/1.2 var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #radioTicker .tl .x{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #radioTicker.min .tls{display:none}
+  #radioTicker .tls{max-height:190px;overflow:hidden}
   @media (max-width:760px){ #radioTicker{left:8px;right:8px;width:auto;bottom:calc(34vh + 14px)}
     #radioTicker .tl:nth-of-type(n+3){display:none} .rbub .b{width:190px} }
 
@@ -511,18 +518,18 @@
     <option value="0.4">ELEVATED ≥0.40</option>
     <option value="0.7">HIGH ≥0.70</option>
   </select></label>
-  <label class="ctl">Layers<span class="segwrap">
-    <button id="spikesBtn" class="on" aria-pressed="true" title="emphasize high-threat activity"><span class="led"></span>SPIKES</button>
-    <button id="surgesBtn" class="on" aria-pressed="true" title="surge-anomaly alerts"><span class="led"></span>SURGES</button>
-    <button id="warningsBtn" class="on" aria-pressed="true" title="active NWS warning footprints"><span class="led"></span>WARNINGS</button>
-    <button id="hazardsBtn" aria-pressed="false" title="quakes, weather, wildfire, traffic, aircraft, declarations"><span class="led"></span>HAZARDS</button>
-    <button id="envBtn" class="on" aria-pressed="true" title="combined thermal, moisture, rain, UV and air-quality field"><span class="led"></span>ENV</button>
-    <button id="radarBtn" aria-pressed="false" title="live CONUS NEXRAD base reflectivity"><span class="led"></span>RADAR</button>
-    <button id="goesBtn" aria-pressed="false" title="satellite: live GOES GeoColor clouds (~10 min old) zoomed out, Esri World Imagery detail zoomed in"><span class="led"></span>GOES</button>
-    <button id="camerasBtn" aria-pressed="false" title="public live cameras — DOT / traffic first (stills + HLS streams)"><span class="led"></span>CAMERAS</button>
-    <button id="radioBtn" class="on" aria-pressed="true" title="public-safety radio systems heard by volunteer scanners: call counts only, sized by how busy each system is right now"><span class="led"></span>RADIO</button>
-    <button id="notableBtn" class="on" aria-pressed="true" title="cells where the latest facts pass raised a flag: thresholds or the 95th percentile of the place's own history"><span class="led"></span>NOTABLE</button>
-  </span></label>
+  <div class="ctl">Layers<span class="domains" id="domains" role="toolbar" aria-label="map layers by domain"></span></div>
+  <span id="layerBin" hidden>
+    <button id="spikesBtn" class="on" aria-pressed="true" data-desc="lift high-threat incidents above the field"><span class="led"></span>Spikes</button>
+    <button id="surgesBtn" class="on" aria-pressed="true" data-desc="places reporting far more than their normal"><span class="led"></span>Surges</button>
+    <button id="notableBtn" class="on" aria-pressed="true" data-desc="places past a threshold or their own 95th percentile"><span class="led"></span>Notable</button>
+    <button id="warningsBtn" class="on" aria-pressed="true" data-desc="active NWS warning footprints"><span class="led"></span>Warnings</button>
+    <button id="radarBtn" aria-pressed="false" data-desc="live NEXRAD reflectivity, every 5 min"><span class="led"></span>Radar</button>
+    <button id="goesBtn" aria-pressed="false" data-desc="GOES clouds zoomed out, imagery zoomed in"><span class="led"></span>Satellite</button>
+    <button id="envBtn" class="on" aria-pressed="true" data-desc="heat, moisture, rain, UV and air as one field"><span class="led"></span>Conditions</button>
+    <button id="camerasBtn" aria-pressed="false" data-desc="public DOT and traffic cameras"><span class="led"></span>Cameras</button>
+    <button id="radioBtn" class="on" aria-pressed="true" title="public-safety radio: incidents heard on volunteer scanners, live calls and transcriptions"><span class="led"></span>Radio</button>
+  </span>
   <span class="spacer"></span>
   <span class="pills">
     <span class="slot">
@@ -537,8 +544,7 @@
 
 <div id="envReadout" hidden></div><!-- kept for the explainer's context string; never shown -->
 
-<!-- Hazard family filter: its own single-row deck (shown only while HAZARDS is on) -->
-<div id="hazFilter" class="hud hazfilter" style="display:none"></div>
+<div id="layerPop" class="hud" role="dialog" aria-label="layers" hidden></div>
 
 <div id="side" class="hud">
   <div id="sideTabs" role="tablist">
@@ -1437,15 +1443,16 @@ function draw(){
   const z = map.getZoom();
   activityPoints=scoped;
   drawActivityField();
+  const radioOwned=d=>showRadio&&/^radio_[0-9a-f]{10}$/.test(d.metro||'');
   scoped.slice().sort((a,b)=>(b.threat_score-a.threat_score)||((b.ts||0)-(a.ts||0)))
     .slice(0,250).forEach(d=>{
-    if(z<12 || (!showSpikes && d.threat_score>=HIGH_THREAT)) return;
+    if(z<12 || (!showSpikes && d.threat_score>=HIGH_THREAT) || radioOwned(d)) return;
     incidentTick(d,z).addTo(markers);
   });
   // severe incidents keep a live ember at every zoom — the field's focal heartbeats,
   // angular like the rest of the glyph language, desynced so they never strobe together
   sparkLayer.clearLayers();
-  if(showSpikes) scoped.filter(d=>d.threat_score>=HIGH_THREAT)
+  if(showSpikes) scoped.filter(d=>d.threat_score>=HIGH_THREAT&&!radioOwned(d))
     .sort((a,b)=>b.threat_score-a.threat_score).slice(0,40).forEach(d=>{
       const s=4+d.threat_score*4, col=sevColor(d.threat_score);
       L.marker([d.lat,d.lon],{icon:L.divIcon({className:'spark',
@@ -1686,8 +1693,15 @@ function hazCat(d){
     default: return d.type==='traffic'?'traffic':'weather';
   }
 }
-// Per-family visibility. All on by default; toggled via the filter chips.
-const hazCats = new Set(Object.keys(HAZ_STYLE));
+// Per-category visibility: every hazard category is its own layer (in its domain's
+// panel), off until chosen. Hazard data loads while any category is on.
+const hazCats = new Set();
+async function setHazCat(cat,on){
+  on?hazCats.add(cat):hazCats.delete(cat);
+  const want=hazCats.size>0;
+  if(want!==showHazards){ showHazards=want; if(want) await loadHazards(); else { hazardData=[]; hazardLayer.clearLayers(); } }
+  draw(); syncDomains(); scheduleUrl();
+}
 async function loadHazards(){
   if(!showHazards){ hazardData=[]; return; }
   const w = Math.max(EMERGING_HOURS, +winHours());
@@ -1728,7 +1742,7 @@ function drawHazards(){
   if(!showHazards&&!showWarnings) return;
   const b=map.getBounds();
   const rows=[...(showWarnings?warningData:[]),...(showHazards?hazardData:[])];
-  rows.filter(d=>b.contains([d.lat,d.lon]) && hazCats.has(d._cat))
+  rows.filter(d=>b.contains([d.lat,d.lon]) && (d.source==='nws'||hazCats.has(d._cat)))
     .sort((a,b)=>(b.threat_score||0)-(a.threat_score||0)).slice(0,260).forEach(d=>{
     const st = HAZ_STYLE[d._cat] || HAZ_STYLE.weather;
     const tooltip=`${esc(d.event||st.label)}${d.source?' · '+esc(d.source):''}`;
@@ -1807,12 +1821,13 @@ function pingNew(pts){
   if(!primed){ pts.forEach(d=>seenIds.add(d.call_id)); primed=true; return; }
   const fresh = pts.filter(d=>!seenIds.has(d.call_id));
   fresh.forEach(d=>seenIds.add(d.call_id));
-  fresh.slice(0,80).forEach(d=>{
+  const spread=Math.min(12000,600*fresh.length);       // a refresh's new incidents arrive one by one
+  fresh.slice(0,80).forEach((d,i,arr)=>setTimeout(()=>{
     const sev=d.threat_score>=0.7?'hi':d.threat_score>=0.45?'mid':'';
     const m=L.marker([d.lat,d.lon],{icon:L.divIcon({className:'ping '+sev,
       html:'<span></span>',iconSize:[0,0]}),interactive:false}).addTo(pingLayer);
     setTimeout(()=>pingLayer.removeLayer(m),2100);
-  });
+  },arr.length>1?Math.round(i/(arr.length-1)*spread+Math.random()*300):0));
   if(fresh.length){
     const c=document.getElementById('count'), tag=document.createElement('span');
     tag.textContent=` +${fresh.length} new`;
@@ -1893,6 +1908,9 @@ function onEmergingClick(c){
 }
 
 async function openIncident(d){
+  if(/^rthr[0-9a-f]{12}$/.test(d.call_id||'')){       // a radio incident: its call timeline
+    const t=radioThreads.find(x=>x.id===String(d.call_id).slice(4)); if(t){ openThread(t); return; }
+  }
   let feeds=[];
   try{ feeds = await (await fetch(`/feeds?lat=${d.lat}&lon=${d.lon}&radius_m=1000`)).json(); }catch(e){}
   const cls=sevClass(d.threat_score);
@@ -1944,60 +1962,102 @@ document.getElementById('surgesBtn').onclick=e=>{
   e.currentTarget.setAttribute('aria-pressed',String(showSurges));
   if(!showSurges) alertLayer.clearLayers(); else if(isNational()) loadAlerts();
 };
-// Filter chips grouped by domain (built once; shown only while HAZARDS is on).
-// Clicking a group label toggles every chip in that group.
-const HAZ_GROUPS = [
-  ["Storm",  ["weather","severe","tornado","winter","heat","tsunami","cyclone"]],
-  ["Water",  ["flood","marine","maritime"]],
-  ["Fire/Air",["fire","smoke","airquality","volcano","quake"]],
-  ["Transport",["traffic","aircraft","tfr","delay","rail"]],
-  ["Infra",  ["outage","declaration","disaster"]],
-  ["Civil",  ["unrest","civil"]],
+// ── layers by domain ──
+// The deck shows one button per domain; a domain opens a panel of its layers. Rasters,
+// warnings and hazard categories sit together by what they are about (radar is weather;
+// vessels are water), not by which feed they come from. Radio is a direct toggle.
+const DOMAINS=[
+  ['activity','Activity',[['btn','spikesBtn'],['btn','surgesBtn'],['btn','notableBtn']]],
+  ['weather','Weather',[['sub','Overlays'],['btn','warningsBtn'],['btn','radarBtn'],['btn','goesBtn'],['btn','envBtn'],
+    ['sub','Events'],['haz','severe'],['haz','tornado'],['haz','winter'],['haz','heat'],['haz','cyclone'],['haz','weather']]],
+  ['water','Water',[['haz','flood'],['haz','marine'],['haz','tsunami'],['haz','maritime']]],
+  ['fireair','Fire & Air',[['haz','fire'],['haz','smoke'],['haz','airquality']]],
+  ['earth','Earth',[['haz','quake'],['haz','volcano'],['haz','disaster']]],
+  ['transport','Transport',[['haz','traffic'],['haz','aircraft'],['haz','tfr'],['haz','delay'],['haz','rail'],['btn','camerasBtn']]],
+  ['infra','Infrastructure',[['haz','outage'],['haz','internet'],['haz','declaration']]],
+  ['civil','Civil',[['haz','civil'],['haz','unrest']]],
 ];
-(function buildHazChips(){
-  const bar=document.getElementById('hazFilter');
-  const chipFor=cat=>{
-    const st=HAZ_STYLE[cat]; if(!st) return null;
-    const chip=document.createElement('span');
-    chip.className='hchip on'; chip.dataset.cat=cat;
-    chip.tabIndex=0; chip.setAttribute('role','button'); chip.setAttribute('aria-pressed','true');
-    chip.style.setProperty('--hcc',st.c);
-    chip.innerHTML=`<i></i>${st.label.split(' ')[0]}`;
-    chip.title=st.label;
-    chip.onclick=()=>{
-      if(hazCats.has(cat)) hazCats.delete(cat); else hazCats.add(cat);
-      chip.classList.toggle('on',hazCats.has(cat));
-      chip.setAttribute('aria-pressed',String(hazCats.has(cat)));
-      drawHazards();              // filter already-loaded data, no refetch
-    };
-    chip.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); chip.click(); } };
-    return chip;
-  };
-  HAZ_GROUPS.forEach(([name,cats])=>{
-    const grp=document.createElement('span'); grp.className='hgrp';
-    const lbl=document.createElement('span'); lbl.className='hglbl'; lbl.textContent=name;
-    lbl.tabIndex=0; lbl.setAttribute('role','button');
-    const chips=cats.map(chipFor).filter(Boolean);
-    lbl.onclick=()=>{                // group toggle: all-off if any on, else all-on
-      const anyOn=cats.some(c=>hazCats.has(c));
-      cats.forEach((c,i)=>{ anyOn?hazCats.delete(c):hazCats.add(c);
-        if(chips[i]){ chips[i].classList.toggle('on',hazCats.has(c));
-          chips[i].setAttribute('aria-pressed',String(hazCats.has(c))); } });
-      drawHazards();
-    };
-    lbl.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); lbl.click(); } };
-    grp.appendChild(lbl); chips.forEach(c=>grp.appendChild(c));
-    bar.appendChild(grp);
+const HAZ_DESC={severe:'SPC storm reports, SIGMETs',tornado:'tornado reports',winter:'snow, ice, wind chill',
+  heat:'heat advisories',cyclone:'NHC tropical systems',weather:'other weather events',flood:'USGS gauges, GDACS floods',
+  marine:'buoys and marine hazards',tsunami:'tsunami alerts',maritime:'AIS vessel traffic',fire:'FIRMS hotspots, NIFC, GDACS',
+  smoke:'HMS smoke plumes',airquality:'AirNow, OpenAQ',quake:'USGS, EMSC',volcano:'volcano alerts, ash SIGMETs',
+  disaster:'GDACS disasters',traffic:'511 incidents',aircraft:'ADS-B, emergency squawks',tfr:'FAA flight restrictions',
+  delay:'FAA airport delays',rail:'Amtrak delays',outage:'power outages',internet:'Cloudflare Radar outages',
+  declaration:'FEMA declarations',civil:'IPAWS civil emergencies',unrest:'ACLED events'};
+const hazBtns=new Map();
+function hazButton(cat){
+  const st=HAZ_STYLE[cat]; if(!st) return null;
+  const b=document.createElement('button'); b.className='li'; b.dataset.cat=cat; b.setAttribute('aria-pressed','false');
+  const name=st.label.charAt(0)+st.label.slice(1).toLowerCase();
+  b.innerHTML=`<span class="led"></span><span class="sw" style="--hcc:${st.c}"></span><span class="nm">${esc(name)}</span><span class="ds">${esc(HAZ_DESC[cat]||'')}</span>`;
+  b.onclick=()=>{ const on=!hazCats.has(cat); b.classList.toggle('on',on); b.setAttribute('aria-pressed',String(on)); setHazCat(cat,on); };
+  hazBtns.set(cat,b); return b;
+}
+function layerRow(id){                         // restyle a layer button as a panel row (same element)
+  const b=document.getElementById(id); if(!b) return null;
+  if(!b.classList.contains('li')){
+    const name=b.textContent.trim(), desc=b.dataset.desc||'';
+    b.classList.add('li'); b.removeAttribute('title');
+    b.innerHTML=`<span class="led"></span><span class="sw"></span><span class="nm">${esc(name)}</span><span class="ds">${esc(desc)}</span>`;
+  }
+  return b;
+}
+const domainItems=new Map(), domainBtns=new Map();
+let openDomain=null;
+(function buildDomains(){
+  const bar=document.getElementById('domains');
+  DOMAINS.forEach(([key,label,items])=>{
+    const els=items.map(([kind,v])=>{
+      if(kind==='sub'){ const d=document.createElement('div'); d.className='lp-sub'; d.textContent=v; return d; }
+      return kind==='btn'?layerRow(v):hazButton(v);
+    }).filter(Boolean);
+    domainItems.set(key,els);
+    const b=document.createElement('button'); b.className='dom'; b.dataset.d=key;
+    b.setAttribute('aria-haspopup','dialog'); b.setAttribute('aria-expanded','false');
+    b.innerHTML=`<span class="led"></span>${esc(label)}<span class="cnt"></span>`;
+    b.onclick=ev=>{ ev.stopPropagation(); openDomain===key?closeLayerPop():openLayerPop(key,label); };
+    domainBtns.set(key,b); bar.appendChild(b);
   });
+  const radio=document.getElementById('radioBtn'); bar.appendChild(radio);   // a direct toggle
+  // some layers switch themselves (satellite follows zoom): watch state, not clicks
+  const mo=new MutationObserver(()=>{ clearTimeout(mo.t); mo.t=setTimeout(syncDomains,0); });
+  domainItems.forEach(els=>els.forEach(el=>{ if(el.classList.contains('li')) mo.observe(el,{attributes:true,attributeFilter:['class']}); }));
+  syncDomains();
 })();
-document.getElementById('hazardsBtn').onclick=async e=>{
-  showHazards=!showHazards; e.currentTarget.classList.toggle('on',showHazards);
-  e.currentTarget.setAttribute('aria-pressed',String(showHazards));
-  document.getElementById('hazFilter').style.display=showHazards?'flex':'none';
-  if(!showHazards){ hazardData=[]; hazardLayer.clearLayers(); }
-  else { await loadHazards(); }
-  draw();                         // quakes/weather/wildfire/traffic/aircraft/declarations layer
-};
+function openLayerPop(key,label){
+  const pop=document.getElementById('layerPop'), btn=domainBtns.get(key);
+  domainBtns.forEach(b=>{ b.classList.remove('open'); b.setAttribute('aria-expanded','false'); });
+  btn.classList.add('open'); btn.setAttribute('aria-expanded','true');
+  pop.innerHTML=`<div class="lp-h">${esc(label)}<button class="lp-all">all</button></div>`;
+  domainItems.get(key).forEach(el=>pop.appendChild(el));
+  pop.querySelector('.lp-all').onclick=()=>{
+    const rows=domainItems.get(key).filter(el=>el.classList.contains('li'));
+    const anyOn=rows.some(el=>el.classList.contains('on'));
+    rows.forEach(el=>{ if(el.classList.contains('on')===anyOn) el.click(); });
+    pop.querySelector('.lp-all').textContent=anyOn?'all':'none';
+  };
+  pop.querySelector('.lp-all').textContent=domainItems.get(key).some(el=>el.classList&&el.classList.contains('on'))?'none':'all';
+  pop.hidden=false; openDomain=key;
+  const r=btn.getBoundingClientRect();
+  pop.style.top=`${Math.round(r.bottom+6)}px`;
+  pop.style.left=`${Math.round(Math.min(r.left,window.innerWidth-pop.offsetWidth-12))}px`;
+}
+function closeLayerPop(){
+  const pop=document.getElementById('layerPop'); pop.hidden=true; openDomain=null;
+  domainBtns.forEach(b=>{ b.classList.remove('open'); b.setAttribute('aria-expanded','false'); });
+}
+document.addEventListener('click',ev=>{ if(openDomain&&!ev.target.closest('#layerPop')&&!ev.target.closest('.domains')) closeLayerPop(); });
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape'&&openDomain){ const k=openDomain; closeLayerPop(); domainBtns.get(k).focus(); } });
+window.addEventListener('resize',()=>{ if(openDomain) closeLayerPop(); });
+function syncDomains(){
+  domainItems.forEach((els,key)=>{
+    const rows=els.filter(el=>el.classList.contains('li')), n=rows.filter(el=>el.classList.contains('on')).length;
+    const b=domainBtns.get(key);
+    b.classList.toggle('all',n>0&&n===rows.length); b.classList.toggle('some',n>0&&n<rows.length);
+    b.querySelector('.cnt').textContent=n?String(n):'';
+    b.title=n?`${n} of ${rows.length} layers on`:'no layers on';
+  });
+}
 document.getElementById('warningsBtn').onclick=async e=>{
   showWarnings=!showWarnings;e.currentTarget.classList.toggle('on',showWarnings);
   e.currentTarget.setAttribute('aria-pressed',String(showWarnings));
@@ -2733,37 +2793,44 @@ function radioPoints(){
 function drawRadio(){
   radioLayer.clearLayers(); if(!showRadio) return;
   const b=map.getBounds().pad(.1);
+  const zz=map.getZoom();
   radioPoints().forEach(([r,at])=>{
     if(!b.contains(at)) return;
     const hot=r.z!=null&&r.z>=3&&r.calls>=8;
-    // antenna glyph: a mast, with one to three pairs of signal arcs by how busy it is
-    const rate=r.per10||0, s=9+Math.min(7,Math.sqrt(rate)*.6), col=hot?'#e0412c':'#4fd1c5', zz=map.getZoom();
-    const o=(dx,dy)=>screenOffset(at[0],at[1],dx,dy,zz);
-    const lines=[[[0,s],[0,-s*.25]],[[-s*.28,s],[s*.28,s]]];
-    const waves=rate>=40?3:rate>=8?2:rate>0?1:0;
-    for(let w=1;w<=waves;w++){ const x=s*(.3+.3*w), y=s*(.25+.2*w);
-      lines.push([[-x*.75,-s*.25-y],[-x,-s*.25],[-x*.75,-s*.25+y]],[[x*.75,-s*.25-y],[x,-s*.25],[x*.75,-s*.25+y]]); }
-    const m=L.featureGroup(lines.map(l=>L.polyline(l.map(q=>o(q[0],q[1])),{color:col,weight:hot?2.1:1.5,
-      opacity:rate>0?.95:.5,lineJoin:'miter',dashArray:r.approx?'3 3':null,interactive:true})));
+    if(zz<7&&!hot) return;                            // zoomed out: only surging systems
+    // a listening post, kept quiet: a short mast on a foot; a surging system gains one
+    // pair of angular arcs. Events heard on it are drawn as events, not as the antenna.
+    const s=5, col=hot?'#e8b04a':'#5fa9a3', o=(dx,dy)=>screenOffset(at[0],at[1],dx,dy,zz);
+    const lines=[[[0,s],[0,-s*.7]],[[-s*.45,s],[s*.45,s]]];
+    if(hot) lines.push([[-s*.55,-s*1.25],[-s*.9,-s*.7],[-s*.55,-s*.15]],[[s*.55,-s*1.25],[s*.9,-s*.7],[s*.55,-s*.15]]);
+    const m=L.featureGroup(lines.map(l=>L.polyline(l.map(q=>o(q[0],q[1])),{color:col,weight:hot?1.8:1.2,
+      opacity:hot?.95:((r.per10||0)>0?.7:.4),lineJoin:'miter',dashArray:r.approx?'2 2':null,interactive:true})));
     m.bindTooltip(`<b>${esc(r.system)}</b><br/>${radioRate(r)}`,{direction:'top',className:'radio-tip'});
     m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
   });
-  drawRadioAreas(b);
   drawRadioThreads(b);
 }
 // incidents heard on the radio: linked calls of one event, on the ~2 km cell their
 // place resolved to. A downward chevron (a pin, angular); dashed when only the town is
 // known; red when urgent; bigger with more calls. Click for the call timeline.
 const PRECISION={address:'from a block address',intersection:'from an intersection',street:'from the street named',town:'town only'};
+// A radio incident is an event like any other: the incident tick in its severity colour,
+// with one pair of angular brackets — "heard on the air" — that widen as calls link in.
+// Town-only placement dashes the brackets; a cleared incident goes grey.
+function radioEventGlyph(t,z){
+  const p=+t.priority||0.3, n=(t.calls||[]).length, col=t.status==='cleared'?'#7c8a93':sevColor(p);
+  const px=4+p*6, b=px*.6, gx=4+Math.min(4,n*.5), at=(dx,dy)=>screenOffset(t.lat,t.lon,dx,dy,z);
+  const lines=[[[0,-px],[0,px]],[[-gx,-b],[-gx-2.5,0],[-gx,b]],[[gx,-b],[gx+2.5,0],[gx,b]]];
+  return L.featureGroup(lines.map((l,i)=>L.polyline(l.map(q=>at(q[0],q[1])),{color:col,
+    weight:i?1.1:(p>=HIGH_THREAT?2.4:1.7),opacity:i?.75:.95,lineCap:'square',lineJoin:'miter',
+    dashArray:i&&t.precision==='town'?'2 2':null,interactive:true})));
+}
 function drawRadioThreads(b){
   radioThreads.forEach(t=>{
     if(t.lat==null||!b.contains([t.lat,t.lon])) return;
-    const zz=map.getZoom(), n=(t.calls||[]).length, s=6+Math.min(6,n*.8), hi=(t.priority||0)>=0.6;
-    const col=t.status==='cleared'?'#7c8a93':hi?'#e0412c':'#e8b04a';
-    const o=(dx,dy)=>screenOffset(t.lat,t.lon,dx,dy,zz);
-    const g=L.featureGroup([[[-s,-s*1.6],[0,0],[s,-s*1.6]],[[-s*.55,-s*1.6],[0,-s*.7],[s*.55,-s*1.6]]].map(l=>
-      L.polyline(l.map(q=>o(q[0],q[1])),{color:col,weight:hi?2:1.5,opacity:.95,lineJoin:'miter',
-        dashArray:t.precision==='town'?'3 3':null,interactive:true})));
+    const zz=map.getZoom(), n=(t.calls||[]).length;
+    if(zz<6&&(t.priority||0)<0.6) return;             // zoomed out: urgent ones only
+    const g=radioEventGlyph(t,zz);
     g.bindTooltip(`<b>${esc(t.title)}</b> · ${esc(t.area||'')}<br/>${esc(n)} linked call${n===1?'':'s'} · ${esc(ago(t.last_ts))}${t.status==='cleared'?' · cleared':''}`,
       {direction:'top',className:'radio-tip'});
     g.on('click',()=>openThread(t)); g.addTo(radioLayer);
@@ -2795,22 +2862,7 @@ function threadsHtml(r){
   return `<div class="rareas"><div class="ra-h">Incidents heard · linked calls</div>`
     +ts.map(t=>`<div class="ra th${(t.priority||0)>=0.6?' hi':''}" data-th="${esc(t.id)}"><b>${esc(t.title)}</b> — ${esc(t.area||'')} · ${esc((t.calls||[]).length)} calls · ${esc(ago(t.last_ts))}</div>`).join('')+`</div>`;
 }
-// what is going on where, summarised from a system's transcribed calls: an open square
-// on the ~2 km cell (never an address), hover for the line, click for the system
-const AREA_DEG=0.02;
-function drawRadioAreas(b){
-  const sysById=new Map(radioRows.map(r=>[r.id,r]));
-  radioAreas.forEach(s=>(s.areas||[]).forEach(a=>{
-    if(a.lat==null||!b.contains([a.lat,a.lon])) return;
-    const h=AREA_DEG/2, hi=a.priority>=0.6, col=hi?'#e0412c':'#4fd1c5';
-    const sq=L.polyline([[a.lat-h,a.lon-h],[a.lat-h,a.lon+h],[a.lat+h,a.lon+h],[a.lat+h,a.lon-h],[a.lat-h,a.lon-h]],
-      {color:col,weight:hi?1.6:1.1,opacity:.8,dashArray:'2 3',lineJoin:'miter',interactive:true});
-    sq.bindTooltip(`<b>${esc(a.area)}</b> · ${esc(s.system||'radio')} · ${esc(ago(s.ts))}<span class="ra-act">${esc(a.activity)}</span>`,
-      {direction:'top',className:'radio-tip'});
-    const r=sysById.get(s.id); if(r) sq.on('click',()=>openRadio(r));
-    sq.addTo(radioLayer);
-  }));
-}
+// what is going on where, summarised from a system's transcribed calls (system popup only)
 function areasHtml(r){
   const s=radioAreas.get(r.id); if(!s||!(s.areas||[]).length) return '';
   return `<div class="rareas"><div class="ra-h">What's going on · from ${esc(s.calls)} transcribed calls · ${esc(ago(s.ts))}</div>`
@@ -2895,8 +2947,8 @@ function drawRadioList(){
 }
 document.getElementById('radioBtn').onclick=e=>{
   showRadio=!showRadio; e.currentTarget.classList.toggle('on',showRadio); e.currentTarget.setAttribute('aria-pressed',String(showRadio));
-  if(showRadio) loadRadio(); else { drawRadio(); radioFx.clearLayers(); radioSayQ.length=0; radioSaying=0; }
-  radioTickerDraw();
+  if(showRadio) loadRadio(); else { drawRadio(); radioQuiet(); }
+  draw(); radioTickerDraw();
 };
 // ── live radio ──
 // Polls /live/radio/feed every few seconds. Each call the lanes newly saw pings its system's
@@ -2907,8 +2959,12 @@ document.getElementById('radioBtn').onclick=e=>{
 // linker just wrote flashes. Cleaned lines only, as everywhere else.
 const RADIO_FEED_MS=5000, radioFx=L.layerGroup().addTo(map), radioSayQ=[], RADIO_MAX_SAY=3;
 const radioCalm=matchMedia('(prefers-reduced-motion:reduce)').matches;
-let radioCursor=null, radioFeedBusy=false, radioSaying=0, tickLines=[], tickCalls=[], tickLast=0;
+let radioCursor=null, radioFeedBusy=false, radioSaying=0, tickCalls=[], tickLast=0, radioTimers=new Set();
+const radioLastPing=new Map(), radioLineQ=[]; let radioLineT=null, tickN=0;
 let tickMin=false; try{ tickMin=localStorage.getItem('radioTickerMin')==='1'; }catch(_){}
+function radioLater(fn,ms){ const t=setTimeout(()=>{ radioTimers.delete(t); fn(); },ms); radioTimers.add(t); }
+function radioQuiet(){ radioTimers.forEach(clearTimeout); radioTimers.clear(); radioLineQ.length=0;
+  clearTimeout(radioLineT); radioLineT=null; radioFx.clearLayers(); radioSayQ.length=0; radioSaying=0; }
 function radioPing(at,cls){
   if(!at||!map.getBounds().pad(.05).contains(at)) return;
   const m=L.marker(at,{icon:L.divIcon({className:'rping'+(cls?' '+cls:''),html:'<span></span>',iconSize:[0,0]}),
@@ -2921,7 +2977,7 @@ function radioSay(l,sysAt){ radioSayQ.push([l,sysAt]); while(radioSayQ.length>8)
 function radioSayNext(){
   while(radioSaying<RADIO_MAX_SAY&&radioSayQ.length){
     const [l,sysAt]=radioSayQ.shift(), at=l.lat!=null?[l.lat,l.lon]:sysAt;
-    if(!at||!map.getBounds().contains(at)) continue;
+    if(!at||map.getZoom()<7||!map.getBounds().contains(at)) continue;   // zoomed out: the strip only
     radioSaying++; radioBubble(l,at,l.lat!=null?sysAt:null);
   }
 }
@@ -2933,7 +2989,7 @@ function radioBubble(l,at,from){
   const tether=from&&(from[0]!==at[0]||from[1]!==at[1])
     ?L.polyline([from,at],{color:col,weight:1,opacity:.7,dashArray:'2 4',interactive:false}).addTo(radioFx):null;
   radioPing(at,hot?'hot':'hi');
-  const el=m.getElement(), t=el.querySelector('.t'), text=l.line;
+  const el=m.getElement(), t=el.querySelector('.t'), text=l.line.length>170?l.line.slice(0,168).replace(/\s+\S*$/,'')+'…':l.line;
   el.querySelector('.b').onclick=ev=>{ L.DomEvent.stop(ev); const r=radioRows.find(x=>x.id===l.sys); if(r) openRadio(r); };
   let i=radioCalm?text.length:0;
   const done=()=>{ const c=el.querySelector('.caret'); if(c) c.remove();
@@ -2943,21 +2999,64 @@ function radioBubble(l,at,from){
   const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length){ clearInterval(tm); done(); } },
     Math.max(14,Math.min(45,5200/text.length)));                  // a line takes ~1.5-3 s to type
 }
-function radioTickerDraw(){
-  const el=document.getElementById('radioTicker'), now=Date.now();
-  tickCalls=tickCalls.filter(x=>now-x<600000);
-  if(!showRadio||(!tickLines.length&&!tickCalls.length)){ el.classList.remove('on'); return; }
-  el.classList.add('on'); el.classList.toggle('min',tickMin);
-  el.innerHTML=`<div class="h" title="new calls and transcriptions as the radio lanes see them — most public scanners are checked every 10 min, focus systems every minute">`
-    +`<span class="lv${now-tickLast<6000?' on':''}"></span>Radio live<span class="n">${esc(tickCalls.length)} calls seen · 10 min ${tickMin?'▸':'▾'}</span></div>`
-    +tickLines.slice(0,4).map((l,i)=>`<div class="tl${(l.priority||0)>=0.6?' hot':''}" data-i="${i}">`
-      +`<span class="m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))}${l.talkgroup?' · '+esc(l.talkgroup):''}</span>`
-      +`<b>${esc(lineKick(l))}</b> — ${esc(l.line)}</div>`).join('');
-  el.querySelector('.h').onclick=()=>{ tickMin=!tickMin; try{ localStorage.setItem('radioTickerMin',tickMin?'1':'0'); }catch(_){} radioTickerDraw(); };
-  el.querySelectorAll('.tl').forEach(n=>n.onclick=()=>{ const l=tickLines[+n.dataset.i], r=radioRows.find(x=>x.id===l.sys);
+// The strip is built once and updated in place: a new line is one new row that slides in;
+// the header's counter changes its text only. Nothing re-renders, so nothing flickers.
+function radioTickerEl(){
+  const el=document.getElementById('radioTicker');
+  if(!el.firstChild){
+    el.innerHTML=`<div class="h" title="new calls and transcriptions as the radio lanes see them — each scanner's calls replay at their real pace, a few minutes behind (most scanners are checked every 10 min, focus systems every minute)">`
+      +`<span class="lv"></span>Radio live<span class="n"></span></div><div class="tls"></div>`;
+    el.querySelector('.h').onclick=()=>{ tickMin=!tickMin; try{ localStorage.setItem('radioTickerMin',tickMin?'1':'0'); }catch(_){} radioTickerDraw(); };
+  }
+  return el;
+}
+function radioTickerAdd(l){
+  const el=radioTickerEl(), list=el.querySelector('.tls'), row=document.createElement('div');
+  row.className='tl'+((l.priority||0)>=0.6?' hot':'');
+  row.innerHTML=`<span class="m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))}${l.talkgroup?' · '+esc(l.talkgroup):''}</span>`
+    +`<span class="x"><b>${esc(lineKick(l))}</b> — ${esc(l.line)}</span>`;
+  row.title=l.line;
+  row.onclick=()=>{ const r=radioRows.find(x=>x.id===l.sys);
     if(l.lat!=null) map.flyTo([l.lat,l.lon],Math.max(map.getZoom(),11));
     else if(r&&r.lat!=null) map.flyTo([r.lat,r.lon],Math.max(map.getZoom(),r.approx?8:10));
-    if(r) setTimeout(()=>openRadio(r),l.lat!=null||r.lat!=null?900:0); });
+    if(r) setTimeout(()=>openRadio(r),l.lat!=null||r.lat!=null?900:0); };
+  list.prepend(row); tickN++;
+  while(list.children.length>4) list.lastElementChild.remove();
+  radioTickerDraw();
+}
+function radioTickerDraw(){
+  const el=radioTickerEl(), now=Date.now();
+  tickCalls=tickCalls.filter(x=>now-x<600000);
+  const on=showRadio&&(tickN>0||tickCalls.length>0);
+  el.classList.toggle('on',on); el.classList.toggle('min',tickMin);
+  if(!on) return;
+  el.querySelector('.lv').classList.toggle('on',now-tickLast<4000);
+  const n=`${tickCalls.length} calls heard · 10 min ${tickMin?'▸':'▾'}`;
+  const ne=el.querySelector('.n'); if(ne.textContent!==n) ne.textContent=n;
+}
+// Lines are released one at a time, a few seconds apart, however many arrive at once.
+function radioLineNext(){
+  radioLineT=null;
+  const nx=radioLineQ.shift(); if(!nx) return;
+  const [l,sysAt]=nx; radioTickerAdd(l); radioSay(l,sysAt); tickLast=Date.now();
+  if(radioLineQ.length) radioLineT=setTimeout(radioLineNext,Math.max(1200,3200-radioLineQ.length*300));
+}
+// One system's calls are replayed at the pace they were made: a scanner polled every 10
+// minutes hands over ten minutes of calls at once; they play back over the next ten
+// minutes instead of firing together. At most one ping per system every 0.7 s.
+function radioReplay(calls,pos){
+  const by=new Map();
+  calls.forEach(c=>{ if(pos.has(c.sys)) (by.get(c.sys)||by.set(c.sys,[]).get(c.sys)).push(c); });
+  by.forEach((cs,sys)=>{
+    cs.sort((a,b)=>a.ts-b.ts);
+    const t0=cs[0].ts, span=Math.max(1,cs[cs.length-1].ts-t0);
+    const scale=span<RADIO_FEED_MS/1000?(RADIO_FEED_MS/1000)/span:Math.min(1,660/span);
+    cs.forEach(c=>radioLater(()=>{
+      const now=Date.now(); tickCalls.push(now); tickLast=now;
+      if(now-(radioLastPing.get(sys)||0)<700) return;
+      radioLastPing.set(sys,now); radioPing(pos.get(sys),c.weight>=0.8?'hi':'');
+    },Math.round((c.ts-t0)*scale*1000)+Math.random()*400));
+  });
 }
 async function radioFeed(){
   if(radioFeedBusy||!showRadio||document.hidden) return;
@@ -2966,19 +3065,15 @@ async function radioFeed(){
     const res=await fetch('/live/radio/feed'+(radioCursor!=null?'?since='+encodeURIComponent(radioCursor):''),{cache:'no-store'});
     if(!res.ok) return;
     const d=await res.json(); radioCursor=d.now;
-    const pos=new Map(radioPoints().map(([r,at])=>[r.id,at])), calls=d.calls||[], lines=d.lines||[], per=new Map();
-    if(calls.length){ tickLast=Date.now(); calls.forEach(()=>tickCalls.push(tickLast)); }
-    calls.forEach((c,i)=>{
-      const n=(per.get(c.sys)||0)+1; per.set(c.sys,n);
-      if(n>8||!pos.has(c.sys)) return;                              // a burst: a few pings say it
-      setTimeout(()=>radioPing(pos.get(c.sys),c.weight>=0.8?'hi':''),Math.round(i/calls.length*RADIO_FEED_MS));
-    });
-    lines.forEach(l=>{ tickLines.unshift(l); radioSay(l,pos.get(l.sys)); });
-    tickLines=tickLines.slice(0,12); if(lines.length) tickLast=Date.now();
+    const pos=new Map(radioPoints().map(([r,at])=>[r.id,at]));
+    radioReplay(d.calls||[],pos);
+    (d.lines||[]).sort((a,b)=>a.ts-b.ts).forEach(l=>radioLineQ.push([l,pos.get(l.sys)]));
+    while(radioLineQ.length>20) radioLineQ.shift();
+    if(radioLineQ.length&&!radioLineT) radioLineNext();
     if((d.threads||[]).length){
       const fresh=new Set(d.threads);
       try{ const r=await fetch('/live/radio/threads',{cache:'no-cache'}); if(r.ok){ radioThreads=await r.json(); drawRadio();
-        radioThreads.filter(t=>fresh.has(t.id)&&t.lat!=null).forEach(t=>radioPing([t.lat,t.lon],'thr')); } }catch(_){}
+        radioThreads.filter(t=>fresh.has(t.id)&&t.lat!=null).forEach((t,i)=>radioLater(()=>radioPing([t.lat,t.lon],'thr'),i*900)); } }catch(_){}
     }
     radioTickerDraw();
   }catch(_){ }finally{ radioFeedBusy=false; }
@@ -3094,7 +3189,7 @@ document.getElementById('tabBoard').onclick=()=>setSideTab(true);
 // The hash mirrors what is on screen (center/zoom, area, window, type, severity,
 // layer toggles) so a URL reproduces the exact view. Written with replaceState so
 // panning never floods history; read once at boot before the first load.
-const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',hazards:'hazardsBtn',
+const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',
   env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn',radio:'radioBtn'};
 let urlT=null, urlReady=false;
 function readViewState(){
@@ -3119,7 +3214,7 @@ function writeViewState(){
   const t=document.getElementById('type').value; if(t) q.set('t',t);
   const sv=document.getElementById('minThreat').value; if(sv!=='0') q.set('s',sv);
   const on=Object.entries(LAYER_BTNS).filter(([,id])=>document.getElementById(id).classList.contains('on')).map(([k])=>k);
-  q.set('l',on.join(','));
+  q.set('l',on.concat([...hazCats].map(c=>'h.'+c)).join(','));
   const hash='#'+q.toString().replace(/%2C/g,',');
   if(hash!==location.hash) history.replaceState(null,'',hash);
 }
@@ -3199,6 +3294,10 @@ document.addEventListener('visibilitychange',()=>{
       const btn=document.getElementById(id);
       if(btn.classList.contains('on')!==st.layers.has(k)) btn.click();
     });
+    const cats=st.layers.has('hazards')?Object.keys(HAZ_STYLE)                 // links from before domains
+      :[...st.layers].filter(k=>k.startsWith('h.')).map(k=>k.slice(2)).filter(c=>HAZ_STYLE[c]);
+    for(const c of cats){ const b=hazBtns.get(c); if(b&&!b.classList.contains('on')) b.click(); }
+    syncDomains();
   }
   await load();
   if(st.type){ const sel=document.getElementById('type'); if([...sel.options].some(o=>o.value===st.type)){ sel.value=st.type; draw(); } }
@@ -3208,7 +3307,7 @@ document.addEventListener('visibilitychange',()=>{
   loadNotable(); setInterval(()=>{ if(!document.hidden) loadNotable(); },300000);
   loadBoard(); boardTimer=setInterval(()=>{ if(!document.hidden) loadBoard(); },60000);
   loadRadio().then(radioFeed); setInterval(()=>{ if(!document.hidden&&(showRadio||boardOn)) loadRadio(); },120000);
-  setInterval(radioFeed,RADIO_FEED_MS); setInterval(radioTickerDraw,15000);
+  setInterval(radioFeed,RADIO_FEED_MS); setInterval(radioTickerDraw,1000);
 })();
 });
 </script>

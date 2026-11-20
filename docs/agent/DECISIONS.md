@@ -342,3 +342,24 @@ road whose stretch in the search box spans <= 3 km. `split_where` drops travel w
 prod data moved 6 of ~40 unplaced threads on the first pass; Census had transient
 timeouts there, which the 6 h retry covers.
 
+### 2026-11-19 — Layers by domain; radio incidents drawn as events; replayed live feed
+
+Owner: radio icons were too much, radio should read as events, the live strip flickered,
+updates arrived in pulses, and the layer deck was organised by feed ("Storm" holding
+weather, radar separate). Now:
+- Deck: one button per domain — Activity, Weather, Water, Fire & Air, Earth, Transport,
+  Infrastructure, Civil — each opening a panel of its layers; Radio is a direct toggle.
+  Radar, satellite, NWS warnings and the conditions field live under Weather; every
+  hazard category is its own toggle (no HAZARDS master, no separate filter bar). The
+  layer buttons keep their ids/handlers and are moved into the panels; a
+  MutationObserver keeps domain counts honest when a layer switches itself. URL `l=`
+  keeps old keys and adds `h.<cat>`; an old `hazards` link turns every category on.
+- Radio systems: a small quiet mast (hidden below zoom 7 unless surging); no waves, no
+  area squares on the map (area lines stay in the system popup). Radio incidents use
+  the incident tick in severity colour with one pair of angular brackets; fused radio
+  incidents are not drawn twice while Radio is on, and open the call timeline.
+- Live feed: each system's burst replays at the pace the calls were made (a 10-minute
+  poll plays back over ~10 minutes), one ping per system per 0.7 s; transcribed lines
+  are released one every 1.2-3.2 s; the strip is built once and only new rows animate;
+  bubbles only from zoom 7. New incident pings spread over up to 12 s.
+
