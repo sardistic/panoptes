@@ -49,3 +49,5 @@ data/rdio_instances.json
 
 # Shodan discovery results hold hobbyists' host addresses — never commit
 data/shodan_*.json
+state/trunkrec_instances.json
+data/trunkrec_instances.json

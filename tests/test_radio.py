@@ -897,3 +897,52 @@ def test_related_endpoint_for_a_radio_thread_never_returns_its_street(db, monkey
     assert body and body[0]["id"] == "x1" and "same street" in body[0]["why"]
     assert "Deep Woods" not in json.dumps([x for x in body if x["kind"] == "radio"])
     assert all(x.get("id") != "rthr0123456789ab" for x in body)
+
+
+def _tr_reply(start_id, n, now):
+    from datetime import datetime, timezone
+    rows = []
+    for k in range(n):
+        cid = start_id + k
+        rows.append({"DT_RowId": cid, "StartTime": datetime.fromtimestamp(now - 60 + k, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
+                     "TargetID": "3335" if k % 2 else "3605", "TargetLabel": "Fire Tac A6" if k % 2 else "Fire Disp Main",
+                     "TargetTag": "", "SourceID": "9112472", "SystemID": "Sac Co", "SystemLabel": "",
+                     "AudioFilename": f"/media/x/{cid}.mp3"})
+    return {"draw": 1, "recordsTotal": 1000, "data": list(reversed(rows))}
+
+
+def test_trunking_recorder_calls_are_recorded_counted_and_playable(db, monkeypatch, tmp_path):
+    from apb.ingest import rdio, trunkrec
+    from apb.store import radio
+    lst = tmp_path / "tr.json"
+    lst.write_text(json.dumps({"instances": [{"base": "https://listen.example.org", "host": "listen.example.org",
+                                              "port": 443, "place": "Sacramento, CA", "state": "open", "systems": ["Sac Co"]},
+                                             {"base": "http://x.example:81", "state": "closed"}]}))
+    monkeypatch.setenv("APB_TRUNKREC_LIST", str(lst))
+    insts = trunkrec.load()
+    assert len(insts) == 1 and insts[0]["kind"] == "trunkrec"
+    monkeypatch.setattr(trunkrec, "_insts", insts)
+    inst = insts[0]
+    assert rdio.instance(inst["key"]) is inst
+    now = time.time()
+    assert trunkrec.poll(inst, now, post=lambda i, body: _tr_reply(100, 4, now)) == 0          # first look: baseline
+    sid = trunkrec.system_id("Sac Co")
+    assert rdio.talkgroup(inst["key"], sid, 3605)["tag"] == "Fire Dispatch"
+    assert rdio.talkgroup(inst["key"], sid, 3335)["tag"] == "Fire-Tac"
+    assert trunkrec.poll(inst, now + 120, post=lambda i, body: _tr_reply(100, 7, now + 120)) == 3
+    ids = [c["id"] for c in radio.recent_calls(inst["key"], sid, 20)]
+    assert set(ids) == set(range(100, 107))
+    act = [a for a in rdio.activity(3600) if a["id"] == f"{inst['key']}:{sid}"]
+    assert act and act[0]["calls"] == 3
+    got = trunkrec.fetch(inst, [106], get=lambda url: b"\xff\xfbMP3" if url.endswith("/media/x/106.mp3") else b"")
+    assert got == {106: (b"\xff\xfbMP3", "audio/mpeg")}
+    assert "SourceID" not in json.dumps(radio.recent_calls(inst["key"], sid, 20))
+
+
+def test_trunking_recorder_tag_guess():
+    from apb.ingest.trunkrec import tag_guess
+    assert tag_guess("Sac Metro Fire Disp") == "Fire Dispatch"
+    assert tag_guess("Regional Transit Police Main") == "Law Dispatch"
+    assert tag_guess("Medic Tac 2") == "EMS-Tac"
+    assert tag_guess("Public Works") == "Untagged"
+    assert tag_guess("x", "Law Dispatch|") == "Law Dispatch"

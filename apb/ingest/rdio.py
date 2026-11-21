@@ -271,6 +271,9 @@ def instance(key: str) -> dict | None:
     if hit is None:                                    # a listened Icecast stream (streams lane)
         from apb.ingest import streams
         hit = next((i for i in streams.instances() if i["key"] == key), None)
+    if hit is None:                                    # a Trunking Recorder player (trunkrec lane)
+        from apb.ingest import trunkrec
+        hit = next((i for i in trunkrec.instances() if i["key"] == key), None)
     return hit
 
 
@@ -418,6 +421,9 @@ def fetch_calls(inst: dict, ids: list[int]) -> dict:
     if inst.get("kind") == "stream":                   # cut and stored by the streams lane
         from apb.ingest import streams
         return streams.fetch(inst["key"], ids)
+    if inst.get("kind") == "trunkrec":                 # a Trunking Recorder MP3, via the proxy
+        from apb.ingest import trunkrec
+        return trunkrec.fetch(inst, ids)
     if not proxy() and os.environ.get("APB_RDIO_DIRECT", "") != "1":
         return {}
     if not proxy_ok():
@@ -588,8 +594,8 @@ def _label(inst: dict, system) -> str:
 def activity(max_age_sec: float = 1800.0) -> list[dict]:
     """Latest count per system with its label, place and surprise — for the API."""
     from apb.store import radio
-    from apb.ingest import streams
-    by_key = {i["key"]: i for i in _instances + streams.instances()}
+    from apb.ingest import streams, trunkrec
+    by_key = {i["key"]: i for i in _instances + streams.instances() + trunkrec.instances()}
     out = []
     for r in radio.latest(max_age_sec):
         inst = by_key.get(r["key"])
