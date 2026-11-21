@@ -119,6 +119,12 @@ register to unlock the keyed lanes.
   normal), with rate surges, internet outages and dark feeds. `/live/sitrep` is a
   five-line situation report over it (Gemini, cached 10 min). The map shows both in
   the side panel's **Right now** tab.
+- `/live/summary?period=minute|day|week` backs the **View all** tab with rolling
+  60-second, 24-hour, and 7-day briefs across reporting feeds. It groups new incident
+  reports, fused events, scanner activity and classifications, weather and environmental
+  reports, sampled conditions, wildlife sightings, and notable flags. Counts reflect
+  when Panoptes received the data, so slower feeds can appear in batches. The brief
+  uses stored data and makes zero model calls and zero upstream requests.
 - `/status` — per-lane operational health (rows, freshness, backoff, buffers), plus
   sampler state, the Street View budget and YouTube / Windy daily quota counters.
 - `/status/costs` — what the paid APIs cost: every Gemini call is metered by feature

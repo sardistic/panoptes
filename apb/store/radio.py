@@ -15,12 +15,16 @@ import json
 import sqlite3
 import time
 
+from apb.common.models import IncidentType
 from apb.store import snapshots
 
 _lock = snapshots.db_lock
 _ready = False
 NORM_SEC = 600.0            # counts are compared as calls per ten minutes
 _MIN_BASELINE = 6
+BRIEF_SEC = 8 * 86400
+_BRIEF_KINDS = ("dispatch", "unit", "noise", "tones")
+_BRIEF_TYPES = tuple(kind.value for kind in IncidentType)
 
 
 def _conn() -> sqlite3.Connection:
@@ -45,6 +49,10 @@ def _conn() -> sqlite3.Connection:
             units TEXT, priority REAL, seconds REAL, lat REAL, lon REAL, done_at REAL,
             PRIMARY KEY (key, id));
         CREATE INDEX IF NOT EXISTS idx_rt_ts ON radio_transcripts(ts);
+        CREATE TABLE IF NOT EXISTS radio_classifications (
+            key TEXT NOT NULL, id INTEGER NOT NULL, kind TEXT, type TEXT, ts REAL NOT NULL,
+            PRIMARY KEY (key, id));
+        CREATE INDEX IF NOT EXISTS idx_rcl_ts ON radio_classifications(ts);
         CREATE TABLE IF NOT EXISTS radio_profiles (
             key TEXT NOT NULL, system INTEGER NOT NULL, area TEXT, state TEXT, lat REAL,
             lon REAL, statewide INTEGER, confidence REAL, dispatch_tgs TEXT, profiled_at REAL,
@@ -69,6 +77,15 @@ def _conn() -> sqlite3.Connection:
             c.execute("ALTER TABLE radio_recent ADD COLUMN seen REAL")
         c.execute("CREATE INDEX IF NOT EXISTS idx_rr_seen ON radio_recent(seen)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_rt_done ON radio_transcripts(done_at)")
+        # Older databases can seed the brief from the classifications still on hand.
+        type_params = ",".join("?" for _ in _BRIEF_TYPES)
+        kind_params = ",".join("?" for _ in _BRIEF_KINDS)
+        c.execute(f"""
+            INSERT OR IGNORE INTO radio_classifications
+            SELECT key, id, CASE WHEN kind IN ({kind_params}) THEN kind END,
+                   CASE WHEN incident_type IN ({type_params}) THEN incident_type END, done_at
+            FROM radio_transcripts WHERE status = 'done' AND done_at >= ?
+            """, (*_BRIEF_KINDS, *_BRIEF_TYPES, time.time() - BRIEF_SEC))
         c.commit()
         _ready = True
     return c
@@ -205,14 +222,22 @@ def add_transcript(key: str, call_id: int, ts: float, system, talkgroup, status:
     result. Raw transcripts are never stored."""
     import json as _json
     units = fields.get("units")
+    now = time.time()
     row = (key, int(call_id), float(ts), system, talkgroup, status, fields.get("weight"),
            fields.get("tg_label"), fields.get("tag"), fields.get("kind"), fields.get("incident_type"),
            fields.get("text"), fields.get("summary"), fields.get("location_text"),
            _json.dumps(units) if units is not None else None, fields.get("priority"),
-           fields.get("seconds"), fields.get("lat"), fields.get("lon"), time.time())
+           fields.get("seconds"), fields.get("lat"), fields.get("lon"), now)
     with _lock:
         c = _conn()
         c.execute("INSERT OR REPLACE INTO radio_transcripts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", row)
+        if status == "done":
+            kind, incident_type = fields.get("kind"), fields.get("incident_type")
+            c.execute("INSERT INTO radio_classifications VALUES (?,?,?,?,?) "
+                      "ON CONFLICT(key, id) DO UPDATE SET kind=excluded.kind, type=excluded.type",
+                      (key, int(call_id), kind if kind in _BRIEF_KINDS else None,
+                       incident_type if incident_type in _BRIEF_TYPES else None, now))
+            c.execute("DELETE FROM radio_classifications WHERE ts < ?", (now - BRIEF_SEC,))
         c.execute("DELETE FROM radio_transcripts WHERE ts < ?", (time.time() - TRANSCRIPT_SEC,))
         c.commit()
 

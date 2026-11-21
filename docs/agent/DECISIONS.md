@@ -438,3 +438,26 @@ fires/hotspots, 511 and quakes corroborate; weather alerts are context (severity
 except red-flag / fire weather (fire). Dry run on a prod DB copy: sensible lists (Bronx
 fire call -> four DOT cameras within 1 km and an earlier fire dispatch nearby).
 
+### 2026-11-20 — View All briefs run on stored feed history
+
+The owner wanted a cheap account of everything newly reported over a minute, a day,
+or a week. The View All tab queries a shared per-period cache over the existing stores.
+It reports rolling 60-second, 24-hour, and 7-day windows by receipt or detection time.
+Legacy news and social rows use their source timestamp until they age out. Counts cover
+the full window and the UI shows a few examples with expandable count breakdowns.
+Existing poll cadence determines how quickly upstream reports become visible.
+
+Minute radio volume counts individually listed calls newly received. Day and week
+totals use the scanner poll windows ending in that period. Eight days of classification
+metadata preserve call types for weekly briefs while radio text keeps its original
+retention. Representative dispatches use the incident type and nearest city. The
+existing facts pass records temperature, wind gusts, visibility, and precipitation at
+condition-band changes, plus IDs and species names for sampled iNaturalist and eBird
+sightings. It deduplicates sightings across overlapping boxes and uses the existing
+notable-cell log to identify new flags. Weather condition and sighting history grows
+as the sampler runs. In shared PostgreSQL mode, incidents, fused events, news and social
+use PostgreSQL. Radio and sampled facts use the collector's local SQLite history.
+
+The brief adds no model or upstream calls and leaves the existing Right now report
+available. There is no new service or configuration.
+

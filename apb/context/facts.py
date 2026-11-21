@@ -365,14 +365,18 @@ def _inat(s, w, n, e):
         "nelat": n, "nelng": e, "swlat": s, "swlng": w, "d1": since, "per_page": 60, "order_by": "observed_on"})
     by_class: dict = {}
     species: dict = {}
+    sightings = []
     for o in d.get("results", []):
         t = o.get("taxon") or {}
         by_class[t.get("iconic_taxon_name") or "other"] = by_class.get(t.get("iconic_taxon_name") or "other", 0) + 1
         name = t.get("preferred_common_name") or t.get("name")
         if name:
             species[name] = species.get(name, 0) + 1
+            if o.get("id"):
+                sightings.append(("iNaturalist sightings", str(o["id"]), name))
     return {"inaturalist_obs_30d": d.get("total_results"), "by_class_sampled": by_class,
-            "top_species": [k for k, _ in sorted(species.items(), key=lambda kv: -kv[1])[:8]]}
+            "top_species": [k for k, _ in sorted(species.items(), key=lambda kv: -kv[1])[:8]],
+            "_sightings": sightings}
 
 
 def _gbif(s, w, n, e):
@@ -403,8 +407,10 @@ def _overpass(s, w, n, e):
 def _ebird(lat, lon, key):
     d = _j(f"https://api.ebird.org/v2/data/obs/geo/recent/notable?lat={lat}&lng={lon}&dist=25&back=7",
            headers={"X-eBirdApiToken": key})
+    sightings = [("eBird notable sightings", f"{x['subId']}:{x['speciesCode']}", x["comName"])
+                 for x in d if x.get("subId") and x.get("speciesCode") and x.get("comName")]
     return {"ebird_notable_7d": [{"species": x.get("comName"), "n": x.get("howMany"), "where": x.get("locName")}
-                                 for x in d[:8]], "ebird_notable_count": len(d)}
+                                 for x in d[:8]], "ebird_notable_count": len(d), "_sightings": sightings}
 
 
 # ── atmosphere by level, aviation, space weather ─────────────────────────────
@@ -774,6 +780,29 @@ def tracked_values(sections: dict) -> dict[str, float]:
     return out
 
 
+def _weather_changes(sections: dict) -> list[tuple[str, float, str]]:
+    current = sections.get("sky", {}).get("now") or {}
+    changes = []
+    for key, topic, unit, step in (
+        ("temperature_2m", "Temperature", "°C", 5),
+        ("wind_gusts_10m", "Wind gusts", "km/h", 20),
+        ("visibility", "Visibility", "m", 2000),
+        ("precipitation", "Precipitation", "mm", 1),
+    ):
+        value = current.get(key)
+        if not isinstance(value, (float, int)) or not math.isfinite(value):
+            continue
+        # Keep dry conditions distinct from light rain.
+        if key == "precipitation":
+            band = math.ceil(value / step)
+        elif key == "visibility":
+            band = min(5, math.floor(value / step))
+        else:
+            band = math.floor(value / step)
+        changes.append((topic, band, f"{value:g} {unit}"))
+    return changes
+
+
 _FIPS = {"01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE",
          "11": "DC", "12": "FL", "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN", "19": "IA",
          "20": "KS", "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN",
@@ -877,6 +906,7 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
     ex = ThreadPoolExecutor(max_workers=22)
     pending = {ex.submit(t[2], *t[3:]): t for t in tasks}
     deadline = now + timeout
+    sightings = []
 
     def run_us_dependents(geo):
         if "county" in geo:
@@ -909,6 +939,7 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
                 run_us_dependents(data)
                 data = {"census_geography": {kk: v.get("name") for kk, v in data.items()}}
             if data:
+                sightings.extend(data.pop("_sightings", ()))
                 result["sections"].setdefault(section, {}).update(data)
                 yield {"section": section, "key": k, "data": data}
     for f, t in pending.items():
@@ -919,6 +950,10 @@ def facts_stream(bounds: dict, timeout: float = 15.0, lite: bool = False):
     try:
         from apb.store import metrics as mstore
         cell = mstore.cell_for(meta["center"]["lat"], meta["center"]["lon"])
+        try:
+            mstore.record_fact_updates(cell, _weather_changes(result["sections"]), sightings)
+        except Exception as e:
+            log.info("facts summary history failed: %s", e)
         cam = mstore.camera_obs(cell)
         if cam:
             result["sections"].setdefault("activity", {})["camera_observations"] = cam

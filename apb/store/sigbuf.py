@@ -39,6 +39,9 @@ def _init_postgres() -> None:
             """)
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_sigbuf_ts "
                       "ON panoptes_signal_buffer(buffer, ts)")
+            c.execute("ALTER TABLE panoptes_signal_buffer ADD COLUMN IF NOT EXISTS first_seen DOUBLE PRECISION")
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_sigbuf_first "
+                      "ON panoptes_signal_buffer (COALESCE(first_seen, ts))")
         _pg_ready = True
 
 
@@ -53,6 +56,9 @@ def _conn() -> sqlite3.Connection:
         );
         CREATE INDEX IF NOT EXISTS idx_sigbuf_ts ON signal_buffer(buffer, ts);
         """)
+        if "first_seen" not in {r[1] for r in c.execute("PRAGMA table_info(signal_buffer)")}:
+            c.execute("ALTER TABLE signal_buffer ADD COLUMN first_seen REAL")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_sigbuf_first ON signal_buffer(COALESCE(first_seen, ts))")
         c.commit()
         _ready = True
     return c
@@ -63,21 +69,23 @@ def save(buffer: str, signals: list[EventSignal]) -> None:
     if not signals:
         return
     try:
+        now = time.time()
         rows = [(s.dedupe_key, buffer, s.observed_at.timestamp(),
-                 s.model_dump_json()) for s in signals]
+                 s.model_dump_json(), now) for s in signals]
         if state.is_postgres():
             _init_postgres()
             with state.pg_connection() as c:
                 with c.cursor() as cur:
                     cur.executemany("""
                         INSERT INTO panoptes_signal_buffer
-                            (dedupe_key, buffer, ts, payload) VALUES (%s,%s,%s,%s)
+                            (dedupe_key, buffer, ts, payload, first_seen) VALUES (%s,%s,%s,%s,%s)
                         ON CONFLICT(dedupe_key) DO NOTHING
                     """, rows)
             return
         with _lock:
             c = _conn()
-            c.executemany("INSERT OR IGNORE INTO signal_buffer VALUES (?,?,?,?)", rows)
+            c.executemany("INSERT OR IGNORE INTO signal_buffer "
+                          "(dedupe_key, buffer, ts, payload, first_seen) VALUES (?,?,?,?,?)", rows)
             c.commit()
     except Exception as e:
         log.warning("save(%s) failed: %s", buffer, e)

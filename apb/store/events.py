@@ -50,6 +50,7 @@ def _conn() -> sqlite3.Connection:
             notified INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_fev_seen ON fused_events(last_seen);
+        CREATE INDEX IF NOT EXISTS idx_fev_first ON fused_events(first_seen);
         """)
         # rows written while far-future timestamps could inflate recency carry peaks in
         # the hundreds of thousands; a real score tops out well under 100
@@ -200,6 +201,7 @@ def _init_postgres() -> None:
             c.execute("ALTER TABLE panoptes_fused_events "
                       "ADD COLUMN IF NOT EXISTS claim_at DOUBLE PRECISION")
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_fev_seen ON panoptes_fused_events(last_seen)")
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_fev_first ON panoptes_fused_events(first_seen)")
             c.execute("UPDATE panoptes_fused_events SET latest_score = 0 "
                       "WHERE latest_score > %s", (_SANE_SCORE,))
             c.execute("UPDATE panoptes_fused_events SET peak_score = latest_score "

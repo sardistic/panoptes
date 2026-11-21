@@ -37,7 +37,17 @@ def _conn() -> sqlite3.Connection:
             cell TEXT PRIMARY KEY, lat REAL, lon REAL, ts REAL NOT NULL, flags TEXT NOT NULL, lite INTEGER);
         CREATE TABLE IF NOT EXISTS cell_notable_log (cell TEXT NOT NULL, ts REAL NOT NULL, flags TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS idx_cnl ON cell_notable_log(cell, ts);
+        CREATE INDEX IF NOT EXISTS idx_cnl_ts ON cell_notable_log(ts);
+        CREATE TABLE IF NOT EXISTS fact_updates (
+            id TEXT PRIMARY KEY, category TEXT NOT NULL, topic TEXT NOT NULL,
+            detail TEXT NOT NULL, ts REAL NOT NULL, cell TEXT);
+        CREATE INDEX IF NOT EXISTS idx_fact_updates_ts ON fact_updates(ts);
+        CREATE TABLE IF NOT EXISTS weather_fact_state (
+            cell TEXT NOT NULL, topic TEXT NOT NULL, band REAL NOT NULL, ts REAL NOT NULL,
+            PRIMARY KEY (cell, topic));
         """)
+        if "cell" not in {r[1] for r in c.execute("PRAGMA table_info(fact_updates)")}:
+            c.execute("ALTER TABLE fact_updates ADD COLUMN cell TEXT")
         c.commit()
         _ready = True
     return c
@@ -45,6 +55,29 @@ def _conn() -> sqlite3.Connection:
 
 def cell_for(lat: float, lon: float) -> str:
     return f"{math.floor(lat / CELL_DEG) * CELL_DEG:.2f},{math.floor(lon / CELL_DEG) * CELL_DEG:.2f}"
+
+
+def record_fact_updates(cell: str, weather: list[tuple[str, float, str]],
+                        sightings: list[tuple[str, str, str]]) -> None:
+    """Keep condition-band changes and newly encountered public sightings for View All."""
+    if not weather and not sightings:
+        return
+    with _lock:
+        c = _conn()
+        now = time.time()
+        updates = [(f"{topic}:{key}", "ecology", topic, species[:120], now, None)
+                   for topic, key, species in sightings]
+        with c:
+            for topic, band, detail in weather:
+                changed = c.execute(
+                    "INSERT INTO weather_fact_state VALUES (?,?,?,?) "
+                    "ON CONFLICT(cell, topic) DO UPDATE SET band=excluded.band, ts=excluded.ts "
+                    "WHERE weather_fact_state.band <> excluded.band", (cell, topic, band, now))
+                if changed.rowcount:
+                    updates.append((f"{cell}:{topic}:{now}", "weather", topic, detail, now, cell))
+            c.executemany("INSERT OR IGNORE INTO fact_updates VALUES (?,?,?,?,?,?)", updates)
+            # iNaturalist returns a rolling 30-day lookback, so keep dedupe keys past it.
+            c.execute("DELETE FROM fact_updates WHERE ts < ?", (now - 32 * 86400,))
 
 
 def record(cell: str, values: dict[str, float]) -> int:

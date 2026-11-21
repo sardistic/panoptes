@@ -163,7 +163,7 @@
     font:600 9px/1 var(--font);letter-spacing:.18em;padding:11px 0 9px;text-transform:uppercase}
   #sideTabs button.on{color:var(--txt);border-bottom-color:var(--amber)}
   #sideTabs button .n{font-family:var(--mono);color:var(--amber);margin-left:5px;letter-spacing:0}
-  #side.board > #sideTitle,#side.board > #count,#side.board > #fieldKey,#side.board > #feed{display:none}
+  #side:not(.feed) > #sideTitle,#side:not(.feed) > #count,#side:not(.feed) > #fieldKey,#side:not(.feed) > #feed{display:none}
   #board{display:none;overflow:auto;padding:0 16px 14px;flex-direction:column}
   #board::-webkit-scrollbar{width:0}
   #side.board > #board{display:flex}
@@ -185,6 +185,27 @@
   #board .brow .up{color:var(--red)} #board .brow .dn{color:var(--steel)}
   #board .brow svg{vertical-align:middle;margin-left:6px}
   #board .empty{color:var(--dim);font-size:10px;padding:10px 0}
+  #summaryPanel{display:none;min-height:0;flex-direction:column;font:400 11px/1.45 var(--font)}
+  #side.summary > #summaryPanel{display:flex}
+  .summary-controls{display:flex;gap:5px;padding:10px 16px 6px}
+  .summary-controls button{flex:1;padding:5px 4px;border:1px solid var(--line);border-radius:2px;
+    background:none;color:var(--dim);font:600 10px var(--font);cursor:pointer}
+  .summary-controls button[aria-pressed=true]{color:var(--amber);border-color:var(--amber)}
+  #summaryRange{padding:0 16px 7px;color:var(--dim);border-bottom:1px solid var(--line);font-size:10px}
+  #summaryBody{overflow:auto;padding:0 16px 14px}
+  .summary-section{padding:10px 0;border-bottom:1px solid var(--line)}
+  .summary-section h4{margin:0 0 5px;color:var(--txt);font:600 12px var(--font)}
+  .summary-totals,.summary-detail,.summary-note{color:var(--dim)}
+  .summary-totals b,.summary-list b{font-family:var(--mono);color:var(--txt);font-weight:600}
+  .summary-highlights,.summary-list{list-style:none;margin:5px 0 0;padding:0}
+  .summary-highlights li{margin:4px 0;overflow-wrap:anywhere}
+  .summary-highlight{color:var(--txt)}
+  button.summary-highlight{font:inherit;color:var(--amber);border:0;background:none;padding:0;cursor:pointer;text-align:left}
+  .summary-section details{margin:5px 0 0;color:var(--dim)}
+  .summary-section summary{cursor:pointer}
+  .summary-list li{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+  .summary-list span{overflow-wrap:anywhere}
+  .summary-note{margin:8px 0 0;font-size:10px}
   .row{padding:10px 0;border-top:1px solid var(--line);cursor:pointer;transition:background .12s}
   #feed .row:first-child{border-top:0}
   .row:hover{background:rgba(120,140,165,.045)}
@@ -561,12 +582,22 @@
 
 <div id="layerPop" class="hud" role="dialog" aria-label="layers" hidden></div>
 
-<div id="side" class="hud">
+<div id="side" class="hud feed">
   <div id="sideTabs" role="tablist">
     <button id="tabFeed" class="on" role="tab" aria-selected="true">Incidents</button>
     <button id="tabBoard" role="tab" aria-selected="false" title="what most deserves a look right now: new, rising, corroborated">Right now<span class="n" id="boardN"></span></button>
+    <button id="tabSummary" role="tab" aria-controls="summaryPanel" aria-selected="false">View all</button>
   </div>
   <div id="board" role="tabpanel" aria-label="Right now"></div>
+  <div id="summaryPanel" role="tabpanel" aria-labelledby="tabSummary">
+    <div class="summary-controls" role="group" aria-label="Summary period">
+      <button data-summary-period="minute" aria-pressed="true">Last minute</button>
+      <button data-summary-period="day" aria-pressed="false">Last 24 hours</button>
+      <button data-summary-period="week" aria-pressed="false">Last 7 days</button>
+    </div>
+    <div id="summaryRange">All reporting feeds</div>
+    <div id="summaryBody"></div>
+  </div>
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
   <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
   <div id="fieldKey" aria-label="Incident light colors">
@@ -3382,14 +3413,95 @@ async function loadBoard(){
   n.textContent=hot?String(hot):'';
   if(boardOn) drawBoard();
 }
-function setSideTab(board){
-  boardOn=board;
-  document.getElementById('side').classList.toggle('board',board);
-  [['tabFeed',!board],['tabBoard',board]].forEach(([id,on])=>{ const b=document.getElementById(id); b.classList.toggle('on',on); b.setAttribute('aria-selected',String(on)); });
-  if(board){ drawBoard(); loadBoard(); }
+function setSideTab(tab){
+  boardOn=tab==='board';
+  const side=document.getElementById('side');
+  [['feed','tabFeed'],['board','tabBoard'],['summary','tabSummary']].forEach(([name,id])=>{
+    const on=name===tab, b=document.getElementById(id);
+    side.classList.toggle(name,on); b.classList.toggle('on',on); b.setAttribute('aria-selected',String(on));
+  });
+  if(boardOn){ drawBoard(); loadBoard(); }
+  if(tab==='summary') loadSummary();
+  else summaryRequest?.abort();
 }
-document.getElementById('tabFeed').onclick=()=>setSideTab(false);
-document.getElementById('tabBoard').onclick=()=>setSideTab(true);
+document.getElementById('tabFeed').onclick=()=>setSideTab('feed');
+document.getElementById('tabBoard').onclick=()=>setSideTab('board');
+document.getElementById('tabSummary').onclick=()=>setSideTab('summary');
+
+let summaryPeriod='minute', summaryRequest=null, summaryData=null, summaryShown=null;
+const summaryNum=new Intl.NumberFormat();
+const summaryTime=new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+function drawSummary(data){
+  const body=document.getElementById('summaryBody');
+  const open=new Set([...body.querySelectorAll('details[open]')].map(el=>el.dataset.group));
+  document.getElementById('summaryRange').textContent='All reporting feeds · '
+    +summaryTime.formatRange(new Date(data.since*1000),new Date(data.until*1000));
+  const active=data.sections.filter(s=>s.totals.some(t=>t.count>0));
+  const mapped=[];
+  body.innerHTML=(active.map(section=>{
+    const totals=section.totals.filter(t=>t.count>0)
+      .map(t=>`<span><b>${summaryNum.format(t.count)}</b> ${esc(t.label)}</span>`).join(' · ');
+    const highlights=section.highlights.map(item=>{
+      const label=esc(item.label);
+      const title=item.lat!=null&&item.lon!=null
+        ?`<button class="summary-highlight" data-summary-map="${mapped.push(item)-1}">${label}</button>`
+        :`<span class="summary-highlight">${label}</span>`;
+      return `<li>${title} <span class="summary-detail">· ${esc(item.detail)}</span></li>`;
+    }).join('');
+    const groups=section.groups.map(group=>{
+      const key=section.title+'/'+group.label;
+      return `<details data-group="${esc(key)}"${open.has(key)?' open':''}><summary>${esc(group.label)}</summary>`
+        +`<ul class="summary-list">${group.items.map(item=>`<li><span>${esc(item.label)}</span><b>${summaryNum.format(item.count)}</b></li>`).join('')}</ul></details>`;
+    }).join('');
+    return `<section class="summary-section"><h4>${esc(section.title)}</h4><div class="summary-totals">${totals}</div>`
+      +(highlights?`<ul class="summary-highlights">${highlights}</ul>`:'')+groups+'</section>';
+  }).join('')||'<p role="status">No new records in this window.</p>')
+    +'<p class="summary-note">New to Panoptes in this window. Feeds can arrive in batches. Weather and wildlife details come from sampled areas.'
+    +(data.period==='minute'?'':' Radio totals use scanner poll windows ending in this period.')+'</p>';
+  body.querySelectorAll('[data-summary-map]').forEach(button=>button.onclick=()=>{
+    const item=mapped[Number(button.dataset.summaryMap)];
+    map.flyTo([item.lat,item.lon],Math.max(map.getZoom(),12));
+  });
+  summaryShown=data.period;
+}
+async function loadSummary(){
+  summaryRequest?.abort();
+  const controller=new AbortController();
+  const body=document.getElementById('summaryBody');
+  const period=summaryPeriod;
+  summaryRequest=controller;
+  if(summaryShown!==period){
+    if(summaryData?.period===period) drawSummary(summaryData);
+    else{
+      summaryShown=null;
+      document.getElementById('summaryRange').textContent='All reporting feeds';
+      body.innerHTML='<p role="status">Loading summary…</p>';
+    }
+  }
+  try{
+    const response=await fetch('/live/summary?period='+period,{signal:controller.signal});
+    if(!response.ok) throw Error('summary unavailable');
+    const data=await response.json();
+    if(controller.signal.aborted) return;
+    if(summaryShown!==period || summaryData?.until!==data.until) drawSummary(data);
+    summaryData=data;
+  }catch(_){
+    if(!controller.signal.aborted && summaryShown!==period)
+      body.innerHTML='<p role="status">Summary unavailable. Retrying shortly.</p>';
+  }finally{
+    if(summaryRequest===controller) summaryRequest=null;
+  }
+}
+const summaryButtons=document.querySelectorAll('[data-summary-period]');
+summaryButtons.forEach(button=>button.onclick=()=>{
+  summaryPeriod=button.dataset.summaryPeriod;
+  summaryButtons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+  loadSummary();
+});
+setInterval(()=>{
+  if(!document.hidden && !summaryRequest && document.getElementById('side').classList.contains('summary'))
+    loadSummary();
+},15000);
 
 // ── shareable view state ──
 // The hash mirrors what is on screen (center/zoom, area, window, type, severity,

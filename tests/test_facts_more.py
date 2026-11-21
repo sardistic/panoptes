@@ -1,5 +1,6 @@
 """New keyless lanes: parsing against captured response shapes (no network)."""
 import json
+from datetime import date
 
 import httpx
 
@@ -86,6 +87,13 @@ def test_cdc_places_maps_measures(monkeypatch):
 
 
 def test_acis_anomaly_uses_temperature_station(monkeypatch):
+    class FixtureDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 9, 19)
+
+    monkeypatch.setattr(m, "date", FixtureDate)
+
     def post(url, json=None, **kw):
         if url.endswith("StnMeta"):
             return _R({"meta": [{"name": "RAIN ONLY", "sids": ["X 6"], "ll": [-78.64, 35.78], "valid_daterange": [[], [], ["2024-01-01", "2026-09-18"]]},

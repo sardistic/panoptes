@@ -50,6 +50,7 @@ def _init_postgres() -> None:
                 )
             """)
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_ts ON panoptes_incidents(ts)")
+            c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_first ON panoptes_incidents(first_seen)")
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_metro ON panoptes_incidents(metro)")
             c.execute("CREATE INDEX IF NOT EXISTS panoptes_inc_threat ON panoptes_incidents(threat_score)")
         _pg_ready = True
@@ -83,6 +84,7 @@ def _init(c: sqlite3.Connection) -> None:
         PRIMARY KEY (metro, call_id)
     );
     CREATE INDEX IF NOT EXISTS idx_inc_ts ON incidents(ts);
+    CREATE INDEX IF NOT EXISTS idx_inc_first ON incidents(first_seen);
     CREATE INDEX IF NOT EXISTS idx_inc_metro ON incidents(metro);
     CREATE INDEX IF NOT EXISTS idx_inc_threat ON incidents(threat_score);
     PRAGMA user_version=1;

@@ -1502,6 +1502,17 @@ def live_sitrep():
         return JSONResponse({"error": "sitrep unavailable"}, status_code=424)
 
 
+@app.get("/live/summary")
+def live_summary(period: Literal["minute", "day", "week"] = "minute"):
+    """Summarize newly recorded activity across all feeds using local history only."""
+    from apb.store import summary
+
+    ttl = {"minute": 10, "day": 45, "week": 90}[period]
+    result = _cached(("view-all-summary", period), ttl,
+                     lambda: summary.build(period, CAD_FEEDS, _place_name))
+    return JSONResponse(result, headers={"Cache-Control": f"public, max-age={ttl}"})
+
+
 @app.get("/db/stats")
 def db_stats():
     """How much history the snapshot poller has accumulated."""
