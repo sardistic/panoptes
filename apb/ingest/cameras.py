@@ -661,24 +661,38 @@ def _iteris(reg, src) -> list[dict]:
     return out
 
 
-def _cars_co(reg, src) -> list[dict]:
-    """Colorado COtrip: Castle Rock CARS "511x" API (keyless GeoJSON) — every camera
-    view carries an HLS playlist and a snapshot PNG."""
-    data = reg.get_json("https://api-511x-co.carsprogram.org/cameras/map-features")
+# ── Castle Rock CARS "511x" sites: each site's public config (/configs/main.json) names
+# its camera layer's API; the site itself reads `<api>/map-features` (keyless GeoJSON,
+# views with stills and/or HLS). Requests carry the site's own Origin, as its page does.
+CARS: dict[str, tuple[str, str, str]] = {
+    "cotrip": ("https://www.cotrip.org", "https://api-511x-co.carsprogram.org/cameras", "CO"),
+    "cars_ny": ("https://511ny.org", "https://api-511x-nysdot.carsprogram.org/cameras", "NY"),
+    "cars_mn": ("https://511mn.org", "https://api-511x-mn.carsprogram.org/cameras", "MN"),
+}
+_CARS_SKIP_HOSTS = ("nyctmc.org",)      # NYC DOT views: the nyctmc source already has them
+
+
+def _cars(reg, src) -> list[dict]:
+    site, api, state = CARS[src.key]
+    r = reg._client.get(f"{api}/map-features", headers={"Origin": site, "Referer": f"{site}/",
+                                                         "Accept": "application/json", "content-language": "en"})
+    r.raise_for_status()
+    data = json.loads(r.text)
     out = []
     for f in data.get("features", []):
         p, c = f.get("properties") or {}, (f.get("geometry") or {}).get("coordinates") or [None, None]
         if not p.get("public", True):
             continue
         for i, v in enumerate(p.get("views") or []):
-            if v.get("broken"):
+            url = str(v.get("url") or "")
+            if v.get("broken") or any(h in url for h in _CARS_SKIP_HOSTS):
                 continue
-            r = _row("cotrip", f"{p.get('id')}.{i}", v.get("name") or p.get("name"), c[1], c[0], state="CO",
-                     roadway=p.get("route"), image_url=v.get("videoPreviewUrl"),
-                     stream_url=v.get("url") if ".m3u8" in str(v.get("url", "")) else None,
-                     page_url="https://www.cotrip.org/")
-            if r:
-                out.append(r)
+            hls = url if ".m3u8" in url else None
+            still = v.get("videoPreviewUrl") or (url if not hls and str(v.get("type", "")).upper().startswith("STILL") else None)
+            r_ = _row(src.key, f"{p.get('id')}.{i}", v.get("name") or p.get("name"), c[1], c[0], state=state,
+                      roadway=p.get("route"), image_url=still, stream_url=hls, page_url=f"{site}/")
+            if r_:
+                out.append(r_)
     return out
 
 
@@ -982,7 +996,8 @@ SOURCES["ak_rwis"] = CameraSource("ak_rwis", "Alaska RWIS road-weather cameras",
 SOURCES["tw_tdx"] = CameraSource("tw_tdx", "Taiwan freeway/highway CCTV (TDX)", _tw_tdx, "TW")
 SOURCES["nddot"] = CameraSource("nddot", "NDDOT travel cameras", _nddot, "ND")
 SOURCES["midrive"] = CameraSource("midrive", "MDOT Mi Drive cameras", _midrive, "MI")
-SOURCES["cotrip"] = CameraSource("cotrip", "COtrip Colorado cameras", _cars_co, "CO")
+SOURCES.update({k: CameraSource(k, f"{v[2]} 511 cameras (CARS)" if k != "cotrip" else "COtrip Colorado cameras",
+                                 _cars, v[2]) for k, v in CARS.items()})
 SOURCES.update({f"it_{k}": CameraSource(f"it_{k}", f"{v[1]} 511 cameras (one-network)", _iteris, v[1])
                 for k, v in ITERIS.items()})
 SOURCES.update(_load_discoveries())      # sniffed feeds (data/camera_discoveries.json)

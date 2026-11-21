@@ -237,8 +237,19 @@ def test_cars_colorado_skips_broken_and_private_views():
                    {"name": "I-25 NB", "url": "https://p.cotrip.org/rtplive/y/playlist.m3u8", "videoPreviewUrl": "https://c.carsprogram.org/y.png", "broken": True}]}},
         {"geometry": {"coordinates": [-105.1, 40.5]}, "properties": {"id": 2, "name": "private", "public": False,
          "views": [{"url": "https://p/z.m3u8", "videoPreviewUrl": "https://c/z.png"}]}}]}
-    rows = cameras._cars_co(_Stub({"map-features": data}), SOURCES["cotrip"])
+    rows = cameras._cars(_Stub({"map-features": data}), SOURCES["cotrip"])
     assert len(rows) == 1 and rows[0]["id"] == "cotrip:1.0" and rows[0]["stream_url"].endswith("x/playlist.m3u8")
+
+
+def test_cars_new_york_takes_stills_and_leaves_nyc_tmc_to_its_own_source():
+    data = {"features": [
+        {"geometry": {"coordinates": [-73.97, 40.78]}, "properties": {"id": 9, "name": "CPW @ 86 St", "public": True,
+         "views": [{"name": "CPW", "type": "STILL_IMAGE", "url": "https://nyctmc.org/api/cameras/a/image"}]}},
+        {"geometry": {"coordinates": [-73.8, 42.65]}, "properties": {"id": 10, "name": "I-87 @ Exit 1", "public": True,
+         "views": [{"name": "I-87", "type": "STILL_IMAGE", "url": "https://s.511ny.org/cam/10.jpg"}]}}]}
+    rows = cameras._cars(_Stub({"map-features": data}), SOURCES["cars_ny"])
+    assert [r["id"] for r in rows] == ["cars_ny:10.0"] and rows[0]["image_url"].endswith("10.jpg")
+    assert rows[0]["state"] == "NY" and rows[0]["page_url"] == "https://511ny.org/"
 
 
 def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper():
