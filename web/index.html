@@ -299,8 +299,7 @@
   .rc .rc-line{font-size:11.5px;line-height:1.35;color:var(--txt-2);margin:2px 0 0 26px}
   .rc .rc-thr{font-size:10px;color:#4fd1c5;margin:2px 0 0 26px;cursor:pointer;letter-spacing:.03em}
   .rc .rc-thr:hover{text-decoration:underline}
-  .rthread .rc{display:block}
-  .rthread .rc-play{float:left;margin-right:6px}
+  .rcalls .rc .rc-line,.rcalls .rc .rc-thr{grid-column:2;margin-left:0}
   #board .rall{cursor:pointer;color:var(--dim);font:500 9.5px/1 var(--font);letter-spacing:.08em;padding:9px 0 3px;text-transform:uppercase}
   #board .rall:hover{color:var(--txt)}
   #board .brow .hot{color:var(--red)}
@@ -3139,7 +3138,8 @@ const lineKick=l=>[l.kind,l.type&&l.type!=='other'?String(l.type).replace(/_/g,'
 // Chat bubbles: the last hour of transcribed calls, grouped by screen distance. Each
 // group speaks with its most urgent line (priority, dispatch, freshness) and counts the
 // rest; zooming in splits groups apart, zooming out merges them and lets only urgent
-// calls speak. A newly heard line types itself into its group's bubble when it leads.
+// calls speak. Bubbles are placed most urgent first; one that would overlap a placed
+// bubble folds into its count. A newly heard line types into its group's bubble.
 const radioLines=new Map(), radioChatLayer=L.layerGroup().addTo(map);
 const lineKey=l=>l.sys+'/'+l.id;
 function chatScore(l,now){
@@ -3163,7 +3163,14 @@ function drawRadioChats(fresh){
     if(!g.top||sc>g.s){ g.top=l; g.s=sc; g.at=at; }
     groups.set(gk,g);
   }
-  [...groups.values()].sort((x,y)=>y.s-x.s).slice(0,z<6?8:16).forEach(g=>{
+  const placed=[], BW=196, BH=64;                       // a bubble's footprint above its point
+  const shown=[...groups.values()].sort((x,y)=>y.s-x.s).filter(g=>{
+    const p=map.latLngToContainerPoint(g.at), r=[p.x-BW/2,p.y-BH-10,p.x+BW/2,p.y-6];
+    const hit=placed.find(q=>r[0]<q.r[2]&&r[2]>q.r[0]&&r[1]<q.r[3]&&r[3]>q.r[1]);
+    if(hit){ hit.g.n+=g.n; hit.g.items.push(...g.items); return false; }
+    placed.push({r,g}); return true;
+  });
+  shown.slice(0,z<6?8:16).forEach(g=>{
     const l=g.top, col=radioColor(l.type), hot=(+l.priority||0)>=0.6, age=now-l.ts;
     const max=z>=11?110:z>=8?80:56, text=l.line.length>max?l.line.slice(0,max-2).replace(/\s+\S*$/,'')+'…':l.line;
     const typing=fresh&&lineKey(l)===fresh&&!radioCalm;

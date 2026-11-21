@@ -2028,6 +2028,31 @@ def live_fused(min_count: int = Query(2, ge=2, le=100),
                     limit_per, include_seed, include_live, kinds), 20.0, _build)
 
 
+_related_bg = {"at": 0.0, "hazards": [], "fused": [], "busy": False}
+
+
+def _related_context() -> tuple[list[dict], list[dict]]:
+    """Hazards and fused events for /related without blocking a popup: building them
+    cold takes ~20 s, so a background thread refreshes them every minute and callers
+    take the latest (empty until the first build lands)."""
+    import threading
+
+    def refresh():
+        try:
+            hz = _hazards_all_rows(24.0)
+            fz = live_fused(min_count=2, min_sources=1, min_score=1.2, max_age_hours=24.0,
+                            limit_per=20, include_seed=True, include_live=True, kinds=None)
+            _related_bg.update(hazards=hz, fused=fz, at=_time.time())
+        except Exception as e:
+            log.info("related: context refresh: %s", e)
+        finally:
+            _related_bg["busy"] = False
+    if _time.time() - _related_bg["at"] > 60.0 and not _related_bg["busy"]:
+        _related_bg["busy"] = True
+        threading.Thread(target=refresh, daemon=True, name="related-context").start()
+    return _related_bg["hazards"], _related_bg["fused"]
+
+
 @app.get("/live/related")
 def live_related(lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180),
                  ts: float | None = Query(None, ge=0), type: str | None = Query(None, max_length=40),
@@ -2061,20 +2086,14 @@ def live_related(lat: float | None = Query(None, ge=-90, le=90), lon: float | No
         items: list[dict] = []
         items += related.incident_items(snapshots.query(min(hours, 72.0)))
         items += related.thread_items(radio_store.threads(min(hours, 72.0) * 3600.0))
-        try:
-            items += related.hazard_items(_hazards_all_rows(24.0))
-        except Exception as e:
-            log.info("related: hazards: %s", e)
+        hz, fz = _related_context()
+        items += related.hazard_items(hz)
         items += related.signal_items(social_store.recent(min(hours, 24.0)) + news_store.recent(min(hours, 24.0)))
         try:
             items += related.camera_items(nearest_cameras(_cameras, lat, lon, min(radius_km, 5.0), 6))
         except Exception as e:
             log.info("related: cameras: %s", e)
-        try:
-            items += related.fused_items(live_fused(min_count=2, min_sources=1, min_score=1.2, max_age_hours=24.0,
-                                                    limit_per=20, include_seed=True, include_live=True, kinds=None))
-        except Exception as e:
-            log.info("related: fused: %s", e)
+        items += related.fused_items(fz)
         seen, out = set(), []
         for r in related.related((lat, lon), items, ts=ts, radius_km=radius_km, window_min=window_min,
                                  type_=type, text=text, exclude=excl, limit=16):
