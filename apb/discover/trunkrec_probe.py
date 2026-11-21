@@ -25,8 +25,11 @@ _DC = ("amazon", "google", "microsoft", "digitalocean", "linode", "akamai", "ovh
 
 
 def targets(shodan: dict, label: str = "trunking") -> list[dict]:
+    """Hosts from every query whose label starts with `label` (trunking, trunking_intl)."""
     out, seen = [], set()
-    for h in (shodan.get("queries", {}).get(label) or {}).get("hosts", []):
+    rows = [h for lab, q in (shodan.get("queries") or {}).items() if lab.startswith(label)
+            for h in (q.get("hosts") or [])]
+    for h in rows:
         names = [n for n in h.get("hostnames") or [] if not n.replace(".", "").isdigit()]
         host = names[0] if names and any(w in names[0] for w in ("listen", "scan", "radio")) else h["ip"]
         k = (host, h["port"])
