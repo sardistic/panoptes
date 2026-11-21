@@ -947,3 +947,36 @@ def test_trunking_recorder_tag_guess():
     assert tag_guess("Medic Tac 2") == "EMS-Tac"
     assert tag_guess("Public Works") == "Untagged"
     assert tag_guess("x", "Law Dispatch|") == "Law Dispatch"
+
+
+def test_icecast_probe_keeps_public_safety_mp3_mounts_on_the_reachable_host():
+    import httpx
+    from apb.discover import icecast_probe
+    status = {"icestats": {"source": [
+        {"listenurl": "http://scanner.local:8000/county", "server_name": "Hamilton County Fire/EMS",
+         "server_type": "audio/mpeg", "bitrate": 16, "genre": ""},
+        {"listenurl": "http://scanner.local:8000/music", "server_name": "Hits FM", "server_type": "audio/mpeg", "genre": "Pop"},
+        {"listenurl": "http://scanner.local:8000/ham", "server_name": "W8XYZ Repeater", "server_type": "audio/mpeg"},
+        {"listenurl": "http://scanner.local:8000/pd.ogg", "server_name": "City Police", "server_type": "application/ogg"}]}}
+
+    def handler(req):
+        if req.url.path == "/status-json.xsl" and req.url.scheme == "http":
+            return httpx.Response(200, json=status)
+        return httpx.Response(404)
+    c = httpx.Client(transport=httpx.MockTransport(handler))
+    got = icecast_probe.probe("1.2.3.4", 8000, c)
+    assert [g["name"] for g in got] == ["Hamilton County Fire/EMS"]
+    assert got[0]["url"] == "http://1.2.3.4:8000/county" and got[0]["via"] == "shodan"
+
+
+def test_streams_merge_the_probed_mounts_with_the_directory(db, monkeypatch, tmp_path):
+    from apb.ingest import streams
+    monkeypatch.setenv("APB_STREAMS_LIST", str(tmp_path / "s.json"))
+    monkeypatch.setenv("APB_STREAMS_EXTRA", str(tmp_path / "x.json"))
+    streams.discover(fetch=lambda: _YP)
+    (tmp_path / "x.json").write_text(json.dumps({"streams": [
+        {"key": "abcdef0123", "name": "Hamilton County Fire/EMS", "genre": "", "url": "http://1.2.3.4:8000/county",
+         "bitrate": 16, "tag": "Fire Dispatch", "via": "shodan"}]}))
+    names = [s["name"] for s in streams.choose()]
+    assert "Hamilton County Fire/EMS" in names and "FDNY Manhattan" in names
+    streams._streams.clear()

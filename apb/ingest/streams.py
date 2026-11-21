@@ -80,9 +80,9 @@ def off() -> bool:
 
 def max_streams() -> int:
     try:
-        return max(0, int(os.environ.get("APB_STREAMS_MAX", "40")))
+        return max(0, int(os.environ.get("APB_STREAMS_MAX", "80")))
     except ValueError:
-        return 40
+        return 80
 
 
 def state_dir() -> Path:
@@ -92,6 +92,11 @@ def state_dir() -> Path:
 
 def list_path() -> Path:
     return Path(os.environ.get("APB_STREAMS_LIST", "").strip() or state_dir() / "streams.json")
+
+
+def extra_path() -> Path:
+    """Mounts found on Icecast servers outside the directory (apb.discover.icecast_probe)."""
+    return Path(os.environ.get("APB_STREAMS_EXTRA", "").strip() or state_dir() / "streams_extra.json")
 
 
 def key_of(url: str) -> str:
@@ -157,11 +162,18 @@ def discover(fetch=None) -> int:
 
 
 def load() -> list[dict]:
-    try:
-        data = json.loads(list_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return [s for s in data.get("streams") or [] if s.get("key") and s.get("url")]
+    """The directory list, then the extra (probed) mounts; one entry per key."""
+    out, seen = [], set()
+    for path in (list_path(), extra_path()):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for st in data.get("streams") or []:
+            if st.get("key") and st.get("url") and st["key"] not in seen:
+                seen.add(st["key"])
+                out.append(st)
+    return out
 
 
 def instances() -> list[dict]:
@@ -420,7 +432,8 @@ def choose() -> list[dict]:
     first APB_STREAMS_MAX (directory order). Registers them with the Rdio lane."""
     global _streams
     from apb.ingest import rdio
-    found = [s for s in load() if wanted(s.get("name") or "", s.get("genre") or "")]   # rules may have tightened
+    # rules may have tightened; probed mounts were filtered on their names by icecast_probe
+    found = [s for s in load() if s.get("via") == "shodan" or wanted(s.get("name") or "", s.get("genre") or "")]
     only = {k.strip() for k in os.environ.get("APB_STREAMS_ONLY", "").split(",") if k.strip()}
     picked = [s for s in found if s["key"] in only] if only else found[:max_streams()]
     _streams = picked

@@ -51,3 +51,4 @@ data/rdio_instances.json
 data/shodan_*.json
 state/trunkrec_instances.json
 data/trunkrec_instances.json
+state/streams_extra.json
