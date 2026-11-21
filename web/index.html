@@ -286,6 +286,15 @@
   .rareas .ra b{color:#4fd1c5;font-weight:600}
   .rareas .ra.hi b{color:#e0412c}
   .rareas .ra.th{cursor:pointer}
+  .rel{margin-top:9px;border-top:1px solid var(--line);padding-top:6px}
+  .rel .ra-h{font:600 8px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+  .rel .rl{display:flex;gap:7px;align-items:flex-start;padding:4px 0;border-top:1px solid rgba(120,140,165,.08);cursor:pointer}
+  .rel .rl:first-of-type{border-top:0}
+  .rel .rl:hover .rx b{text-decoration:underline}
+  .rel .rt{flex:0 0 auto;font:700 7px/1 var(--font);letter-spacing:.12em;border:1px solid;padding:2px 4px;margin-top:1px}
+  .rel .rx{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .rel .rx b{font:500 10.5px/1.3 var(--font);color:var(--txt)}
+  .rel .rx i{font:400 9.5px/1.3 var(--font);font-style:normal;color:var(--dim)}
   .rareas .ra.th:hover b{text-decoration:underline}
   .rc .rc-line{font-size:11.5px;line-height:1.35;color:var(--txt-2);margin:2px 0 0 26px}
   .rc .rc-thr{font-size:10px;color:#4fd1c5;margin:2px 0 0 26px;cursor:pointer;letter-spacing:.03em}
@@ -1856,15 +1865,17 @@ function drawHazards(){
       const area=L.geoJSON(d.geometry,{style:{color:st.c,weight:1.25,opacity:.82,
         fillColor:st.c,fillOpacity:.11,dashArray:d.certainty==='Observed'?null:'4 3'}});
       area.bindTooltip(tooltip,{sticky:true});
-      area.on('click',e=>L.popup({maxWidth:340}).setLatLng(e.latlng)
-        .setContent(popupHtml()).openOn(map));
+      area.on('click',e=>{ const pop=L.popup({maxWidth:340}).setLatLng(e.latlng)
+        .setContent(popupHtml().replace(/<\/div>$/,relBox()+'</div>')).openOn(map);
+        loadRelated(pop,relQuery(e.latlng.lat,e.latlng.lng,d.ts,d.event||d._cat),[e.latlng.lat,e.latlng.lng]); });
       area.addTo(hazardLayer);
       return;
     }
     const m=hazardBeacon(d,map.getZoom(),st);
     m.bindTooltip(tooltip,{direction:'top'});
-    m.on('click',()=>L.popup({maxWidth:340}).setLatLng([d.lat,d.lon])
-      .setContent(popupHtml()).openOn(map));
+    m.on('click',()=>{ const pop=L.popup({maxWidth:340}).setLatLng([d.lat,d.lon])
+      .setContent(popupHtml().replace(/<\/div>$/,relBox()+'</div>')).openOn(map);
+      loadRelated(pop,relQuery(d.lat,d.lon,d.ts,d.event||d._cat,'hazard:'+d.source+':'+(d.id||d.event_id||'')),[d.lat,d.lon]); });
     m.addTo(hazardLayer);
   });
 }
@@ -2017,19 +2028,60 @@ async function openIncident(d){
     +`<div class="meta">${feeds.length?`${feeds.length} nearby feed(s)`:'no public feeds nearby'}</div>`
     +(/^radio_[0-9a-f]{10}$/.test(d.metro||'')&&/^rdio\d+$/.test(d.call_id||'')
       ?`<div class="meta">heard on radio dispatch · <a href="#" class="rc-hear" data-src="/live/radio/audio/${esc(d.metro.slice(6))}/${esc(String(d.call_id).slice(4))}">▶ hear the call</a></div>`:'');
-  const pop=L.popup().setLatLng([d.lat,d.lon])
-    .setContent(base+`<div class="meta" style="opacity:.55">checking news…</div></div>`)
+  const rq=relQuery(d.lat,d.lon,d.ts,d.type,(/^radio_/.test(d.metro||'')?'radio:':'incident:')+(d.call_id||''));
+  const pop=L.popup({maxWidth:340}).setLatLng([d.lat,d.lon])
+    .setContent(base+`<div class="meta" style="opacity:.55">checking news…</div>`+relBox()+`</div>`)
     .openOn(map);
-  wireHear(pop);
+  wireHear(pop); loadRelated(pop,rq,[d.lat,d.lon]);
   fetchCorrelation(d.lat,d.lon,d.type).then(r=>{       // incident-level correlation
     if(!map.hasLayer(pop)) return;
     const any=(r.articles||[]).length || (r.local||[]).length;
     pop.setContent(base+(any
       ? `<div class="kick" style="margin-top:11px">Possible Cause</div>`+articlesHtml(r)
-      : `<div class="empty">${r.throttled?'news search busy — try again in a minute':'no related news nearby'}</div>`)+`</div>`);
-    wireHear(pop);
+      : `<div class="empty">${r.throttled?'news search busy — try again in a minute':'no related news nearby'}</div>`)+relBox()+`</div>`);
+    wireHear(pop); loadRelated(pop,rq,[d.lat,d.lon]);
   });
 }
+// ── related: what every other feed has near this place and time ──
+// /live/related ranks CAD and radio incidents, hazards and warnings, news and social,
+// cameras and corroborated events by distance, time, same type and (for radio) the same
+// street. The popup lists them; thin dashed links tie them to it on the map while open.
+const REL_KIND={incident:['INCIDENT','#d2a34a'],radio:['RADIO','#4fd1c5'],hazard:['HAZARD','#e0662c'],
+  news:['NEWS','#a9b4c0'],social:['SOCIAL','#4fb7bd'],camera:['CAMERA','#9fc4d0'],fused:['CORROBORATED','#e8c95c']};
+const relatedLayer=L.layerGroup().addTo(map);
+const relBox=()=>`<div class="rel"><div class="ra-h">Related · other feeds</div><div class="rel-l"><div class="rc-m">looking across feeds…</div></div></div>`;
+async function loadRelated(pop,query,origin){
+  let rows=[];
+  try{ const r=await fetch('/live/related?'+query); rows=r.ok?await r.json():[]; }catch(_){}
+  if(!map.hasLayer(pop)) return;
+  const el=pop.getElement&&pop.getElement(), box=el&&el.querySelector('.rel-l'); if(!box) return;
+  relatedLayer.clearLayers();
+  if(!rows.length){ box.innerHTML='<div class="rc-m">nothing else nearby in this window</div>'; return; }
+  box.innerHTML=rows.slice(0,8).map((r,i)=>{ const [tag,col]=REL_KIND[r.kind]||['ITEM','#9aa6b2'];
+    return `<div class="rl" data-i="${i}"><span class="rt" style="color:${col};border-color:${col}55">${tag}</span>`
+      +`<span class="rx"><b>${esc(String(r.title||'').slice(0,90))}</b><i>${esc((r.why||[]).join(' · '))}${r.sub?' · '+esc(String(r.sub).slice(0,50)):''}</i></span></div>`; }).join('');
+  rows.slice(0,8).forEach((r,i)=>{
+    if(r.lat==null||!origin) return;
+    const col=(REL_KIND[r.kind]||[0,'#9aa6b2'])[1];
+    if(r.km>0.05) L.polyline([origin,[r.lat,r.lon]],{color:col,weight:1.2,opacity:.75,dashArray:'3 4',interactive:false}).addTo(relatedLayer);
+    box.querySelector(`[data-i="${i}"]`).onclick=()=>openRelated(r);
+  });
+  pop.once('remove',()=>relatedLayer.clearLayers());
+}
+function openRelated(r){
+  if(r.kind==='radio'){
+    const t=radioThreads.find(x=>x.id===(r.thread||String(r.id||'').replace(/^rthr/,'')));
+    if(t){ openThread(t); return; }
+  }
+  if((r.kind==='incident'||r.kind==='radio')&&r.ref&&r.ref.lat!=null){ openIncident({...r.ref,threat_score:+r.ref.threat_score||0}); return; }
+  if((r.kind==='news'||r.kind==='social')&&r.url){ const u=safeLink(r.url); if(u) window.open(u,'_blank','noopener'); return; }
+  map.flyTo([r.lat,r.lon],Math.max(map.getZoom(),r.kind==='camera'?14:12));
+  L.popup({maxWidth:320}).setLatLng([r.lat,r.lon]).setContent(`<div class="pop"><div class="kick">${esc((REL_KIND[r.kind]||['ITEM'])[0])}</div>`
+    +`<div class="sum">${esc(r.title||'')}</div><div class="meta">${esc(r.sub||'')}${r.why?' · '+esc(r.why.join(' · ')):''}</div>`
+    +(r.image?`<div class="meta"><img src="${esc(r.image)}" alt="camera still" style="width:100%;margin-top:6px" loading="lazy"></div>`:'')+`</div>`).openOn(map);
+}
+const relQuery=(lat,lon,ts,type,ex)=>`lat=${(+lat).toFixed(5)}&lon=${(+lon).toFixed(5)}`
+  +(ts?`&ts=${Math.round(ts)}`:'')+(type?`&type=${encodeURIComponent(type)}`:'')+(ex?`&exclude=${encodeURIComponent(ex)}`:'');
 function wireHear(pop){
   const el=pop.getElement&&pop.getElement(); if(!el) return;
   el.querySelectorAll('.rc-hear').forEach(a=>a.onclick=ev=>{ ev.preventDefault(); const p=radioPlayer();
@@ -2955,13 +3007,15 @@ function openThread(t,where){
       +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup||'')}</b>${c.kind?' · '+esc(c.kind):''}</div>`
       +(c.line?`<div class="rc-line">${esc(c.line)}</div>`:'')+`</div>`).join('')+`</div></div>`
     +`<div class="meta" style="margin-top:6px">${esc(calls.length)} calls linked by the model · `
-    +(sys?`<a href="#" class="th-sys">${esc(t.system||'system')}</a>`:esc(t.system||''))+` · place shown as a ~2 km area</div></div>`;
+    +(sys?`<a href="#" class="th-sys">${esc(t.system||'system')}</a>`:esc(t.system||''))+` · place shown as a ~2 km area</div>`
+    +(t.lat!=null?relBox():'')+`</div>`;
   if(!at){ if(sys) openRadio(sys); return; }
   const pop=L.popup({maxWidth:360,minWidth:300}).setLatLng(at).setContent(html).openOn(map);
   const el=pop.getElement();
   el.querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{ const c=calls.find(x=>String(x.id)===n.dataset.id); if(c) playCall(c); });
   const sl=el.querySelector('.th-sys'); if(sl) sl.onclick=ev=>{ ev.preventDefault(); openRadio(sys); };
   markPlaying();
+  if(t.lat!=null) loadRelated(pop,'thread='+encodeURIComponent(t.id),[t.lat,t.lon]);
 }
 function threadsHtml(r){
   const ts=radioThreads.filter(t=>t.sys===r.id).slice(0,6); if(!ts.length) return '';
@@ -3130,8 +3184,9 @@ function openChatGroup(g){
   const html=`<div class="pop"><div class="kick">Heard on the radio · ${esc(g.n)} call${g.n===1?'':'s'} here</div>`
     +`<div class="rcalls rthread"><div class="rc-list">`+rows.map(l=>`<div class="rc" data-k="${esc(lineKey(l))}"><button class="rc-play" title="play this call">▶</button>`
       +`<div class="rc-m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))} · <b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b></div>`
-      +`<div class="rc-line">${esc(l.line)}</div></div>`).join('')+`</div></div></div>`;
+      +`<div class="rc-line">${esc(l.line)}</div></div>`).join('')+`</div></div>`+relBox()+`</div>`;
   const pop=L.popup({maxWidth:360,minWidth:280}).setLatLng(g.at).setContent(html).openOn(map);
+  loadRelated(pop,relQuery(g.at[0],g.at[1],rows[0].ts,rows[0].type),g.at);
   pop.getElement().querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{
     const l=radioLines.get(n.dataset.k); if(l) playCall({id:l.id,audio:l.audio}); });
 }

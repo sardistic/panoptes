@@ -434,6 +434,12 @@ def threads(max_age_sec: float = 10800.0, key: str | None = None, system: int | 
     return [_thread(r) for r in rows]
 
 
+def thread(tid: str) -> dict | None:
+    with _lock:
+        r = _conn().execute("SELECT * FROM radio_threads WHERE tid = ?", (tid,)).fetchone()
+    return _thread(r) if r else None
+
+
 def transcripts_for(key: str, ids: list[int]) -> dict[int, dict]:
     """{call id: transcript row} for the given calls of one instance."""
     ids = [int(i) for i in ids][:500]

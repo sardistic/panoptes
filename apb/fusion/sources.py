@@ -62,6 +62,57 @@ _ACTIVITY_FLAGS = ("attention", "outage", "connectivity", "crime", "noise", "tra
                    "vehicles", "pedestrians", "delay")
 
 
+_HAZ_SKIP = {"adsb", "aisstream", "squawk", "faa_delay", "radar", "openaq", "airnow", "ndbc", "hms_smoke"}
+
+
+def hazard_signals(rows: list[dict], max_per_source: int = 400) -> list[EventSignal]:
+    """Hazard / warning rows (the /live/hazards/all aggregate) as fusion signals.
+
+    Located official observations corroborate an incident of their kind: fire hotspots
+    and wildfires (fire), 511 incidents (traffic), quakes. Weather alerts are context
+    (severity held under the corroboration bar) — a warning's point would otherwise
+    "confirm" every incident in its cell — except red-flag / fire-weather, which is fire.
+    """
+    from apb.common.models import IncidentType
+    from apb.fusion.related import family
+    out: list[EventSignal] = []
+    per: dict[str, int] = {}
+    for r in rows:
+        src = str(r.get("source") or "")
+        if r.get("lat") is None or src in _HAZ_SKIP or per.get(src, 0) >= max_per_source:
+            continue
+        text = f"{r.get('type') or ''} {r.get('event') or ''} {r.get('summary') or ''}"
+        fam = family(text)
+        sev = float(r.get("threat_score") or 0.3)
+        if src == "511" or fam == "traffic":
+            kind, itype = SignalKind.traffic, "traffic"
+        elif fam == "fire":
+            kind, itype = (SignalKind.weather if src == "nws" else SignalKind.context), "fire"
+        elif fam == "quake":
+            kind, itype = SignalKind.context, "quake"
+        elif src in ("nws", "spc", "nhc", "sigmet", "eonet", "usgs_flood") or fam == "weather":
+            kind, itype, sev = SignalKind.weather, "weather", min(sev, 0.3)
+        else:
+            kind, itype, sev = SignalKind.context, "other", min(sev, 0.3)
+        try:
+            ts = float(r.get("ts") or 0)
+        except (TypeError, ValueError):
+            ts = 0.0
+        if not ts:
+            continue
+        per[src] = per.get(src, 0) + 1
+        title = str(r.get("event") or r.get("headline") or r.get("summary") or itype)
+        out.append(EventSignal(
+            signal_id=f"hazard:{src}:{r.get('id') or r.get('event_id') or round(r['lat'], 4)}:{int(ts)}",
+            source=src or "hazard", source_kind=kind,
+            observed_at=datetime.fromtimestamp(ts, tz=timezone.utc),
+            lat=float(r["lat"]), lon=float(r["lon"]), location_text=r.get("location"),
+            normalized_type=IncidentType(itype), summary=title[:280],
+            confidence=0.7, severity=max(0.0, min(1.0, sev)),
+            dedupe_key=f"hazard:{src}:{r.get('id') or round(r['lat'], 3)},{round(r['lon'], 3)}"))
+    return out
+
+
 def derived_signals(max_age_hours: float = 6.0) -> list[EventSignal]:
     """The other two detectors, as signals, so all three vote in one place:
 

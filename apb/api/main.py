@@ -883,6 +883,16 @@ def live_squawks(max_age_hours: Hours = 0.0):
 @app.get("/live/hazards/all")
 def live_hazards_all(request: Request, max_age_hours: Hours = 24.0):
     """One browser-friendly aggregate for every optional hazard family."""
+    rows = _hazards_all_rows(max_age_hours)
+    encoded = json.dumps(rows, separators=(",", ":"), default=str).encode()
+    etag = '"' + hashlib.sha256(encoded).hexdigest()[:24] + '"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(encoded, media_type="application/json", headers={"ETag": etag})
+
+
+def _hazards_all_rows(max_age_hours: float = 24.0) -> list[dict]:
+    """Every hazard family in one list (cached 20 s) — the map layer, fusion and /related."""
     def _build():
         rows: list[dict] = []
         rows.extend(live_hazards(source=None, max_age_hours=max_age_hours))
@@ -899,12 +909,7 @@ def live_hazards_all(request: Request, max_age_hours: Hours = 24.0):
             rows.extend(fn(max_age_hours=max_age_hours))
         rows.sort(key=lambda d: d.get("ts") or 0, reverse=True)
         return rows[:10_000]
-    rows = _cached(("hazards_all", max_age_hours), 20.0, _build)
-    encoded = json.dumps(rows, separators=(",", ":"), default=str).encode()
-    etag = '"' + hashlib.sha256(encoded).hexdigest()[:24] + '"'
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-    return Response(encoded, media_type="application/json", headers={"ETag": etag})
+    return _cached(("hazards_all", max_age_hours), 20.0, _build)
 
 
 @app.get("/live/cameras")
@@ -2008,11 +2013,77 @@ def live_fused(min_count: int = Query(2, ge=2, le=100),
         signals = gather_signals(_cad, limit_per=limit_per, max_age_hours=max_age_hours,
                                  include_seed=include_seed, include_live=include_live,
                                  kinds=_parse_kinds(kinds))
+        if include_live:                        # warnings, fires, quakes, 511 vote too
+            from apb.fusion.sources import hazard_signals
+            want = _parse_kinds(kinds)
+            try:
+                signals += [s for s in hazard_signals(_hazards_all_rows(max(max_age_hours, 24.0)))
+                            if want is None or s.source_kind.value in want]
+            except Exception as e:
+                log.info("fused: hazards unavailable: %s", e)
         return [e.__dict__ for e in detect(
             signals, min_count=min_count, min_sources=min_sources, min_score=min_score,
             max_age_hours=max_age_hours)]
     return _cached(("fused", min_count, min_sources, min_score, max_age_hours,
                     limit_per, include_seed, include_live, kinds), 20.0, _build)
+
+
+@app.get("/live/related")
+def live_related(lat: float | None = Query(None, ge=-90, le=90), lon: float | None = Query(None, ge=-180, le=180),
+                 ts: float | None = Query(None, ge=0), type: str | None = Query(None, max_length=40),
+                 thread: str | None = Query(None, pattern=r"^[0-9a-f]{12}$"),
+                 exclude: str | None = Query(None, max_length=120),
+                 radius_km: float = Query(3.0, gt=0.0, le=25.0),
+                 window_min: float = Query(90.0, gt=0.0, le=720.0)):
+    """What else is going on here: items from every feed near a point and time, ranked
+    by distance, time, same incident family and (for radio) the same street named —
+    CAD and radio incidents, hazards and warnings, news and social, cameras and
+    corroborated events, each with a short "why". `thread` takes a radio incident's
+    place, time, type and streets from the server (the streets are never returned)."""
+    from apb.context.tasking import nearest_cameras
+    from apb.fusion import news_store, related, social_store
+    from apb.store import radio as radio_store, snapshots
+    text, excl = None, set(filter(None, (exclude or "").split(",")))
+    if thread:
+        t = radio_store.thread(thread)
+        if not t or t.get("lat") is None:
+            return JSONResponse({"error": "unknown or unplaced thread"}, status_code=404)
+        lat, lon, ts, type = t["lat"], t["lon"], t.get("last_ts"), t.get("type")
+        text = f"{t.get('loc_text') or ''} {t.get('title') or ''}"
+        excl.add(f"radio:rthr{thread}")
+    if lat is None or lon is None:
+        return JSONResponse({"error": "lat/lon or thread required"}, status_code=400)
+    now = _time.time()
+    hours = max(2.0, ((now - ts) / 3600.0 if ts else 0.0) + window_min / 60.0 + 0.5)
+
+    def _build():
+        items: list[dict] = []
+        items += related.incident_items(snapshots.query(min(hours, 72.0)))
+        items += related.thread_items(radio_store.threads(min(hours, 72.0) * 3600.0))
+        try:
+            items += related.hazard_items(_hazards_all_rows(24.0))
+        except Exception as e:
+            log.info("related: hazards: %s", e)
+        items += related.signal_items(social_store.recent(min(hours, 24.0)) + news_store.recent(min(hours, 24.0)))
+        try:
+            items += related.camera_items(nearest_cameras(_cameras, lat, lon, min(radius_km, 5.0), 6))
+        except Exception as e:
+            log.info("related: cameras: %s", e)
+        try:
+            items += related.fused_items(live_fused(min_count=2, min_sources=1, min_score=1.2, max_age_hours=24.0,
+                                                    limit_per=20, include_seed=True, include_live=True, kinds=None))
+        except Exception as e:
+            log.info("related: fused: %s", e)
+        seen, out = set(), []
+        for r in related.related((lat, lon), items, ts=ts, radius_km=radius_km, window_min=window_min,
+                                 type_=type, text=text, exclude=excl, limit=16):
+            k = (r["kind"], r.get("id"))
+            if k not in seen:
+                seen.add(k)
+                out.append(r)
+        return out
+    key = ("related", round(lat, 3), round(lon, 3), int((ts or 0) // 60), type, thread, exclude, radius_km, window_min)
+    return JSONResponse(_cached(key, 30.0, _build), headers={"Cache-Control": "public, max-age=30"})
 
 
 @app.get("/live/social")

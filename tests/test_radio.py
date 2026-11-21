@@ -841,3 +841,59 @@ def test_a_failed_or_stale_batch_job_marks_its_calls_failed(db):
                              post=lambda path, body: {"name": "batches/x"})
     radio_stt.poll_backlog(now, get=lambda name: {"metadata": {"state": "BATCH_STATE_EXPIRED"}})
     assert radio.transcripts_for(db["key"], [700])[700]["status"] == "failed" and radio.jobs() == []
+
+
+def test_related_ranks_by_place_time_type_and_street():
+    from apb.fusion import related
+    origin, ts = (35.43, -82.54), 1_800_000_000.0
+    items = [
+        {"kind": "incident", "id": "a", "lat": 35.432, "lon": -82.541, "ts": ts - 180, "type": "traffic",
+         "title": "Crash", "_text": "two-vehicle crash NC 280 at Deep Woods Dr"},
+        {"kind": "incident", "id": "b", "lat": 35.44, "lon": -82.52, "ts": ts - 1800, "type": "medical", "title": "Medical"},
+        {"kind": "incident", "id": "far", "lat": 36.0, "lon": -82.0, "ts": ts, "type": "traffic", "title": "Far"},
+        {"kind": "hazard", "id": "w", "lat": 36.5, "lon": -83.5, "ts": ts - 7200, "ongoing": True, "type": "Flood Warning",
+         "title": "Flood Warning", "geometry": {"type": "Polygon", "coordinates": [[[-83, 35], [-82, 35], [-82, 36], [-83, 36], [-83, 35]]]}},
+    ]
+    out = related.related(origin, items, ts=ts, type_="traffic", text="NC 280 at Deep Woods")
+    assert [r["id"] for r in out][:1] == ["a"] and "far" not in {r["id"] for r in out}
+    a = out[0]
+    assert "same street" in a["why"] and "also traffic" in a["why"] and "3 min earlier" in a["why"]
+    assert "_text" not in a and "geometry" not in a
+    w = next(r for r in out if r["id"] == "w")
+    assert w["km"] == 0.0 and w["why"][0] == "covers this place"
+    assert related.streets("Respond 1200 block of Oak Ave and I-26") == {"n:oak", "r:26"}
+
+
+def test_hazards_vote_in_fusion_by_kind():
+    from apb.fusion.sources import hazard_signals
+    rows = [{"source": "firms", "lat": 35.0, "lon": -82.0, "ts": 1_800_000_000, "type": "fire", "threat_score": 0.6},
+            {"source": "nws", "lat": 35.0, "lon": -82.0, "ts": 1_800_000_000, "event": "Red Flag Warning", "threat_score": 0.7},
+            {"source": "nws", "lat": 35.0, "lon": -82.0, "ts": 1_800_000_000, "event": "Winter Storm Warning", "threat_score": 0.8},
+            {"source": "511", "lat": 35.0, "lon": -82.0, "ts": 1_800_000_000, "type": "traffic", "summary": "Crash", "threat_score": 0.5},
+            {"source": "adsb", "lat": 35.0, "lon": -82.0, "ts": 1_800_000_000}]
+    got = {(s.source, s.normalized_type.value): s for s in hazard_signals(rows)}
+    assert set(got) == {("firms", "fire"), ("nws", "fire"), ("nws", "weather"), ("511", "traffic")}
+    assert got[("nws", "weather")].severity <= 0.3                 # context, not corroboration
+    assert got[("nws", "fire")].severity == 0.7 and got[("511", "traffic")].source_kind.value == "traffic"
+
+
+def test_related_endpoint_for_a_radio_thread_never_returns_its_street(db, monkeypatch):
+    from fastapi.testclient import TestClient
+    from apb.api import main
+    from apb.store import radio, snapshots
+    now = time.time()
+    radio.save_thread({"tid": "0123456789ab", "key": db["key"], "system": 1, "first_ts": now - 600, "last_ts": now - 300,
+                       "type": "traffic", "title": "Crash on the highway", "activity": "", "area": "Fletcher",
+                       "state": "NC", "priority": 0.5, "status": "active", "loc_text": "NC 280 at Deep Woods",
+                       "lat": 35.43, "lon": -82.55, "precision": "intersection", "calls": [1], "published": 1})
+    snapshots.record([{"metro": "chp", "call_id": "x1", "type": "traffic", "summary": "Collision NC 280 at Deep Woods Dr",
+                       "location": "NC 280", "sentiment": "elevated", "threat_score": 0.5, "lat": 35.432, "lon": -82.548,
+                       "at": "2026-11-20T00:00:00+00:00", "ts": now - 420}])
+    monkeypatch.setattr(main, "_hazards_all_rows", lambda h=24.0: [])
+    monkeypatch.setattr(main, "live_fused", lambda **k: [])
+    r = TestClient(main.app).get("/live/related?thread=0123456789ab")
+    assert r.status_code == 200
+    body = r.json()
+    assert body and body[0]["id"] == "x1" and "same street" in body[0]["why"]
+    assert "Deep Woods" not in json.dumps([x for x in body if x["kind"] == "radio"])
+    assert all(x.get("id") != "rthr0123456789ab" for x in body)
