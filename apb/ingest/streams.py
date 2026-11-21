@@ -54,7 +54,17 @@ COUNT_EVERY = 600.0
 _SAFETY = re.compile(r"\bscanner\b|police|sheriff|\bfire\b|fire ?dept|fire/ems|dispatch|public safety|\bems\b|"
                      r"\bp25\b|\b911\b|\bfdny\b|\bpd\b|highway patrol|\bdps\b|rescue|emergency", re.I)
 _SKIP = re.compile(r"\btest|repeater|amateur|\bham\b|public works|penndot|music|weather radio|noaa|"
-                   r"\bwx\b|aviation|\batc\b|air traffic|railroad|\brail\b", re.I)
+                   r"\bwx\b|aviation|\batc\b|air traffic|railroad|\brail\b|\bcb\b|\blsb\b|\busb\b|"
+                   r"old time|\botr\b|drama|podcast|comedy", re.I)
+# the directory genre must say it is a scanner feed ("She On Fire", genre "various", is not)
+_GENRE = re.compile(r"scanner|public safety|police|sheriff|fire|\bems\b|dispatch|911|emergency", re.I)
+_NOT_GENRE = re.compile(r"music|rock|jazz|hits|\bpop\b|estilo|talk radio", re.I)
+
+
+def wanted(name: str, genre: str) -> bool:
+    text = f"{name} {genre}"
+    return bool(_SAFETY.search(text) and _GENRE.search(genre or "") and not _SKIP.search(text)
+                and not _NOT_GENRE.search(genre or ""))
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -111,10 +121,7 @@ def parse_yp(xml: str) -> list[dict]:
         name, genre, url = f("server_name"), f("genre"), f("listen_url")
         if f("server_type") != "audio/mpeg" or not url.startswith(("http://", "https://")):
             continue
-        text = f"{name} {genre}"
-        if not _SAFETY.search(text) or _SKIP.search(text):
-            continue
-        if re.search(r"music|rock|jazz|hits|\bpop\b|estilo|talk radio", genre, re.I):
+        if not wanted(name, genre):
             continue
         norm = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
         if not norm or norm in seen:
@@ -413,7 +420,7 @@ def choose() -> list[dict]:
     first APB_STREAMS_MAX (directory order). Registers them with the Rdio lane."""
     global _streams
     from apb.ingest import rdio
-    found = load()
+    found = [s for s in load() if wanted(s.get("name") or "", s.get("genre") or "")]   # rules may have tightened
     only = {k.strip() for k in os.environ.get("APB_STREAMS_ONLY", "").split(",") if k.strip()}
     picked = [s for s in found if s["key"] in only] if only else found[:max_streams()]
     _streams = picked

@@ -732,6 +732,12 @@ _YP = """<directory>
  <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
 <entry><server_name>Fire Hits FM</server_name><listen_url>http://s.example/hits</listen_url>
  <server_type>audio/mpeg</server_type><bitrate>128</bitrate><genre>Pop Hits</genre></entry>
+<entry><server_name>She On Fire</server_name><listen_url>http://s.example/she</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>128</bitrate><genre>various</genre></entry>
+<entry><server_name>Cops and Robbers: Police Procedural OTR</server_name><listen_url>http://s.example/otr</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>64</bitrate><genre>Old Time Radio OTR</genre></entry>
+<entry><server_name>38 LSB From Phoenix (CB RADIO)</server_name><listen_url>http://s.example/cb</listen_url>
+ <server_type>audio/mpeg</server_type><bitrate>16</bitrate><genre>Live Scanner Arizona Emergency CB Radio</genre></entry>
 <entry><server_name>Charlotte Fire</server_name><listen_url>http://s.example/clt.ogg</listen_url>
  <server_type>application/ogg</server_type><bitrate>16</bitrate><genre>Scanner</genre></entry>
 </directory>"""
