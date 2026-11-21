@@ -917,7 +917,8 @@ def test_trunking_recorder_calls_are_recorded_counted_and_playable(db, monkeypat
     lst = tmp_path / "tr.json"
     lst.write_text(json.dumps({"instances": [{"base": "https://listen.example.org", "host": "listen.example.org",
                                               "port": 443, "place": "Sacramento, CA", "state": "open", "systems": ["Sac Co"]},
-                                             {"base": "http://x.example:81", "state": "closed"}]}))
+                                             {"base": "http://x.example:81", "state": "closed"},
+                                             {"base": "https://1.2.3.4:8443", "host": "1.2.3.4", "state": "open", "systems": ["Sac Co"]}]}))
     monkeypatch.setenv("APB_TRUNKREC_LIST", str(lst))
     insts = trunkrec.load()
     assert len(insts) == 1 and insts[0]["kind"] == "trunkrec"

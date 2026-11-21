@@ -102,10 +102,16 @@ def load() -> list[dict]:
         raw = json.loads(list_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    out = []
-    for r in raw.get("instances", []):
+    out, seen = [], set()
+    rows = sorted(raw.get("instances", []), key=lambda r: (str(r.get("host") or "").replace(".", "").isdigit(),
+                                                         bool(r.get("dc"))))
+    for r in rows:                                     # by name first: home addresses change
         if r.get("state") != "open" or not r.get("base"):
             continue
+        sig = tuple(sorted(r.get("systems") or [])) or (r["base"],)
+        if sig in seen:                                # one player reached by two names
+            continue
+        seen.add(sig)
         place = None if r.get("dc") else r.get("place")
         labels = {system_id(s): s for s in r.get("systems") or []}
         out.append({"key": key_of(r["base"]), "kind": "trunkrec", "base": r["base"].rstrip("/"),
