@@ -461,17 +461,20 @@
   .rping.hot span{border-color:#e0412c;border-width:2px}
   .rping.thr span{border-color:#e8b04a;width:16px;height:16px;margin:-8px 0 0 -8px;animation-duration:2.2s}
   @keyframes rping{0%{transform:rotate(45deg) scale(.4);opacity:1}100%{transform:rotate(45deg) scale(3.6);opacity:0}}
-  .rbub{pointer-events:none}
-  .rbub .b{position:absolute;left:12px;bottom:10px;width:236px;background:rgba(13,16,21,.95);
-    border:1px solid #2c7a73;border-left:2px solid #4fd1c5;padding:5px 8px 6px;
-    font:500 10.5px/1.42 var(--font);color:#d7f3ef;box-shadow:0 3px 14px rgba(0,0,0,.45);
-    animation:rbubin .25s ease-out;pointer-events:auto;cursor:pointer;transition:opacity .8s}
-  .rbub.hot .b{border-left-color:#e0412c;border-color:#7a2c2c}
-  .rbub .k{display:block;font:600 8px/1.3 var(--font);letter-spacing:.12em;text-transform:uppercase;color:#4fd1c5;margin-bottom:2px}
-  .rbub.hot .k{color:#ff6a50}
-  .rbub .caret{display:inline-block;width:5px;height:10px;background:#4fd1c5;vertical-align:-1px;margin-left:1px;animation:pulse 1s steps(1) infinite}
-  .rbub.out .b{opacity:0}
-  @keyframes rbubin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .rchat-ico{pointer-events:none}
+  .rchat{position:absolute;left:0;bottom:9px;transform:translateX(-50%);width:max-content;max-width:190px;
+    background:rgba(13,16,21,.93);border:1px solid rgba(120,140,165,.28);border-left:2px solid var(--rc);
+    padding:3px 7px 4px;font:500 9.5px/1.35 var(--font);color:#d9e6e4;pointer-events:auto;cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.45);transition:opacity .4s}
+  .rchat::after{content:"";position:absolute;left:50%;bottom:-5px;width:7px;height:7px;margin-left:-4px;
+    background:rgba(13,16,21,.93);border-right:1px solid rgba(120,140,165,.28);border-bottom:1px solid rgba(120,140,165,.28);
+    transform:rotate(45deg)}
+  .rchat .k{display:block;font:600 7.5px/1.3 var(--font);letter-spacing:.12em;text-transform:uppercase;color:var(--rc)}
+  .rchat .k i{font-style:normal;font-family:var(--mono);color:var(--dim);letter-spacing:0;margin-left:3px}
+  .rchat.hot{border-color:rgba(224,65,44,.65);border-left-color:var(--rc);box-shadow:0 0 12px rgba(224,65,44,.35)}
+  .rchat.new{animation:rbubin .25s ease-out}
+  .rchat:hover{opacity:1!important;z-index:2}
+  @keyframes rbubin{from{opacity:0;transform:translate(-50%,4px)}to{opacity:1;transform:translateX(-50%)}}
   #radioTicker{left:352px;bottom:44px;width:360px;padding:7px 10px 5px;display:none}
   #radioTicker.on{display:block}
   #radioTicker .h{font:600 8.5px/1 var(--font);letter-spacing:.16em;text-transform:uppercase;color:#4fd1c5;
@@ -488,11 +491,11 @@
   #radioTicker.min .tls{display:none}
   #radioTicker .tls{max-height:190px;overflow:hidden}
   @media (max-width:760px){ #radioTicker{left:8px;right:8px;width:auto;bottom:calc(34vh + 14px)}
-    #radioTicker .tl:nth-of-type(n+3){display:none} .rbub .b{width:190px} }
+    #radioTicker .tl:nth-of-type(n+3){display:none} .rchat{max-width:150px} }
 
   @media (prefers-reduced-motion:reduce){
     .dot,.loadmark,.surge-halo span,.ping span,.spark i,#top::before,#clip,#clip .lid,#clip .pupil{animation:none!important}
-    .rping span,.rbub .b,.rbub .caret,#radioTicker .tl{animation:none!important}
+    .rping span,.rchat,#radioTicker .tl{animation:none!important}
   }
 </style>
   <!-- First-party analytics: self-hosted Umami, no third-party requests. -->
@@ -1259,11 +1262,14 @@ const EnvironmentField=L.Layer.extend({
 // transcriptions and radio incidents add hot spots on their ~2 km cells (amber for
 // dispatch, red when urgent). Screen-blended light: overlapping activity builds up.
 const RADIO_RGB={chat:[79,209,197],disp:[232,176,74],hot:[224,65,44]};
+// The heat is a blend layer over the terrain (like a Photoshop layer mode): it tints
+// and lifts what is underneath instead of painting flat glow on top of it.
+const RADIO_BLEND='color-dodge', RADIO_GAIN=1.6;
 const RadioField=L.Layer.extend({
   initialize(){ this._base=[]; this._spots=new Map(); this._live=new Map(); },
   onAdd(m){
     this._map=m; this._canvas=L.DomUtil.create('canvas','radio-field leaflet-zoom-animated');
-    m.getPane('overlayPane').appendChild(this._canvas);
+    m.getPane('radioHeat').appendChild(this._canvas);
     m.on('resize',this.redraw,this); this.redraw();
   },
   onRemove(m){ m.off('resize',this.redraw,this); this._canvas.remove(); },
@@ -1293,8 +1299,9 @@ const RadioField=L.Layer.extend({
       const p=m.latLngToContainerPoint(at);
       if(p.x<-r||p.y<-r||p.x>size.x+r||p.y>size.y+r||a<=.004) return;
       const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
-      g.addColorStop(0,`rgba(${rgb},${Math.min(.85,a)})`);
-      g.addColorStop(.35,`rgba(${rgb},${Math.min(.85,a)*.45})`);
+      a=Math.min(.9,a*RADIO_GAIN);
+      g.addColorStop(0,`rgba(${rgb},${a})`);
+      g.addColorStop(.35,`rgba(${rgb},${a*.45})`);
       g.addColorStop(1,`rgba(${rgb},0)`);
       ctx.fillStyle=g; ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
     };
@@ -1321,6 +1328,10 @@ const RadioField=L.Layer.extend({
   }
 });
 let environmentField=new EnvironmentField().addTo(map);
+map.createPane('radioHeat');
+map.getPane('radioHeat').style.zIndex=360;                 // over terrain and night shade, under the marks (400+)
+map.getPane('radioHeat').style.pointerEvents='none';
+map.getPane('radioHeat').style.mixBlendMode=RADIO_BLEND;
 let radioField=new RadioField().addTo(map);
 let incidentField=new IncidentField().addTo(map);
 // living field: ~12fps clock drives the per-cell breathing in IncidentField.redraw
@@ -2862,6 +2873,7 @@ async function loadRadio(){
   try{ const r=await fetch('/live/radio?max_age_minutes=45'); radioRows=r.ok?await r.json():[]; }catch(_){ radioRows=[]; }
   try{ const r=await fetch('/live/radio/areas'); radioAreas=new Map((r.ok?await r.json():[]).map(a=>[a.id,a])); }catch(_){ radioAreas=new Map(); }
   try{ const r=await fetch('/live/radio/threads'); radioThreads=r.ok?await r.json():[]; }catch(_){ radioThreads=[]; }
+  try{ const r=await fetch('/live/radio/lines?max_age_minutes=60'); if(r.ok) addRadioLines(await r.json()); }catch(_){}
   drawRadio(); if(boardOn) drawRadioList();
 }
 function radioPoints(){
@@ -2900,6 +2912,7 @@ function drawRadio(){
     m.on('click',()=>openRadio(r,at)); m.addTo(radioLayer);
   });
   drawRadioThreads(b);
+  drawRadioChats();
 }
 // incidents heard on the radio: linked calls of one event, on the ~2 km cell their
 // place resolved to. A downward chevron (a pin, angular); dashed when only the town is
@@ -3050,15 +3063,16 @@ document.getElementById('radioBtn').onclick=e=>{
 // Each newly transcribed call types out in a bubble on its ~2 km cell (tethered to the
 // antenna) or at the antenna, and lands in the "Radio live" strip; an incident thread the
 // linker just wrote flashes. Cleaned lines only, as everywhere else.
-const RADIO_FEED_MS=5000, radioFx=L.layerGroup().addTo(map), radioSayQ=[], RADIO_MAX_SAY=3;
+const RADIO_FEED_MS=5000, radioFx=L.layerGroup().addTo(map);
 const radioCalm=matchMedia('(prefers-reduced-motion:reduce)').matches;
-let radioCursor=null, radioFeedBusy=false, radioSaying=0, tickCalls=[], tickLast=0, radioTimers=new Set();
+let radioCursor=null, radioFeedBusy=false, tickCalls=[], tickLast=0, radioTimers=new Set();
 const radioLastPing=new Map(), radioLineQ=[]; let radioLineT=null, tickN=0;
 let tickMin=false; try{ tickMin=localStorage.getItem('radioTickerMin')==='1'; }catch(_){}
 function radioLater(fn,ms){ const t=setTimeout(()=>{ radioTimers.delete(t); fn(); },ms); radioTimers.add(t); }
 function radioQuiet(){ radioTimers.forEach(clearTimeout); radioTimers.clear(); radioLineQ.length=0;
+  radioChatLayer.clearLayers();
   radioField._live.clear(); radioField.redraw();
-  clearTimeout(radioLineT); radioLineT=null; radioFx.clearLayers(); radioSayQ.length=0; radioSaying=0; }
+  clearTimeout(radioLineT); radioLineT=null; radioFx.clearLayers(); }
 function radioPing(at,cls,col){
   if(!at||!map.getBounds().pad(.05).contains(at)) return;
   const sp=col?`<span style="border-color:${col};box-shadow:0 0 8px ${col}99"></span>`:'<span></span>';
@@ -3068,31 +3082,58 @@ function radioPing(at,cls,col){
 }
 const sysName=id=>(radioRows.find(r=>r.id===id)||{}).system||'radio';
 const lineKick=l=>[l.kind,l.type&&l.type!=='other'?String(l.type).replace(/_/g,' '):null].filter(Boolean).join(' · ')||'radio';
-function radioSay(l,sysAt){ radioSayQ.push([l,sysAt]); while(radioSayQ.length>8) radioSayQ.shift(); radioSayNext(); }
-function radioSayNext(){
-  while(radioSaying<RADIO_MAX_SAY&&radioSayQ.length){
-    const [l,sysAt]=radioSayQ.shift(), at=l.lat!=null?[l.lat,l.lon]:sysAt;
-    if(!at||map.getZoom()<7||!map.getBounds().contains(at)) continue;   // zoomed out: the strip only
-    radioSaying++; radioBubble(l,at,l.lat!=null?sysAt:null);
-  }
+// Chat bubbles: the last hour of transcribed calls, grouped by screen distance. Each
+// group speaks with its most urgent line (priority, dispatch, freshness) and counts the
+// rest; zooming in splits groups apart, zooming out merges them and lets only urgent
+// calls speak. A newly heard line types itself into its group's bubble when it leads.
+const radioLines=new Map(), radioChatLayer=L.layerGroup().addTo(map);
+const lineKey=l=>l.sys+'/'+l.id;
+function chatScore(l,now){
+  return 2*(+l.priority||0.2)+(l.kind==='dispatch'?1:0)+1.2*Math.exp(-(now-l.ts)/900);
 }
-function radioBubble(l,at,from){
-  const hot=(l.priority||0)>=0.6, col=radioColor(l.type);
-  const m=L.marker(at,{icon:L.divIcon({className:'rbub'+(hot?' hot':''),iconSize:[0,0],
-    html:`<div class="b" style="border-left-color:${col}"><span class="k" style="color:${col}">${esc(lineKick(l))} · ${esc(l.talkgroup||sysName(l.sys))}</span><span class="t"></span><span class="caret" style="background:${col}"></span></div>`}),
-    zIndexOffset:900,keyboard:false}).addTo(radioFx);
-  const tether=from&&(from[0]!==at[0]||from[1]!==at[1])
-    ?L.polyline([from,at],{color:col,weight:1,opacity:.7,dashArray:'2 4',interactive:false}).addTo(radioFx):null;
-  radioPing(at,l.kind==='dispatch'?'alert':'',col);
-  const el=m.getElement(), t=el.querySelector('.t'), text=l.line.length>170?l.line.slice(0,168).replace(/\s+\S*$/,'')+'…':l.line;
-  el.querySelector('.b').onclick=ev=>{ L.DomEvent.stop(ev); const r=radioRows.find(x=>x.id===l.sys); if(r) openRadio(r); };
-  let i=radioCalm?text.length:0;
-  const done=()=>{ const c=el.querySelector('.caret'); if(c) c.remove();
-    setTimeout(()=>{ el.classList.add('out');
-      setTimeout(()=>{ radioFx.removeLayer(m); if(tether) radioFx.removeLayer(tether); radioSaying=Math.max(0,radioSaying-1); radioSayNext(); },800); },6000); };
-  if(i>=text.length){ t.textContent=text; done(); return; }
-  const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length){ clearInterval(tm); done(); } },
-    Math.max(14,Math.min(45,5200/text.length)));                  // a line takes ~1.5-3 s to type
+function addRadioLines(rows){ (rows||[]).forEach(l=>radioLines.set(lineKey(l),l)); }
+let chatT=null;
+function drawRadioChats(fresh){
+  radioChatLayer.clearLayers();
+  if(!showRadio) return;
+  const z=map.getZoom(), now=Date.now()/1000, b=map.getBounds();
+  const pos=new Map(radioPoints().map(([r,at])=>[r.id,at]));
+  const minPri=z<5?.6:z<7?.4:0, cw=z<7?210:170, ch=z<7?96:78, groups=new Map();
+  for(const [k,l] of radioLines){
+    if(now-l.ts>3600){ radioLines.delete(k); continue; }
+    const at=l.lat!=null?[l.lat,l.lon]:pos.get(l.sys);
+    if(!at||!b.contains(at)) continue;
+    if((+l.priority||0)<minPri&&!(z>=5&&l.kind==='dispatch')) continue;
+    const p=map.latLngToContainerPoint(at), gk=Math.floor(p.x/cw)+','+Math.floor(p.y/ch), sc=chatScore(l,now);
+    const g=groups.get(gk)||{n:0,items:[]}; g.n++; g.items.push([sc,l]);
+    if(!g.top||sc>g.s){ g.top=l; g.s=sc; g.at=at; }
+    groups.set(gk,g);
+  }
+  [...groups.values()].sort((x,y)=>y.s-x.s).slice(0,z<6?8:16).forEach(g=>{
+    const l=g.top, col=radioColor(l.type), hot=(+l.priority||0)>=0.6, age=now-l.ts;
+    const max=z>=11?110:z>=8?80:56, text=l.line.length>max?l.line.slice(0,max-2).replace(/\s+\S*$/,'')+'…':l.line;
+    const typing=fresh&&lineKey(l)===fresh&&!radioCalm;
+    const html=`<div class="rchat${hot?' hot':''}${typing?' new':''}" style="--rc:${col};opacity:${(.62+.38*Math.exp(-age/1200)).toFixed(2)}">`
+      +`<span class="k">${esc(lineKick(l))}${g.n>1?` <i>+${g.n-1}</i>`:''}</span><span class="t">${typing?'':esc(text)}</span></div>`;
+    const m=L.marker(g.at,{icon:L.divIcon({className:'rchat-ico',html,iconSize:[0,0]}),
+      zIndexOffset:hot?900:500,keyboard:false}).addTo(radioChatLayer);
+    m.on('click',()=>openChatGroup(g));
+    if(typing){
+      const t=m.getElement().querySelector('.t'); let i=0;
+      const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length) clearInterval(tm); },
+        Math.max(14,Math.min(40,4200/text.length)));
+    }
+  });
+}
+function openChatGroup(g){
+  const now=Date.now()/1000, rows=g.items.sort((x,y)=>y[0]-x[0]).slice(0,8).map(([,l])=>l);
+  const html=`<div class="pop"><div class="kick">Heard on the radio · ${esc(g.n)} call${g.n===1?'':'s'} here</div>`
+    +`<div class="rcalls rthread"><div class="rc-list">`+rows.map(l=>`<div class="rc" data-k="${esc(lineKey(l))}"><button class="rc-play" title="play this call">▶</button>`
+      +`<div class="rc-m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))} · <b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b></div>`
+      +`<div class="rc-line">${esc(l.line)}</div></div>`).join('')+`</div></div></div>`;
+  const pop=L.popup({maxWidth:360,minWidth:280}).setLatLng(g.at).setContent(html).openOn(map);
+  pop.getElement().querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{
+    const l=radioLines.get(n.dataset.k); if(l) playCall({id:l.id,audio:l.audio}); });
 }
 // The strip is built once and updated in place: a new line is one new row that slides in;
 // the header's counter changes its text only. Nothing re-renders, so nothing flickers.
@@ -3137,8 +3178,8 @@ function radioLineNext(){
   const hot=(l.priority||0)>=0.6, disp=l.kind==='dispatch', at=l.lat!=null?[l.lat,l.lon]:sysAt, col=radioColor(l.type);
   radioField.bump(l.sys,sysAt,disp?.45:.2,disp?'disp':'chat',col);
   if(l.lat!=null&&disp) radioField.spot('l'+l.sys+l.id,at,l.priority,Date.now()/1000,col);
-  if(at&&map.getZoom()<7) radioPing(at,disp?'alert':'',col);
-  radioSay(l,sysAt);
+  if(at) radioPing(at,disp?'alert':'',col);
+  addRadioLines([l]); drawRadioChats(lineKey(l));
   if(radioLineQ.length) radioLineT=setTimeout(radioLineNext,Math.max(1200,3200-radioLineQ.length*300));
 }
 // One system's calls are replayed at the pace they were made: a scanner polled every 10
@@ -3181,6 +3222,7 @@ async function radioFeed(){
   }catch(_){ }finally{ radioFeedBusy=false; }
 }
 map.on('moveend zoomend',()=>{ clearTimeout(window._rdT); window._rdT=setTimeout(drawRadio,150); });
+setInterval(()=>{ if(!document.hidden&&showRadio) drawRadioChats(); },30000);     // bubbles age
 
 // ── "right now" board ──
 // One ranked list instead of thirty layers: fused events ordered by novelty x trend x

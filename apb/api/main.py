@@ -1756,14 +1756,41 @@ def live_radio_threads(max_age_minutes: float = Query(180.0, gt=0.0, le=4320.0))
                         headers={"Cache-Control": "public, max-age=30"})
 
 
+def _radio_line(t: dict) -> dict | None:
+    """A transcribed call as the map shows it: cleaned words, kind, type, urgency and the
+    ~2 km cell when placed — or None for noise and mostly-[inaudible] calls."""
+    from apb.context.radio_areas import clean
+    from apb.context.radio_stt import coarse
+    line = clean(t.get("text") or t.get("summary"))[:240]
+    heard = __import__("re").sub(r"\[?inaudible\]?|[^A-Za-z0-9]+", " ", line, flags=2).split()
+    if len(heard) < 3 or t.get("incident_type") == "noise" or t.get("kind") in ("noise", "tones") \
+            or t.get("system") is None:
+        return None
+    cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
+    return {"sys": f"{t['key']}:{t['system']}", "id": t["id"], "ts": t["ts"],
+            "talkgroup": t.get("tg_label"), "kind": t.get("kind"), "type": t.get("incident_type"),
+            "priority": t.get("priority"), "line": line,
+            "lat": cell[0] if cell else None, "lon": cell[1] if cell else None,
+            "audio": f"/live/radio/audio/{t['key']}/{t['id']}"}
+
+
+@app.get("/live/radio/lines")
+def live_radio_lines(max_age_minutes: float = Query(60.0, gt=0.0, le=360.0),
+                     limit: int = Query(400, ge=1, le=1000)):
+    """Recent transcribed calls as cleaned lines (newest first) — the map's chat
+    bubbles. Same cleaning as /calls and /feed: no house numbers, units or names."""
+    from apb.store import radio as radio_store
+    out = [x for x in (_radio_line(t) for t in radio_store.transcripts(max_age_minutes * 60.0, limit=limit)) if x]
+    return JSONResponse(out, headers={"Cache-Control": "public, max-age=30"})
+
+
 @app.get("/live/radio/feed")
 def live_radio_feed(since: float | None = Query(None, ge=0.0)):
     """Live radio indicators: what the radio lanes saw after `since` (the `now` of the
     previous reply; omit it for the last 90 s). New calls (system, talkgroup, weight — no
     content), newly transcribed calls (cleaned line, kind, ~2 km cell when placed) and
     incident threads written since. Poll every few seconds."""
-    from apb.context.radio_areas import clean
-    from apb.context.radio_stt import coarse, weight_for
+    from apb.context.radio_stt import weight_for
     from apb.ingest import rdio
     from apb.store import radio as radio_store
     now = _time.time()
@@ -1778,16 +1805,9 @@ def live_radio_feed(since: float | None = Query(None, ge=0.0)):
         calls.append({"sys": f"{c['key']}:{c['system']}", "id": c["id"], "ts": c["ts"],
                       "talkgroup": tg["label"], "weight": w})
     for t in got["lines"]:
-        line = clean(t.get("text") or t.get("summary"))[:240]
-        heard = __import__("re").sub(r"\[?inaudible\]?|[^A-Za-z0-9]+", " ", line, flags=2).split()
-        if len(heard) < 3 or t.get("incident_type") == "noise" or t.get("system") is None:
-            continue                                   # nothing, noise, or mostly [inaudible]
-        cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
-        lines.append({"sys": f"{t['key']}:{t['system']}", "id": t["id"], "ts": t["ts"],
-                      "talkgroup": t.get("tg_label"), "kind": t.get("kind"), "type": t.get("incident_type"),
-                      "priority": t.get("priority"), "line": line,
-                      "lat": cell[0] if cell else None, "lon": cell[1] if cell else None,
-                      "audio": f"/live/radio/audio/{t['key']}/{t['id']}"})
+        x = _radio_line(t)
+        if x:
+            lines.append(x)
     return JSONResponse({"now": now, "calls": calls, "lines": lines, "threads": got["threads"]},
                         headers={"Cache-Control": "no-store"})
 
