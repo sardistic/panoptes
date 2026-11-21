@@ -42,12 +42,12 @@ def mounts(status: dict) -> list[dict]:
 
 
 def wanted(m: dict) -> bool:
-    from apb.ingest.streams import _SAFETY, _SKIP
+    from apb.ingest.streams import _HAM_CALL, _SAFETY, _SKIP
     name = f"{m.get('server_name') or ''} {m.get('server_description') or ''} {m.get('listenurl') or ''}"
     genre = str(m.get("genre") or "")
     text = f"{name} {genre}"
     mp3 = "mpeg" in str(m.get("server_type") or m.get("content-type") or "audio/mpeg")
-    return bool(mp3 and _SAFETY.search(text) and not _SKIP.search(text)
+    return bool(mp3 and _SAFETY.search(text) and not _SKIP.search(text) and not _HAM_CALL.search(name)
                 and not re.search(r"music|rock|jazz|hits|\bpop\b|talk radio|christian|country", genre, re.I))
 
 

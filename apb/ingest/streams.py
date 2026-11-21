@@ -55,7 +55,10 @@ _SAFETY = re.compile(r"\bscanner\b|police|sheriff|\bfire\b|fire ?dept|fire/ems|d
                      r"\bp25\b|\b911\b|\bfdny\b|\bpd\b|highway patrol|\bdps\b|rescue|emergency", re.I)
 _SKIP = re.compile(r"\btest|repeater|amateur|\bham\b|public works|penndot|music|weather radio|noaa|"
                    r"\bwx\b|aviation|\batc\b|air traffic|railroad|\brail\b|\bcb\b|\blsb\b|\busb\b|"
-                   r"old time|\botr\b|drama|podcast|comedy", re.I)
+                   r"old time|\botr\b|drama|podcast|comedy|\bdmr\b|\bhub\b|air ?band|\bgmrs\b|\bfrs\b", re.I)
+# an amateur callsign in the name (W8CMN, KD2ABC) marks a ham net, not public safety;
+# business licences (KCF415: letters then digits) do not match
+_HAM_CALL = re.compile(r"\b[AKNW][A-Z]?\d[A-Z]{1,3}\b")
 # the directory genre must say it is a scanner feed ("She On Fire", genre "various", is not)
 _GENRE = re.compile(r"scanner|public safety|police|sheriff|fire|\bems\b|dispatch|911|emergency", re.I)
 _NOT_GENRE = re.compile(r"music|rock|jazz|hits|\bpop\b|estilo|talk radio", re.I)
@@ -64,7 +67,13 @@ _NOT_GENRE = re.compile(r"music|rock|jazz|hits|\bpop\b|estilo|talk radio", re.I)
 def wanted(name: str, genre: str) -> bool:
     text = f"{name} {genre}"
     return bool(_SAFETY.search(text) and _GENRE.search(genre or "") and not _SKIP.search(text)
-                and not _NOT_GENRE.search(genre or ""))
+                and not _HAM_CALL.search(name) and not _NOT_GENRE.search(genre or ""))
+
+
+def probed_ok(name: str, genre: str) -> bool:
+    """Mounts found by icecast_probe were kept on their names; re-check what the rules
+    learned since (ham callsigns, DMR hubs, air band)."""
+    return not _SKIP.search(f"{name} {genre}") and not _HAM_CALL.search(name)
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -80,9 +89,9 @@ def off() -> bool:
 
 def max_streams() -> int:
     try:
-        return max(0, int(os.environ.get("APB_STREAMS_MAX", "80")))
+        return max(0, int(os.environ.get("APB_STREAMS_MAX", "120")))
     except ValueError:
-        return 80
+        return 120
 
 
 def state_dir() -> Path:
@@ -433,7 +442,8 @@ def choose() -> list[dict]:
     global _streams
     from apb.ingest import rdio
     # rules may have tightened; probed mounts were filtered on their names by icecast_probe
-    found = [s for s in load() if s.get("via") == "shodan" or wanted(s.get("name") or "", s.get("genre") or "")]
+    found = [s for s in load() if (probed_ok(s.get("name") or "", s.get("genre") or "") if s.get("via") == "shodan"
+                                   else wanted(s.get("name") or "", s.get("genre") or ""))]
     only = {k.strip() for k in os.environ.get("APB_STREAMS_ONLY", "").split(",") if k.strip()}
     picked = [s for s in found if s["key"] in only] if only else found[:max_streams()]
     _streams = picked
