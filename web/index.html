@@ -451,12 +451,16 @@
   }
 
   /* ── live radio: a ping per call the lanes see, a typed line per transcription ── */
-  .rping span{position:absolute;left:0;top:0;width:10px;height:10px;margin:-5px 0 0 -5px;
-    border:1.5px solid #4fd1c5;animation:rping 1.4s ease-out forwards;pointer-events:none}
+  .rping span{position:absolute;left:0;top:0;width:12px;height:12px;margin:-6px 0 0 -6px;
+    border:1.5px solid #4fd1c5;box-shadow:0 0 6px rgba(79,209,197,.55);animation:rping 1.4s ease-out forwards;pointer-events:none}
+  .rping.hi span{box-shadow:0 0 7px rgba(232,176,74,.6)}
+  .rping.hot span{box-shadow:0 0 8px rgba(224,65,44,.7)}
+  .rping.alert span{width:16px;height:16px;margin:-8px 0 0 -8px;border-width:2px;animation-duration:1.9s}
+  .rping.alert span+span{animation-delay:.35s;animation-fill-mode:both}
   .rping.hi span{border-color:#e8b04a}
   .rping.hot span{border-color:#e0412c;border-width:2px}
   .rping.thr span{border-color:#e8b04a;width:16px;height:16px;margin:-8px 0 0 -8px;animation-duration:2.2s}
-  @keyframes rping{0%{transform:rotate(45deg) scale(.4);opacity:1}100%{transform:rotate(45deg) scale(3.2);opacity:0}}
+  @keyframes rping{0%{transform:rotate(45deg) scale(.4);opacity:1}100%{transform:rotate(45deg) scale(3.6);opacity:0}}
   .rbub{pointer-events:none}
   .rbub .b{position:absolute;left:12px;bottom:10px;width:236px;background:rgba(13,16,21,.95);
     border:1px solid #2c7a73;border-left:2px solid #4fd1c5;padding:5px 8px 6px;
@@ -1079,6 +1083,18 @@ function incidentFamily(type){
   return 'other';
 }
 function hexRgb(hex){ return [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)); }
+// Radio calls by type: the incident-field families, lifted for pings and bubbles on a
+// dark map (same hue, more light). Untranscribed calls stay radio teal.
+const RADIO_FAM={violence:'#ef6a62',fire:'#f39a4c',medical:'#e58aa6',traffic:'#e8c95c',
+  suspicious:'#b9a0e6',public:'#7fcfc5',other:'#aab3a2'};
+function radioFamily(type){
+  const t=String(type||'').toLowerCase();
+  if(/shots|assault|robbery|domestic|weapon|stabb/.test(t)) return 'violence';
+  if(/pursuit/.test(t)) return 'traffic';
+  if(/welfare/.test(t)) return 'medical';
+  const f=incidentFamily(t); return RADIO_FAM[f]?f:'other';
+}
+const radioColor=type=>RADIO_FAM[radioFamily(type)];
 const IncidentField=L.Layer.extend({
   initialize(){ this._data=[]; },
   onAdd(m){
@@ -1237,14 +1253,83 @@ const EnvironmentField=L.Layer.extend({
     }
   }
 });
+// Radio heat: where the radio is busy right now. Every reporting system glows by its
+// call rate (more when above its own normal); each call as it replays adds energy that
+// decays over ~2 min, so busy systems visibly flare with their traffic; placed
+// transcriptions and radio incidents add hot spots on their ~2 km cells (amber for
+// dispatch, red when urgent). Screen-blended light: overlapping activity builds up.
+const RADIO_RGB={chat:[79,209,197],disp:[232,176,74],hot:[224,65,44]};
+const RadioField=L.Layer.extend({
+  initialize(){ this._base=[]; this._spots=new Map(); this._live=new Map(); },
+  onAdd(m){
+    this._map=m; this._canvas=L.DomUtil.create('canvas','radio-field leaflet-zoom-animated');
+    m.getPane('overlayPane').appendChild(this._canvas);
+    m.on('resize',this.redraw,this); this.redraw();
+  },
+  onRemove(m){ m.off('resize',this.redraw,this); this._canvas.remove(); },
+  setBase(rows){ this._base=rows||[]; this.redraw(); },
+  // a call heard on a system (energy decays), or a placed line / incident (a spot)
+  bump(id,at,amount,kind,col){
+    if(!at) return;
+    const now=Date.now()/1000, e=this._live.get(id)||{at,e:0,d:0,t:now};
+    e.e=this._decay(e,now)+amount; e.d=Math.min(1,e.d*.8+(kind==='disp'?.6:0)); e.t=now; e.at=at;
+    if(col){ e.c=hexRgb(col); e.ct=now; }               // the last typed call tints its system
+    this._live.set(id,e);
+  },
+  spot(id,at,pri,ts,col){ if(at) this._spots.set(id,{at,pri:+pri||0.3,ts:ts||Date.now()/1000,c:col?hexRgb(col):null}); },
+  _decay(e,now){ return e.e*Math.exp(-(now-e.t)/110); },
+  busy(){ const now=Date.now()/1000; for(const e of this._live.values()) if(this._decay(e,now)>.03) return true; return false; },
+  redraw(){
+    if(!this._map||!this._canvas) return;
+    const m=this._map,size=m.getSize(),dpr=Math.min(1.25,window.devicePixelRatio||1),z=m.getZoom();
+    this._canvas.width=Math.round(size.x*dpr); this._canvas.height=Math.round(size.y*dpr);
+    this._canvas.style.width=`${size.x}px`; this._canvas.style.height=`${size.y}px`;
+    L.DomUtil.setPosition(this._canvas,m.containerPointToLayerPoint([0,0]));
+    const ctx=this._canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(this._off) return;
+    ctx.globalCompositeOperation='screen';         // builds up, never clips to white
+    const now=Date.now()/1000, R=z<5?22:z<7?30:z<10?44:60;
+    const glow=(at,r,rgb,a)=>{
+      const p=m.latLngToContainerPoint(at);
+      if(p.x<-r||p.y<-r||p.x>size.x+r||p.y>size.y+r||a<=.004) return;
+      const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+      g.addColorStop(0,`rgba(${rgb},${Math.min(.85,a)})`);
+      g.addColorStop(.35,`rgba(${rgb},${Math.min(.85,a)*.45})`);
+      g.addColorStop(1,`rgba(${rgb},0)`);
+      ctx.fillStyle=g; ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
+    };
+    // steady: each system by its call rate, lifted when above its own normal
+    for(const r of this._base){
+      if(r.lat==null) continue;
+      const rate=Math.min(1,Math.log1p(r.per10||0)/Math.log(80)), lift=r.z!=null&&r.z>=2?Math.min(1,(r.z-1)/4):0;
+      glow([r.lat,r.lon],R*(r.approx?1.5:1)*(1+.5*rate),(lift>.5?RADIO_RGB.disp:RADIO_RGB.chat).join(','),
+           (.05+.16*rate+.2*lift)*(r.approx?.6:1));
+    }
+    // live: energy from calls being heard right now
+    for(const [id,e] of this._live){
+      const v=this._decay(e,now); if(v<.01){ this._live.delete(id); continue; }
+      const a=Math.min(1,v), typed=e.c&&now-e.ct<180;
+      glow(e.at,R*(.8+.9*a),(typed?e.c:e.d>.3?RADIO_RGB.disp:RADIO_RGB.chat).join(','),.08+.3*Math.min(1,a/2));
+    }
+    // placed: transcribed dispatches and radio incidents, fading over 90 min
+    const cellPx=Math.max(10,2000/(156543.03*Math.cos(m.getCenter().lat*Math.PI/180)/Math.pow(2,z)));
+    for(const [id,sp] of this._spots){
+      const age=now-sp.ts; if(age>5400){ this._spots.delete(id); continue; }
+      const f=Math.exp(-age/2400);
+      glow(sp.at,Math.max(14,Math.min(90,cellPx*1.3)),(sp.c||(sp.pri>=.6?RADIO_RGB.hot:RADIO_RGB.disp)).join(','),(.12+.3*sp.pri)*f);
+    }
+  }
+});
 let environmentField=new EnvironmentField().addTo(map);
+let radioField=new RadioField().addTo(map);
 let incidentField=new IncidentField().addTo(map);
 // living field: ~12fps clock drives the per-cell breathing in IncidentField.redraw
 if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
   let fieldLast=0;
   const fieldPulse=now=>{
     if(!document.hidden && now-fieldLast>84){ fieldLast=now;
-      incidentField._t=now/1000; incidentField.redraw(); }
+      incidentField._t=now/1000; incidentField.redraw();
+      if(!radioField._off&&radioField.busy()) radioField.redraw(); }
     requestAnimationFrame(fieldPulse);
   };
   requestAnimationFrame(fieldPulse);
@@ -2791,7 +2876,13 @@ function radioPoints(){
   return out;
 }
 function drawRadio(){
-  radioLayer.clearLayers(); if(!showRadio) return;
+  radioLayer.clearLayers();
+  const now=Date.now()/1000;
+  radioThreads.forEach(t=>{ if(t.lat!=null&&t.status!=='cleared'&&now-(t.last_ts||0)<5400)
+    radioField.spot('t'+t.id,[t.lat,t.lon],t.priority,t.last_ts,radioColor(t.type)); });
+  radioField._off=!showRadio;
+  radioField.setBase(showRadio?radioPoints().map(([r,at])=>({...r,lat:at[0],lon:at[1]})):[]);
+  if(!showRadio) return;
   const b=map.getBounds().pad(.1);
   const zz=map.getZoom();
   radioPoints().forEach(([r,at])=>{
@@ -2815,13 +2906,15 @@ function drawRadio(){
 // known; red when urgent; bigger with more calls. Click for the call timeline.
 const PRECISION={address:'from a block address',intersection:'from an intersection',street:'from the street named',town:'town only'};
 // A radio incident is an event like any other: the incident tick in its severity colour,
-// with one pair of angular brackets — "heard on the air" — that widen as calls link in.
+// with one pair of angular brackets — "heard on the air", in the call type's colour —
+// that widen as calls link in.
 // Town-only placement dashes the brackets; a cleared incident goes grey.
 function radioEventGlyph(t,z){
-  const p=+t.priority||0.3, n=(t.calls||[]).length, col=t.status==='cleared'?'#7c8a93':sevColor(p);
+  const p=+t.priority||0.3, n=(t.calls||[]).length, cleared=t.status==='cleared';
+  const col=cleared?'#7c8a93':sevColor(p), fam=cleared?'#7c8a93':radioColor(t.type);
   const px=4+p*6, b=px*.6, gx=4+Math.min(4,n*.5), at=(dx,dy)=>screenOffset(t.lat,t.lon,dx,dy,z);
   const lines=[[[0,-px],[0,px]],[[-gx,-b],[-gx-2.5,0],[-gx,b]],[[gx,-b],[gx+2.5,0],[gx,b]]];
-  return L.featureGroup(lines.map((l,i)=>L.polyline(l.map(q=>at(q[0],q[1])),{color:col,
+  return L.featureGroup(lines.map((l,i)=>L.polyline(l.map(q=>at(q[0],q[1])),{color:i?fam:col,
     weight:i?1.1:(p>=HIGH_THREAT?2.4:1.7),opacity:i?.75:.95,lineCap:'square',lineJoin:'miter',
     dashArray:i&&t.precision==='town'?'2 2':null,interactive:true})));
 }
@@ -2964,12 +3057,14 @@ const radioLastPing=new Map(), radioLineQ=[]; let radioLineT=null, tickN=0;
 let tickMin=false; try{ tickMin=localStorage.getItem('radioTickerMin')==='1'; }catch(_){}
 function radioLater(fn,ms){ const t=setTimeout(()=>{ radioTimers.delete(t); fn(); },ms); radioTimers.add(t); }
 function radioQuiet(){ radioTimers.forEach(clearTimeout); radioTimers.clear(); radioLineQ.length=0;
+  radioField._live.clear(); radioField.redraw();
   clearTimeout(radioLineT); radioLineT=null; radioFx.clearLayers(); radioSayQ.length=0; radioSaying=0; }
-function radioPing(at,cls){
+function radioPing(at,cls,col){
   if(!at||!map.getBounds().pad(.05).contains(at)) return;
-  const m=L.marker(at,{icon:L.divIcon({className:'rping'+(cls?' '+cls:''),html:'<span></span>',iconSize:[0,0]}),
+  const sp=col?`<span style="border-color:${col};box-shadow:0 0 8px ${col}99"></span>`:'<span></span>';
+  const m=L.marker(at,{icon:L.divIcon({className:'rping'+(cls?' '+cls:''),html:/alert/.test(cls||'')?sp+sp:sp,iconSize:[0,0]}),
     interactive:false,keyboard:false}).addTo(radioFx);
-  setTimeout(()=>radioFx.removeLayer(m),cls==='thr'?2300:1500);
+  setTimeout(()=>radioFx.removeLayer(m),/thr|alert/.test(cls||'')?2300:1500);
 }
 const sysName=id=>(radioRows.find(r=>r.id===id)||{}).system||'radio';
 const lineKick=l=>[l.kind,l.type&&l.type!=='other'?String(l.type).replace(/_/g,' '):null].filter(Boolean).join(' · ')||'radio';
@@ -2982,13 +3077,13 @@ function radioSayNext(){
   }
 }
 function radioBubble(l,at,from){
-  const hot=(l.priority||0)>=0.6, col=hot?'#e0412c':'#4fd1c5';
+  const hot=(l.priority||0)>=0.6, col=radioColor(l.type);
   const m=L.marker(at,{icon:L.divIcon({className:'rbub'+(hot?' hot':''),iconSize:[0,0],
-    html:`<div class="b"><span class="k">${esc(lineKick(l))} · ${esc(l.talkgroup||sysName(l.sys))}</span><span class="t"></span><span class="caret"></span></div>`}),
+    html:`<div class="b" style="border-left-color:${col}"><span class="k" style="color:${col}">${esc(lineKick(l))} · ${esc(l.talkgroup||sysName(l.sys))}</span><span class="t"></span><span class="caret" style="background:${col}"></span></div>`}),
     zIndexOffset:900,keyboard:false}).addTo(radioFx);
   const tether=from&&(from[0]!==at[0]||from[1]!==at[1])
     ?L.polyline([from,at],{color:col,weight:1,opacity:.7,dashArray:'2 4',interactive:false}).addTo(radioFx):null;
-  radioPing(at,hot?'hot':'hi');
+  radioPing(at,l.kind==='dispatch'?'alert':'',col);
   const el=m.getElement(), t=el.querySelector('.t'), text=l.line.length>170?l.line.slice(0,168).replace(/\s+\S*$/,'')+'…':l.line;
   el.querySelector('.b').onclick=ev=>{ L.DomEvent.stop(ev); const r=radioRows.find(x=>x.id===l.sys); if(r) openRadio(r); };
   let i=radioCalm?text.length:0;
@@ -3014,7 +3109,7 @@ function radioTickerAdd(l){
   const el=radioTickerEl(), list=el.querySelector('.tls'), row=document.createElement('div');
   row.className='tl'+((l.priority||0)>=0.6?' hot':'');
   row.innerHTML=`<span class="m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))}${l.talkgroup?' · '+esc(l.talkgroup):''}</span>`
-    +`<span class="x"><b>${esc(lineKick(l))}</b> — ${esc(l.line)}</span>`;
+    +`<span class="x"><b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b> — ${esc(l.line)}</span>`;
   row.title=l.line;
   row.onclick=()=>{ const r=radioRows.find(x=>x.id===l.sys);
     if(l.lat!=null) map.flyTo([l.lat,l.lon],Math.max(map.getZoom(),11));
@@ -3038,7 +3133,12 @@ function radioTickerDraw(){
 function radioLineNext(){
   radioLineT=null;
   const nx=radioLineQ.shift(); if(!nx) return;
-  const [l,sysAt]=nx; radioTickerAdd(l); radioSay(l,sysAt); tickLast=Date.now();
+  const [l,sysAt]=nx; radioTickerAdd(l); tickLast=Date.now();
+  const hot=(l.priority||0)>=0.6, disp=l.kind==='dispatch', at=l.lat!=null?[l.lat,l.lon]:sysAt, col=radioColor(l.type);
+  radioField.bump(l.sys,sysAt,disp?.45:.2,disp?'disp':'chat',col);
+  if(l.lat!=null&&disp) radioField.spot('l'+l.sys+l.id,at,l.priority,Date.now()/1000,col);
+  if(at&&map.getZoom()<7) radioPing(at,disp?'alert':'',col);
+  radioSay(l,sysAt);
   if(radioLineQ.length) radioLineT=setTimeout(radioLineNext,Math.max(1200,3200-radioLineQ.length*300));
 }
 // One system's calls are replayed at the pace they were made: a scanner polled every 10
@@ -3053,8 +3153,10 @@ function radioReplay(calls,pos){
     const scale=span<RADIO_FEED_MS/1000?(RADIO_FEED_MS/1000)/span:Math.min(1,660/span);
     cs.forEach(c=>radioLater(()=>{
       const now=Date.now(); tickCalls.push(now); tickLast=now;
+      const disp=c.weight>=0.8;
+      radioField.bump(sys,pos.get(sys),disp?.5:.22,disp?'disp':'chat');
       if(now-(radioLastPing.get(sys)||0)<700) return;
-      radioLastPing.set(sys,now); radioPing(pos.get(sys),c.weight>=0.8?'hi':'');
+      radioLastPing.set(sys,now); radioPing(pos.get(sys),disp?'hi alert':'');
     },Math.round((c.ts-t0)*scale*1000)+Math.random()*400));
   });
 }

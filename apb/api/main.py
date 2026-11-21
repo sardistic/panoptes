@@ -1779,8 +1779,9 @@ def live_radio_feed(since: float | None = Query(None, ge=0.0)):
                       "talkgroup": tg["label"], "weight": w})
     for t in got["lines"]:
         line = clean(t.get("text") or t.get("summary"))[:240]
-        if not line or t.get("incident_type") == "noise" or t.get("system") is None:
-            continue
+        heard = __import__("re").sub(r"\[?inaudible\]?|[^A-Za-z0-9]+", " ", line, flags=2).split()
+        if len(heard) < 3 or t.get("incident_type") == "noise" or t.get("system") is None:
+            continue                                   # nothing, noise, or mostly [inaudible]
         cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
         lines.append({"sys": f"{t['key']}:{t['system']}", "id": t["id"], "ts": t["ts"],
                       "talkgroup": t.get("tg_label"), "kind": t.get("kind"), "type": t.get("incident_type"),

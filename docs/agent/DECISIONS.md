@@ -407,3 +407,17 @@ radio_stt_jobs across restarts; failed / expired / >26 h jobs mark their calls f
 Verified the Batch REST shape on prod (results under metadata.output.inlinedResponses;
 a 1-request job finished in ~2 min).
 
+### 2026-11-20 — Radio activity as light: heat field, alert pings, colour by call type
+
+Owner wanted radio activity visible as pings / heat, and call types to look different.
+`RadioField` (canvas, screen-blended so busy regions build up without clipping to white):
+each reporting system glows by its call rate (amber when well above its own normal);
+every replayed call adds energy that decays over ~2 min, so busy systems flare with their
+traffic; placed dispatches and radio incidents add hot spots on their ~2 km cells (fade
+over 90 min). Pings: dispatch calls are a double-ring "alert", unit traffic a single
+ring; lines ping at every zoom (bubbles still from zoom 7). Call types use the incident
+field's family hues, brightened for a dark map (RADIO_FAM: violence, fire, medical,
+traffic, suspicious, public, other; pursuit = traffic, welfare = medical) on pings,
+bubbles, the strip and the heat; radio incidents keep severity on the tick and show the
+type on their brackets. Lines that are mostly "[inaudible]" are not served by the feed.
+
