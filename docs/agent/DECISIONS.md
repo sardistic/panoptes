@@ -421,3 +421,20 @@ traffic, suspicious, public, other; pursuit = traffic, welfare = medical) on pin
 bubbles, the strip and the heat; radio incidents keep severity on the tick and show the
 type on their brackets. Lines that are mostly "[inaudible]" are not served by the feed.
 
+### 2026-11-20 — Radio linked to every other feed: /live/related, hazards in fusion
+
+Owner: "link and correlate radio with all the other information feeds". Fusion already
+clustered CAD, social, news, camera checks, NOTABLE and radio (surges, located calls,
+placed threads); what was missing was seeing the links, and hazards were not in fusion.
+`apb/fusion/related.py` + `/live/related` rank items near a point/time from CAD and radio
+incidents, radio threads, the hazards aggregate (a covering warning polygon counts as
+0 km), social/news buffers, the nearest cameras and fused events: exp distance and time
+decay, x1.5 same incident family (type field first, whole words), x2 same street. For a
+radio thread (`?thread=`) place, time, type and streets come from the server; its streets
+(loc_text) are matched server-side and never returned, and its own calls are excluded.
+Popups (radio incident, incident, hazard, radio chat group) list "Related · other feeds"
+and dashed lines link them while open. Hazards vote in fusion via `hazard_signals`:
+fires/hotspots, 511 and quakes corroborate; weather alerts are context (severity <= 0.3)
+except red-flag / fire weather (fire). Dry run on a prod DB copy: sensible lists (Bronx
+fire call -> four DOT cameras within 1 km and an earlier fire dispatch nearby).
+
