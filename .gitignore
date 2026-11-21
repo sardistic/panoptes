@@ -46,3 +46,6 @@ data/sniff_captures/
 # Rdio Scanner instance lists hold operators home addresses — never commit them
 data/rdio_candidates.json
 data/rdio_instances.json
+
+# Shodan discovery results hold hobbyists' host addresses — never commit
+data/shodan_*.json

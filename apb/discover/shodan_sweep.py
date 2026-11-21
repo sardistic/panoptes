@@ -55,20 +55,55 @@ QUERIES: dict[str, tuple[str, str, str]] = {
     "traveliq": ('http.html:"/map/mapIcons/Cameras"',
                  "Carmanah / TravelIQ 511 sites (camera list route)",
                  "apb.discover.camera_sniff / cameras.TRAVELIQ"),
-    "activecad": ('http.title:"Active 911" OR http.title:"Active Calls" http.html:"dispatch"',
+    "activecad": ('http.title:"Active Calls" http.html:"dispatch"',
                   "agency 'active calls' pages",
                   "apb.discover.vendor_dork"),
     "arcgis": ('http.title:"ArcGIS REST Services Directory" http.html:"FeatureServer"',
                "public ArcGIS servers",
                "apb.discover.arcgis_sweep"),
+    # more scanner software that publishes on purpose
+    "rdio_html": ('http.html:"rdio-scanner"',
+                  "Rdio Scanner instances with a custom page title",
+                  "radio activity lane (rdio_probe)"),
+    "thinline": ('http.title:"ThinLine Radio"',
+                 "ThinLine Radio (Rdio Scanner fork) web apps",
+                 "radio activity lane (rdio_probe — same protocol)"),
+    "proscan": ('http.title:"ProScan"',
+                "ProScan web servers (scanner control + audio stream)",
+                "radio — review: audio stream only"),
+    "icecast_ps": ('product:"Icecast" http.html:"police"',
+                   "Icecast servers with police mounts",
+                   "streams lane"),
+    # public camera platforms (agency / 511 sites built to show cameras to the public)
+    "cams_511": ('http.title:"511" http.html:"camera"',
+                 "511 traveller-information sites with camera pages",
+                 "apb.discover.camera_sniff"),
+    "cams_traffic": ('http.title:"Traffic Cameras"',
+                     "city / county traffic-camera portals",
+                     "apb.discover.camera_sniff"),
+    "cams_iteris": ('http.html:"iteris" http.html:"camera"',
+                    "Iteris-built traveller / camera sites",
+                    "apb.discover.camera_sniff"),
+    "cams_castlerock": ('http.html:"castlerock" http.html:"camera"',
+                        "Castle Rock 511 platforms",
+                        "apb.discover.camera_sniff"),
 }
 
 
 def _get(client: httpx.Client, path: str, key: str, **params) -> dict:
-    r = client.get(f"{_API}{path}", params={"key": key, **params})
+    """GET a Shodan API path. Errors never carry the request URL (it holds the key)."""
+    try:
+        r = client.get(f"{_API}{path}", params={"key": key, **params})
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"{path}: {type(e).__name__}") from None
     if r.status_code in (401, 403):
         raise PermissionError(r.json().get("error", r.text)[:200] if r.content else str(r.status_code))
-    r.raise_for_status()
+    if r.status_code >= 400:
+        try:
+            detail = r.json().get("error", "")
+        except ValueError:
+            detail = r.text[:120]
+        raise RuntimeError(f"{path}: HTTP {r.status_code} {detail}"[:200].replace(key, "***"))
     return r.json()
 
 
@@ -107,7 +142,7 @@ def sweep(key: str, labels: list[str], search: bool, country: str | None,
                 entry["total"] = count.get("total")
                 entry["facets"] = {k: [(f["value"], f["count"]) for f in v]
                                    for k, v in (count.get("facets") or {}).items()}
-            except (PermissionError, httpx.HTTPError) as e:
+            except (PermissionError, RuntimeError, httpx.HTTPError) as e:
                 entry["count_error"] = str(e)[:200]
             if search:
                 hosts: dict[str, dict] = {}
@@ -121,7 +156,7 @@ def sweep(key: str, labels: list[str], search: bool, country: str | None,
                             break
                         time.sleep(1.1)                       # Shodan allows ~1 request/second
                     entry["hosts"] = list(hosts.values())
-                except (PermissionError, httpx.HTTPError) as e:
+                except (PermissionError, RuntimeError, httpx.HTTPError) as e:
                     entry["search_error"] = str(e)[:200]
             out["queries"][label] = entry
             time.sleep(1.1)

@@ -562,6 +562,7 @@ TRAVELIQ: dict[str, tuple[str, str | None]] = {
     "ak": ("511.alaska.gov", "AK"), "ab": ("511.alberta.ca", "AB"), "sk": ("hotline.gov.sk.ca", "SK"),
     "ns": ("511.novascotia.ca", "NS"), "nb": ("511.gnb.ca", "NB"), "nl": ("511nl.ca", "NL"),
     "yk": ("511yukon.ca", "YT"), "pe": ("511.gov.pe.ca", "PE"), "mb": ("www.manitoba511.ca", "MB"),
+    "on": ("511on.ca", "ON"),          # found 2026-11-20 testing the route on 511 sites (936 cameras)
 }
 _WKT_POINT = re.compile(r"POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)")
 
