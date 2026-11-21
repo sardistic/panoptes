@@ -2051,6 +2051,7 @@ def live_related(lat: float | None = Query(None, ge=-90, le=90), lon: float | No
         lat, lon, ts, type = t["lat"], t["lon"], t.get("last_ts"), t.get("type")
         text = f"{t.get('loc_text') or ''} {t.get('title') or ''}"
         excl.add(f"radio:rthr{thread}")
+        excl.update(f"radio:rdio{c}" for c in t.get("calls") or [])     # its own calls, as incidents
     if lat is None or lon is None:
         return JSONResponse({"error": "lat/lon or thread required"}, status_code=400)
     now = _time.time()

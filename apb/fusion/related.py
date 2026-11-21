@@ -19,13 +19,13 @@ import math
 import re
 
 FAMILIES = {
-    "violence": ("shots", "shooting", "assault", "robbery", "domestic", "weapon", "stabb", "violen", "unrest", "riot"),
-    "fire": ("fire", "smoke", "burn", "red flag", "hotspot", "wildfire", "hazmat", "explosion"),
-    "medical": ("medical", "ems", "overdose", "cardiac", "injur", "welfare", "breathing"),
-    "traffic": ("traffic", "crash", "collision", "vehicle", "pursuit", "road", "accident", "closure"),
-    "weather": ("storm", "tornado", "flood", "wind", "hail", "winter", "snow", "heat", "warning", "thunder"),
-    "outage": ("outage", "power", "internet"),
-    "quake": ("quake", "earthquake", "seismic"),
+    "violence": r"\b(?:shots?|shooting|assault|robbery|domestic|weapon|stabb\w*|violen\w*|unrest|riot)",
+    "fire": r"\b(?:fire|smoke|burning|red flag|hotspot|wildfire|hazmat|explosion)",
+    "medical": r"\b(?:medical|ems|overdose|cardiac|injur\w*|welfare|breathing)",
+    "traffic": r"\b(?:traffic|crash|collision|vehicle|pursuit|accident|closure)",
+    "weather": r"\b(?:storm|tornado|flood\w*|wind|hail|winter|snow|heat|thunder\w*)",
+    "outage": r"\b(?:outage|power|internet)",
+    "quake": r"\b(?:quake|earthquake|seismic)",
 }
 
 _STREET = re.compile(
@@ -37,8 +37,8 @@ _ROUTE = re.compile(r"\b(?:I|US|SR|CR|NC|SC|VA|GA|TN|CA|FL|NY|NJ|PA|OH|MI|TX|AZ|
 
 def family(text: str | None) -> str | None:
     t = str(text or "").lower().replace("_", " ")
-    for fam, words in FAMILIES.items():
-        if any(w in t for w in words):
+    for fam, pat in FAMILIES.items():
+        if re.search(pat, t):
             return fam
     return None
 
@@ -105,7 +105,7 @@ def score(origin: tuple, item: dict, *, ts: float | None, radius_km: float, wind
             why.append("same minute")
     else:
         s *= 0.7
-    ifam = family(f"{item.get('type') or ''} {item.get('title') or ''}")
+    ifam = family(item.get("type")) or family(item.get("title"))   # the type field first
     if fam and ifam == fam:
         s *= 1.5
         why.append(f"also {fam}")
