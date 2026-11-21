@@ -461,3 +461,19 @@ use PostgreSQL. Radio and sampled facts use the collector's local SQLite history
 The brief adds no model or upstream calls and leaves the existing Right now report
 available. There is no new service or configuration.
 
+### 2026-11-20 — Natural-language View All and on-demand agent analysis
+
+View All leads with a short, deterministic read that updates on the normal summary
+refresh. The Agent brief button checks stored source counts for the two leading
+fused events where available, checks feed health, and sends bounded evidence from
+the selected period to pinned Gemini 3.5 Flash-Lite. The model returns up to three
+short points. Every point must refer to at least one server-supplied evidence ID.
+Its sources and the exact summary cutoff are shown in the panel.
+
+The agent uses one text-only model request per cache miss and skips empty windows.
+The collector reserves attempts atomically in SQLite before sending them. The shared
+limits are 24 attempts per UTC day and 600 per UTC month. One request per period
+can generate a brief at a time in a worker. Gemini usage is metered under
+`view_all_brief`; reserved calls also appear in the cost endpoint. Refreshing the
+plain-language read incurs zero model calls.
+

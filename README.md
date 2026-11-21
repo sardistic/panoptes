@@ -124,7 +124,12 @@ register to unlock the keyed lanes.
   reports, fused events, scanner activity and classifications, weather and environmental
   reports, sampled conditions, wildlife sightings, and notable flags. Counts reflect
   when Panoptes received the data, so slower feeds can appear in batches. The brief
-  uses stored data and makes zero model calls and zero upstream requests.
+  uses stored data, includes a short plain-language read, and makes zero model calls
+  and zero upstream requests. The **Agent brief** button uses
+  `POST /live/summary/brief?period=minute|day|week` to check the leading fused events'
+  source mix and feed health, then write a few sentences with references to the
+  evidence it used. It uses one text-only Flash-Lite request per uncached brief,
+  up to 24 per UTC day and 600 per UTC month across all viewers on the collector.
 - `/status` — per-lane operational health (rows, freshness, backoff, buffers), plus
   sampler state, the Street View budget and YouTube / Windy daily quota counters.
 - `/status/costs` — what the paid APIs cost: every Gemini call is metered by feature

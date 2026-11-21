@@ -39,7 +39,7 @@ def _shared_rows(connection, prefix: str, marker: str, window: tuple) -> tuple:
         ORDER BY severity DESC, n DESC, metro, type
         """, window).fetchall()
     fused = connection.execute(f"""
-        SELECT types, lat, lon, source_count, COUNT(*) OVER () AS n
+        SELECT uid, types, lat, lon, source_count, COUNT(*) OVER () AS n
         FROM {prefix}fused_events WHERE first_seen > {marker} AND first_seen <= {marker}
         ORDER BY peak_score DESC, first_seen DESC, uid LIMIT 5
         """, window).fetchall()
@@ -201,7 +201,7 @@ def build(period: str, feeds: dict, place_name) -> dict:
         sections["events"]["highlights"].append({
             "label": kind.replace("_", " "), "detail": f"{place} · {row['source_count']} source kinds"
             if place else f"{row['source_count']} source kinds",
-            "lat": row["lat"], "lon": row["lon"],
+            "uid": row["uid"], "lat": row["lat"], "lon": row["lon"],
         })
 
     radio_types, systems = Counter(), Counter()
@@ -254,7 +254,61 @@ def build(period: str, feeds: dict, place_name) -> dict:
     sections["notable"]["totals"]["new_flags"] = sum(flag_counts.values())
     _group(sections["notable"], "New flags by type", flag_counts)
 
+    read = _quick_read(sections, period)
     for section in sections.values():
         section["totals"] = [{"label": label.replace("_", " "), "count": n}
                              for label, n in section["totals"].items()]
-    return {"period": period, "since": window[0], "until": now, "sections": list(sections.values())}
+    return {"period": period, "since": window[0], "until": now,
+            "read": read, "sections": list(sections.values())}
+
+
+def _quick_read(sections: dict, period: str) -> str:
+    """Put a readable lead above the counts on every refresh, even without a model."""
+    incident = sections["events"]
+    radio_totals = sections["radio"]["totals"]
+    event_count = incident["totals"]["new_fused_events"]
+    reports = incident["totals"]["incident_reports"]
+    sentences = []
+    if event_count:
+        lead = incident["highlights"][0]
+        noun = "event" if event_count == 1 else "events"
+        sentences.append(f"Panoptes detected {event_count:,} new {noun}. "
+                         f"Among the highest-ranked reports was {lead['label']} ({lead['detail']}).")
+    elif reports:
+        noun = "report" if reports == 1 else "reports"
+        types = next(g["items"] for g in incident["groups"] if g["label"] == "Incident types")
+        lead = types[0]
+        sentences.append(f"Panoptes received {reports:,} new incident {noun}, led by "
+                         f"{lead['count']:,} classified as {lead['label']}.")
+    calls = radio_totals["call records received" if period == "minute" else "calls tallied"]
+    if calls:
+        noun = "call" if calls == 1 else "calls"
+        verb = "received records for" if period == "minute" else "tallied"
+        sentences.append(f"Scanner feeds {verb} {calls:,} {noun}.")
+    elif radio_totals["calls classified"]:
+        sentences.append(f"Panoptes classified {radio_totals['calls classified']:,} scanner recordings.")
+    if sections["radio"]["highlights"] and not event_count:
+        lead = sections["radio"]["highlights"][0]
+        sentences.append(f"Radio traffic included a {lead['label']} in the {lead['detail']} area.")
+    for key, noun in (("weather", "weather"), ("ecology", "environment")):
+        section = sections[key]
+        if section["highlights"]:
+            lead = section["highlights"][0]
+            sentences.append(f"The {noun} feeds highlighted {lead['label']} ({lead['detail']}).")
+    if not sentences and any(any(s["totals"].values()) for s in sections.values()):
+        return "New reports arrived from the monitored feeds. The details below show where activity was recorded."
+    return " ".join(sentences) or "Panoptes received no new reports in this window."
+
+
+def event_sources(uid: str, until: float) -> dict:
+    """Source counts for a selected fused event as eligible for the brief's cutoff."""
+    if state.is_postgres():
+        events._init_postgres()
+        with state.pg_connection() as c:
+            row = c.execute("SELECT sources FROM panoptes_fused_events "
+                            "WHERE uid = %s AND last_seen <= %s", (uid, until)).fetchone()
+        return (row["sources"] or {}) if row else {}
+    with snapshots.db_lock:
+        row = events._conn().execute("SELECT sources FROM fused_events "
+                                     "WHERE uid = ? AND last_seen <= ?", (uid, until)).fetchone()
+    return json.loads(row["sources"] or "{}") if row else {}

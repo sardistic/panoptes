@@ -317,22 +317,26 @@ def _meter(feature: str, model: str, usage: dict) -> None:
 
 
 def generate_usage(parts: list[dict], max_tokens: int = 800,
-                   feature: str = "other", model: str | None = None) -> tuple[str, dict]:
+                   feature: str = "other", model: str | None = None, *,
+                   thinking_level: str | None = None, json_output: bool = False,
+                   timeout: float = 60.0) -> tuple[str, dict]:
     """generate(), plus the response's usageMetadata (token counts by modality). A given
     `model` is used alone (no fallback to a newer, possibly pricier one)."""
     key = api_key()
     if not key:
         raise RuntimeError("GEMINI_API_KEY is not configured")
-    body = {"contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": max_tokens,
-                                 "thinkingConfig": {"thinkingBudget": 0}}}
+    thinking = {"thinkingLevel": thinking_level} if thinking_level else {"thinkingBudget": 0}
+    config = {"temperature": 0.1, "maxOutputTokens": max_tokens, "thinkingConfig": thinking}
+    if json_output:
+        config["responseMimeType"] = "application/json"
+    body = {"contents": [{"role": "user", "parts": parts}], "generationConfig": config}
     r = None
     for model in ([model] if model else healthy_models(key)[:3]):
         try:
-            r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body, timeout=60.0)
-            if r.status_code == 400 and "thinking" in r.text.lower():
+            r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=body, timeout=timeout)
+            if r.status_code == 400 and thinking_level is None and "thinking" in r.text.lower():
                 slim = {**body, "generationConfig": {k: v for k, v in body["generationConfig"].items() if k != "thinkingConfig"}}
-                r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=slim, timeout=60.0)
+                r = _client.post(f"{_GEN}/models/{model}:generateContent", params={"key": key}, json=slim, timeout=timeout)
         except httpx.TimeoutException:
             _benched[model] = time.time() + _BENCH_SEC
             continue

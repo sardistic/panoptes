@@ -192,7 +192,16 @@
     background:none;color:var(--dim);font:600 10px var(--font);cursor:pointer}
   .summary-controls button[aria-pressed=true]{color:var(--amber);border-color:var(--amber)}
   #summaryRange{padding:0 16px 7px;color:var(--dim);border-bottom:1px solid var(--line);font-size:10px}
-  #summaryBody{overflow:auto;padding:0 16px 14px}
+  #summaryScroll{overflow:auto;padding:0 16px 14px}
+  #summaryRead{margin:9px 0 7px;color:var(--txt);font-size:12px}
+  .summary-agent{padding:0 0 8px;border-bottom:1px solid var(--line)}
+  .summary-agent button{background:none;color:var(--amber);border:1px solid var(--line);border-radius:2px;
+    padding:4px 8px;cursor:pointer;font:600 10px var(--font)}
+  .summary-agent button:disabled{color:var(--dim);cursor:wait}
+  #summaryAgentOutput{color:var(--dim)}
+  #summaryAgentOutput p{margin:6px 0}
+  #summaryAgentOutput .agent-point{color:var(--txt);margin:4px 0}
+  #summaryAgentOutput summary{cursor:pointer}
   .summary-section{padding:10px 0;border-bottom:1px solid var(--line)}
   .summary-section h4{margin:0 0 5px;color:var(--txt);font:600 12px var(--font)}
   .summary-totals,.summary-detail,.summary-note{color:var(--dim)}
@@ -596,7 +605,14 @@
       <button data-summary-period="week" aria-pressed="false">Last 7 days</button>
     </div>
     <div id="summaryRange">All reporting feeds</div>
-    <div id="summaryBody"></div>
+    <div id="summaryScroll">
+      <p id="summaryRead"></p>
+      <div class="summary-agent">
+        <button id="summaryAgentButton" type="button">Agent brief</button>
+        <div id="summaryAgentOutput" aria-live="polite"></div>
+      </div>
+      <div id="summaryBody"></div>
+    </div>
   </div>
   <h3 id="sideTitle">ACTIVE INCIDENTS</h3>
   <div id="count" role="status" aria-live="polite">0<small> in view</small></div>
@@ -3431,11 +3447,44 @@ document.getElementById('tabSummary').onclick=()=>setSideTab('summary');
 let summaryPeriod='minute', summaryRequest=null, summaryData=null, summaryShown=null;
 const summaryNum=new Intl.NumberFormat();
 const summaryTime=new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const agentTime=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit',second:'2-digit'});
+const agentBriefs=new Map(), agentPending=new Set();
+function drawAgentBrief(){
+  const button=document.getElementById('summaryAgentButton');
+  const output=document.getElementById('summaryAgentOutput');
+  const data=agentBriefs.get(summaryPeriod);
+  button.disabled=agentPending.has(summaryPeriod);
+  button.textContent=button.disabled?'Checking reports…':data?.state==='ready'?'Refresh agent brief':'Agent brief';
+  if(data?.state==='ready'){
+    output.innerHTML=`<p>Evidence through ${esc(agentTime.format(new Date(data.until*1000)))}</p>`
+      +data.points.map(point=>`<p class="agent-point">${esc(point.text)} <small>[${point.sources.join(', ')}]</small></p>`).join('')
+      +`<details><summary>Sources checked</summary><ol>${data.evidence.map(item=>
+        `<li value="${item.id}"><b>${esc(item.label)}</b> · ${esc(item.detail)}</li>`).join('')}</ol></details>`;
+  }else{
+    output.textContent=button.disabled?'':data?.error||data?.read||'';
+  }
+}
+document.getElementById('summaryAgentButton').onclick=async()=>{
+  const period=summaryPeriod;
+  if(agentPending.has(period)) return;
+  agentPending.add(period);
+  drawAgentBrief();
+  try{
+    const response=await fetch('/live/summary/brief?period='+period,{method:'POST'});
+    agentBriefs.set(period, await response.json());
+  }catch(_){
+    agentBriefs.set(period,{error:'The agent brief is temporarily unavailable.'});
+  }finally{
+    agentPending.delete(period);
+    if(summaryPeriod===period) drawAgentBrief();
+  }
+};
 function drawSummary(data){
   const body=document.getElementById('summaryBody');
   const open=new Set([...body.querySelectorAll('details[open]')].map(el=>el.dataset.group));
   document.getElementById('summaryRange').textContent='All reporting feeds · '
     +summaryTime.formatRange(new Date(data.since*1000),new Date(data.until*1000));
+  document.getElementById('summaryRead').textContent=data.read||'';
   const active=data.sections.filter(s=>s.totals.some(t=>t.count>0));
   const mapped=[];
   body.innerHTML=(active.map(section=>{
@@ -3455,7 +3504,7 @@ function drawSummary(data){
     }).join('');
     return `<section class="summary-section"><h4>${esc(section.title)}</h4><div class="summary-totals">${totals}</div>`
       +(highlights?`<ul class="summary-highlights">${highlights}</ul>`:'')+groups+'</section>';
-  }).join('')||'<p role="status">No new records in this window.</p>')
+  }).join(''))
     +'<p class="summary-note">New to Panoptes in this window. Feeds can arrive in batches. Weather and wildlife details come from sampled areas.'
     +(data.period==='minute'?'':' Radio totals use scanner poll windows ending in this period.')+'</p>';
   body.querySelectorAll('[data-summary-map]').forEach(button=>button.onclick=()=>{
@@ -3475,6 +3524,7 @@ async function loadSummary(){
     else{
       summaryShown=null;
       document.getElementById('summaryRange').textContent='All reporting feeds';
+      document.getElementById('summaryRead').textContent='';
       body.innerHTML='<p role="status">Loading summary…</p>';
     }
   }
@@ -3496,6 +3546,7 @@ const summaryButtons=document.querySelectorAll('[data-summary-period]');
 summaryButtons.forEach(button=>button.onclick=()=>{
   summaryPeriod=button.dataset.summaryPeriod;
   summaryButtons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
+  drawAgentBrief();
   loadSummary();
 });
 setInterval(()=>{

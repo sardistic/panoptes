@@ -45,14 +45,15 @@ def allow(provider: str, n: int, monthly_cap: int, daily_cap: int) -> bool:
     month, day = _periods()
     with _lock:
         c = _conn()
-        rows = dict(c.execute("SELECT period, n FROM spend WHERE provider = ? AND period IN (?, ?)",
-                              (provider, month, day)).fetchall())
-        if rows.get(month, 0) + n > monthly_cap or rows.get(day, 0) + n > daily_cap:
-            return False
-        for period in (month, day):
-            c.execute("INSERT INTO spend (provider, period, n) VALUES (?, ?, ?) "
-                      "ON CONFLICT(provider, period) DO UPDATE SET n = n + excluded.n", (provider, period, n))
-        c.commit()
+        with c:
+            c.execute("BEGIN IMMEDIATE")
+            rows = dict(c.execute("SELECT period, n FROM spend WHERE provider = ? AND period IN (?, ?)",
+                                  (provider, month, day)).fetchall())
+            if rows.get(month, 0) + n > monthly_cap or rows.get(day, 0) + n > daily_cap:
+                return False
+            for period in (month, day):
+                c.execute("INSERT INTO spend (provider, period, n) VALUES (?, ?, ?) "
+                          "ON CONFLICT(provider, period) DO UPDATE SET n = n + excluded.n", (provider, period, n))
     return True
 
 

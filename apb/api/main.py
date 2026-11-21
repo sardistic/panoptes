@@ -1502,15 +1502,30 @@ def live_sitrep():
         return JSONResponse({"error": "sitrep unavailable"}, status_code=424)
 
 
+def _summary_window(period: str, ttl: int) -> dict:
+    from apb.store import summary
+
+    return _cached(("view-all-summary", period), ttl,
+                   lambda: summary.build(period, CAD_FEEDS, _place_name))
+
+
 @app.get("/live/summary")
 def live_summary(period: Literal["minute", "day", "week"] = "minute"):
     """Summarize newly recorded activity across all feeds using local history only."""
-    from apb.store import summary
-
     ttl = {"minute": 10, "day": 45, "week": 90}[period]
-    result = _cached(("view-all-summary", period), ttl,
-                     lambda: summary.build(period, CAD_FEEDS, _place_name))
+    result = _summary_window(period, ttl)
     return JSONResponse(result, headers={"Cache-Control": f"public, max-age={ttl}"})
+
+
+@app.post("/live/summary/brief")
+def live_summary_brief(period: Literal["minute", "day", "week"] = "minute"):
+    """Write a budgeted, evidence-linked analysis of the selected window."""
+    from apb.context import brief
+
+    if state.is_postgres() and not _poller_leader:
+        return JSONResponse({"error": "Agent briefs run on the collector."}, status_code=503)
+    status_code, result = brief.generate(period, lambda: _summary_window(period, 10))
+    return JSONResponse(result, status_code=status_code, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/db/stats")
@@ -1601,6 +1616,7 @@ def status_costs(days: int = Query(30, ge=1, le=90)):
            "quotas": {"youtube_units": spend.used("youtube_units"), "windy_requests": spend.used("windy"),
                       "radio_audio_sec": spend.used("radio_stt_sec"),
                       "radio_profile_calls": spend.used("radio_profile_calls"),
+                      "view_all_brief_calls": spend.used("view_all_brief"),
                       "camera_checks": spend.used("gemini_tasking")}}
     return JSONResponse(out, headers={"Cache-Control": "public, max-age=60"})
 
