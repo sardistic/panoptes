@@ -65,12 +65,13 @@ def test_carmanah_v2_emits_one_row_per_enabled_view_and_needs_key_when_keyed(mon
                            "Description": "Toronto Bound"},
                           {"Id": 2, "Url": "https://511on.ca/map/Cctv/2", "Status": "Disabled"}]}]
     reg = _Stub({"/api/v2/get/cameras": payload})
-    rows = cameras._carmanah_v2(reg, SOURCES["on511"])
+    src = cameras.CameraSource("on511", "Ontario 511 cameras", cameras._carmanah_v2, "ON", host="511on.ca")
+    rows = cameras._carmanah_v2(reg, src)                    # the parser stays; Ontario now uses tq_on
     assert len(rows) == 1 and rows[0]["id"] == "on511:7.1"
     assert rows[0]["name"] == "QEW at Thompson · Toronto Bound"
     monkeypatch.delenv("T511_GA_KEY", raising=False)
     assert cameras._carmanah_v2(reg, SOURCES["ga511"]) == []
-    assert "ga511" not in cameras.available() and "on511" in cameras.available()
+    assert "ga511" not in cameras.available() and "tq_on" in cameras.available()
 
 
 def test_chart_md_derives_hls_from_streamer_host_only():
@@ -252,7 +253,8 @@ def test_cars_new_york_takes_stills_and_leaves_nyc_tmc_to_its_own_source():
     assert rows[0]["state"] == "NY" and rows[0]["page_url"] == "https://511ny.org/"
 
 
-def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper():
+def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper(monkeypatch):
+    monkeypatch.setitem(cameras.ATIS, "va", ("https://511.vdot.virginia.gov/services/map/array/cameras", "VA"))
     doc = {"data": [
         {"geometry": {"coordinates": [-77.3, 38.8]}, "properties": {"id": "1", "description": "Univ Dr", "route": "",
          "https_url": "https://m.vdotcameras.com/rtplive/x/playlist.m3u8", "problem_stream": False}},
@@ -261,7 +263,7 @@ def test_atis_lane_handles_hls_sites_multi_still_sites_and_data_wrapper():
         {"geometry": {"coordinates": [-100.0, 44.9]}, "properties": {"id": "7", "name": "Watertown North", "route": "I-29",
          "cameras": [{"id": "a", "name": "Looking South", "image": "https://sd.cdn.iteris-atis.com/c/1/latest.jpg"},
                      {"id": "b", "name": "Looking North", "image": "https://sd.cdn.iteris-atis.com/c/4/latest.jpg"}]}}]}
-    rows = cameras._atis(_Stub({"": doc}), SOURCES["at_va"])
+    rows = cameras._atis(_Stub({"": doc}), cameras.CameraSource("at_va", "VA", cameras._atis, "VA"))
     ids = [r["id"] for r in rows]
     assert ids == ["at_va:1", "at_va:7.a", "at_va:7.b"]           # broken stream skipped, stills expanded
     assert rows[0]["stream_url"].endswith("x/playlist.m3u8") and rows[1]["image_url"].endswith("1/latest.jpg")

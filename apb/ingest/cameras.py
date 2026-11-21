@@ -624,7 +624,6 @@ _ITERIS_QUERY = ("query MapFeatures($input: MapFeaturesArgs!, $plowType: String)
 ITERIS: dict[str, tuple[str, str, tuple[float, float, float, float]]] = {
     "ia": ("511ia.org", "IA", (43.6, 40.3, -90.1, -96.7)),
     "in": ("511in.org", "IN", (41.8, 37.7, -84.7, -88.1)),
-    "mn": ("511mn.org", "MN", (49.4, 43.4, -89.4, -97.3)),
     "ne": ("511.nebraska.gov", "NE", (43.1, 39.9, -95.2, -104.1)),
     "ma": ("mass511.com", "MA", (42.9, 41.2, -69.9, -73.6)),
     "ks": ("www.kandrive.gov", "KS", (40.1, 36.9, -94.5, -102.1)),
@@ -703,7 +702,6 @@ ATIS: dict[str, tuple[str, str]] = {
     "sc": ("https://sc.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "SC"),
     "mt": ("https://mt.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "MT"),
     "sd": ("https://sd.cdn.iteris-atis.com/geojson/icons/metadata/icons.cameras.geojson", "SD"),
-    "va": ("https://511.vdot.virginia.gov/services/map/array/cameras", "VA"),
 }
 
 
@@ -934,11 +932,9 @@ def _load_discoveries() -> dict[str, "CameraSource"]:
 SOURCES: dict[str, CameraSource] = {
     "caltrans": CameraSource("caltrans", "Caltrans CCTV (12 districts)", _caltrans, "CA"),
     "nyctmc": CameraSource("nyctmc", "NYC DOT traffic cameras", _nyctmc, "NY"),
-    "ny511": CameraSource("ny511", "511NY cameras", _ny511, "NY"),
     "deldot": CameraSource("deldot", "DelDOT cameras", _deldot, "DE"),
     "chart_md": CameraSource("chart_md", "Maryland CHART cameras", _chart_md, "MD"),
     "seattle": CameraSource("seattle", "Seattle SDOT/WSDOT cameras", _seattle, "WA"),
-    "on511": CameraSource("on511", "Ontario 511 cameras", _carmanah_v2, "ON", host="511on.ca"),
     "tfl": CameraSource("tfl", "TfL JamCams (London)", _tfl, "UK"),
     "nzta": CameraSource("nzta", "NZTA cameras (New Zealand)", _nzta, "NZ"),
     "tripcheck": CameraSource("tripcheck", "ODOT TripCheck cameras", _tripcheck, "OR"),
@@ -995,7 +991,9 @@ SOURCES.update({f"at_{k}": CameraSource(f"at_{k}", f"{v[1]} 511 cameras (Iteris 
 SOURCES["ak_rwis"] = CameraSource("ak_rwis", "Alaska RWIS road-weather cameras", _ak_rwis, "AK")
 SOURCES["tw_tdx"] = CameraSource("tw_tdx", "Taiwan freeway/highway CCTV (TDX)", _tw_tdx, "TW")
 SOURCES["nddot"] = CameraSource("nddot", "NDDOT travel cameras", _nddot, "ND")
-SOURCES["midrive"] = CameraSource("midrive", "MDOT Mi Drive cameras", _midrive, "MI")
+# Retired 2026-11-21: 511NY (ny511) -> cars_ny, Ontario v2 (on511) -> tq_on, 511MN one-network
+# (it_mn) -> cars_mn; VDOT's array/cameras and MDOT Mi Drive's AllForMap now 404 (the
+# sniffer found no camera list on either map yet). Their parsers stay for a re-find.
 SOURCES.update({k: CameraSource(k, f"{v[2]} 511 cameras (CARS)" if k != "cotrip" else "COtrip Colorado cameras",
                                  _cars, v[2]) for k, v in CARS.items()})
 SOURCES.update({f"it_{k}": CameraSource(f"it_{k}", f"{v[1]} 511 cameras (one-network)", _iteris, v[1])
