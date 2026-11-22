@@ -303,8 +303,13 @@ def learn_once(gen=None, now: float | None = None) -> int:
                       + "".join(f"\n    e.g. {e}" for e in exs if e))
     text = PROMPT + "\n\n" + head + "\n\nTerms:\n" + "\n".join(blocks)
     call = gen or (lambda parts, max_tokens: explain.generate_usage(
-        parts, max_tokens, feature="radio_terms", model=MODEL, json_output=True))
-    raw, _ = call([{"text": text}], max_tokens=1200)
+        parts, max_tokens, feature="radio_terms", model=MODEL, thinking_level="MINIMAL",
+        json_output=True, timeout=30.0))     # 3.5 Flash-Lite rejects thinkingBudget 0
+    try:
+        raw, _ = call([{"text": text}], max_tokens=1200)
+    except Exception:
+        spend.refund("radio_term_calls", 1)            # a failed call does not use the day's budget
+        raise
     got = {str(x.get("term") or "").strip(): x for x in _parse(raw)}
     now = now or time.time()
     learned = 0
