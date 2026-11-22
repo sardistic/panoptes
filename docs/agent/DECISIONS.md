@@ -477,3 +477,22 @@ can generate a brief at a time in a worker. Gemini usage is metered under
 `view_all_brief`; reserved calls also appear in the cost endpoint. Refreshing the
 plain-language read incurs zero model calls.
 
+### 2026-11-21 — Radio codes and jargon are highlighted, with a per-system history
+
+Owner asked for call codes, non-obvious terms and previously referenced items in
+transcribed lines to be highlighted with a tooltip, backed by a database. Transcripts were
+already stored (redacted, 3 days), so a second transcript table was not added. Instead
+`radio_terms` (same SQLite as the radio store) keeps, per system, every code / term /
+acronym heard: count, first and last heard, and the newest *cleaned* example line. Rows
+outlive the transcripts; never-defined terms heard fewer than 3 times are pruned after 14 days.
+Meanings come from a seed (`config/radio_glossary.yaml`: APCO ten-codes, code N, MPDS
+levels, fire / EMS / police / traffic jargon) plus a learner: one pinned Flash-Lite call
+(cap `APB_RADIO_TERMS_DAILY`, default 24/day) asks what one system's most frequent
+undefined terms mean *there* from cleaned examples. Ten-codes vary by agency, so frequent
+seeded codes are asked too and a local answer overrides the seed for that system.
+The server marks each published line with spans (`terms: [[start, end, key]]`) so the
+browser only renders. Publishing rule kept: codes whose meaning names a condition or
+death are not seeded (10-79, 11-44), learned meanings matching the medical list become
+"Medical call code", and unknown acronyms (possible names or call signs) are counted but
+never served. Rejected: client-side regex matching (two detectors drifting apart); storing
+raw transcripts longer (owner's privacy rule).

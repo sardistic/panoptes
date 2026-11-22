@@ -980,3 +980,101 @@ def test_streams_merge_the_probed_mounts_with_the_directory(db, monkeypatch, tmp
     names = [s["name"] for s in streams.choose()]
     assert "Hamilton County Fire/EMS" in names and "FDNY Manhattan" in names
     streams._streams.clear()
+
+
+# ---- radio terms (codes / jargon tooltips) ----
+
+@pytest.fixture()
+def terms(db, monkeypatch):
+    from apb.context import radio_terms
+    monkeypatch.setattr(radio_terms, "_learned", {})
+    monkeypatch.setattr(radio_terms, "_learned_at", 0.0)
+    monkeypatch.setattr(radio_terms, "_phrase_re", None)
+    monkeypatch.setitem(radio_terms._stats, "last_learn", 0.0)
+    return radio_terms
+
+
+def test_term_spans_find_codes_and_jargon_but_not_numbers(terms):
+    line = "Engine respond code 3, working fire, 10-4 and 10 97 in 10 minutes, BOLO NB, Columbus PD"
+    keys = [k for _, _, k in terms.spans(line)]
+    assert keys == ["code 3", "working fire", "10-4", "10-97", "BOLO", "NB"]
+    s, e, _ = terms.spans(line)[3]
+    assert line[s:e] == "10 97"
+    assert terms.spans("ALL UNITS RESPOND NOW") == []          # an all-caps line is not acronyms
+
+
+def test_terms_are_counted_per_system_and_unknowns_stay_private(terms, db):
+    from apb.store import radio
+    now = time.time()
+    for i in range(4):
+        _add_done(db, 100 + i, now - 400 + i, f"SRT staging, 10-50 on the bypass, code 3 call {i}")
+    terms.run_once(now=now, gen=lambda parts, max_tokens: ('{"terms": []}', {}))
+    scope = f"{db['key']}:1"
+    rows = {r["term"]: r for r in radio.terms_for(scope)}
+    assert rows["10-50"]["n"] == 4 and rows["SRT"]["n"] == 4 and rows["staging"]["n"] == 4
+    assert rows["10-50"]["example"].endswith("call 3")
+    _add_done(db, 200, now - 10, "10-50 cleared")              # a later scan adds to the history
+    terms.scan()
+    assert {r["term"]: r for r in radio.terms_for(scope)}["10-50"]["n"] == 5
+    served = {x["t"] for x in terms.for_system(scope)}
+    assert {"10-50", "code 3", "staging"} <= served and "SRT" not in served
+
+
+def test_learning_defines_a_local_term_and_drops_medical_meanings(terms, db, monkeypatch):
+    from apb.store import radio
+    now = time.time()
+    for i in range(4):
+        _add_done(db, 300 + i, now - 300 + i, f"SRT en route, KX2 also, 10-79 requested, signal 9 {i}")
+    seen = {}
+
+    def gen(parts, max_tokens):
+        seen["text"] = parts[0]["text"]
+        return json.dumps({"terms": [
+            {"term": "SRT", "meaning": "Special response team (county tactical unit)", "confidence": 0.8},
+            {"term": "KX2", "meaning": None, "confidence": 0.9},
+            {"term": "10-79", "meaning": "Notify coroner, death investigation", "confidence": 0.9},
+            {"term": "signal 9", "meaning": "Maybe a meal break", "confidence": 0.3}]}), {}
+    terms.run_once(now=now, gen=gen)
+    assert '"SRT"' in seen["text"] and "e.g. SRT en route" in seen["text"]
+    rows = {r["term"]: r for r in radio.terms_for(f"{db['key']}:1")}
+    assert rows["SRT"]["meaning"].startswith("Special response team")
+    assert rows["KX2"]["meaning"] is None and rows["KX2"]["asked"]
+    assert rows["10-79"]["meaning"] == "Medical call code"       # never a condition or a death
+    assert rows["signal 9"]["meaning"] is None                   # too unsure
+    # SRT is now highlighted everywhere and in the glossary
+    assert [k for _, _, k in terms.spans("SRT staging")] == ["SRT", "staging"]
+    assert terms.glossary()["learned"]["SRT"]["m"].startswith("Special response team")
+    # asked terms are not asked again; nothing new means no call
+    calls = []
+    terms.learn_once(gen=lambda p, m: calls.append(1) or ('{"terms": []}', {}), now=now + 10)
+    assert calls == []
+
+
+def test_term_learning_respects_its_daily_cap(terms, db, monkeypatch):
+    monkeypatch.setenv("APB_RADIO_TERMS_DAILY", "0")
+    for i in range(4):
+        _add_done(db, 400 + i, time.time() - 100 + i, "QRX now")
+    terms.scan()
+    calls = []
+    assert terms.learn_once(gen=lambda p, m: calls.append(1) or ('{"terms": []}', {})) == 0
+    assert calls == []
+
+
+def test_api_serves_term_spans_and_glossary(terms, db, monkeypatch):
+    from fastapi.testclient import TestClient
+    from apb.api.main import app
+    now = time.time()
+    radio = __import__("apb.store.radio", fromlist=["add_recent"])
+    radio.add_recent(db["key"], [(500, now - 30, 1, 7)])
+    _add_done(db, 500, now - 30, "Engine respond code 3 for a working fire on Oak Ave")
+    terms.scan()
+    c = TestClient(app)
+    lines = c.get("/live/radio/lines").json()
+    assert lines and [t[2] for t in lines[0]["terms"]] == ["code 3", "working fire"]
+    calls = c.get(f"/live/radio/{db['key']}:1/calls").json()
+    assert [t[2] for t in calls[0]["terms"]] == ["code 3", "working fire"]
+    g = c.get("/live/radio/glossary").json()
+    assert g["codes"]["10-4"]["m"].startswith("Acknowledged") and "10-" in g["generic"]
+    hist = {x["t"]: x for x in c.get(f"/live/radio/{db['key']}:1/terms").json()}
+    assert hist["code 3"]["n"] == 1 and "working fire" in hist["code 3"]["ex"]
+    assert c.get("/live/radio/nope/terms").status_code == 400

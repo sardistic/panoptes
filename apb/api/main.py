@@ -312,6 +312,8 @@ def _startup() -> None:
                 radio_stt.start()          # transcribes the calls that matter, on a budget
                 from apb.context import radio_areas
                 radio_areas.start()        # what is going on where, from those transcripts
+                from apb.context import radio_terms
+                radio_terms.start()        # codes / jargon heard per system, for tooltips
                 from apb.ingest import streams
                 streams.start()            # public scanner audio streams, cut into calls
                 from apb.ingest import trunkrec
@@ -351,6 +353,7 @@ async def _lifespan(app: FastAPI):
         __import__("apb.ingest.rdio", fromlist=["stop"]).stop()
         __import__("apb.context.radio_stt", fromlist=["stop"]).stop()
         __import__("apb.context.radio_areas", fromlist=["stop"]).stop()
+        __import__("apb.context.radio_terms", fromlist=["stop"]).stop()
         __import__("apb.ingest.streams", fromlist=["stop"]).stop()
         __import__("apb.ingest.trunkrec", fromlist=["stop"]).stop()
         maritime_store.stop()
@@ -1566,6 +1569,7 @@ def status():
         "radio": __import__("apb.ingest.rdio", fromlist=["status"]).status(),
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
         "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
+        "radio_terms": __import__("apb.context.radio_terms", fromlist=["status"]).status(),
         "streams": __import__("apb.ingest.streams", fromlist=["status"]).status(),
         "trunkrec": __import__("apb.ingest.trunkrec", fromlist=["status"]).status(),
         "costs": _costs_brief(),
@@ -1795,6 +1799,7 @@ def live_radio_threads(max_age_minutes: float = Query(180.0, gt=0.0, le=4320.0))
 def _radio_line(t: dict) -> dict | None:
     """A transcribed call as the map shows it: cleaned words, kind, type, urgency and the
     ~2 km cell when placed — or None for noise and mostly-[inaudible] calls."""
+    from apb.context import radio_terms as _terms
     from apb.context.radio_areas import clean
     from apb.context.radio_stt import coarse
     line = clean(t.get("text") or t.get("summary"))[:240]
@@ -1805,7 +1810,7 @@ def _radio_line(t: dict) -> dict | None:
     cell = coarse((t["lat"], t["lon"])) if t.get("lat") is not None else None
     return {"sys": f"{t['key']}:{t['system']}", "id": t["id"], "ts": t["ts"],
             "talkgroup": t.get("tg_label"), "kind": t.get("kind"), "type": t.get("incident_type"),
-            "priority": t.get("priority"), "line": line,
+            "priority": t.get("priority"), "line": line, "terms": _terms.spans(line),
             "lat": cell[0] if cell else None, "lon": cell[1] if cell else None,
             "audio": f"/live/radio/audio/{t['key']}/{t['id']}"}
 
@@ -1848,6 +1853,25 @@ def live_radio_feed(since: float | None = Query(None, ge=0.0)):
                         headers={"Cache-Control": "no-store"})
 
 
+@app.get("/live/radio/glossary")
+def live_radio_glossary():
+    """Radio codes and jargon the map highlights: the seed glossary (ten-codes, response
+    codes, fire / EMS / police / traffic terms), generic notes for codes it does not
+    know, and meanings learned from what systems actually say."""
+    from apb.context import radio_terms
+    return JSONResponse(radio_terms.glossary(), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/live/radio/{rid}/terms")
+def live_radio_terms(rid: str):
+    """Codes and terms heard on one radio system: how often, first and last heard, the
+    newest cleaned line using it, and what it means there when that was learned."""
+    if not _RADIO_ID_RE.match(rid):
+        return JSONResponse({"error": "bad id"}, status_code=400)
+    from apb.context import radio_terms
+    return JSONResponse(radio_terms.for_system(rid), headers={"Cache-Control": "public, max-age=60"})
+
+
 @app.get("/live/radio/{rid}/calls")
 def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     """Newest calls on one radio system: time, talkgroup, how much it matters, a
@@ -1860,6 +1884,7 @@ def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
     key, _, system = rid.partition(":")
     if not rdio.instance(key):
         return JSONResponse({"error": "unknown system"}, status_code=404)
+    from apb.context import radio_terms
     from apb.context.radio_areas import clean
     in_thread = {cid: (t["tid"], clean(t.get("title")))
                  for t in radio_store.threads(4 * 3600.0, key, int(system)) for cid in t["calls"]}
@@ -1874,6 +1899,7 @@ def live_radio_calls(rid: str, limit: int = Query(30, ge=1, le=100)):
             row.update(kind=c.get("kind"), type=c.get("incident_type"),
                        priority=c.get("priority"), located=c.get("lat") is not None,
                        line=clean(c.get("text") or c.get("summary"))[:240] or None)
+            row["terms"] = radio_terms.spans(row["line"])
         if c["id"] in in_thread:
             row["thread"], row["thread_title"] = in_thread[c["id"]]
         out.append(row)

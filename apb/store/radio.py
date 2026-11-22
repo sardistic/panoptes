@@ -71,6 +71,12 @@ def _conn() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS radio_state (
             key TEXT PRIMARY KEY, last_id INTEGER, last_poll REAL, state TEXT,
             fails INTEGER DEFAULT 0, next_at REAL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS radio_terms (
+            scope TEXT NOT NULL, term TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0,
+            first_ts REAL, last_ts REAL, example TEXT, meaning TEXT, source TEXT,
+            confidence REAL, asked REAL, PRIMARY KEY (scope, term));
+        CREATE INDEX IF NOT EXISTS idx_rterm_term ON radio_terms(term);
+        CREATE TABLE IF NOT EXISTS radio_term_meta (k TEXT PRIMARY KEY, v REAL);
         """)
         cols = {r[1] for r in c.execute("PRAGMA table_info(radio_recent)").fetchall()}
         if "seen" not in cols:                    # when the lane first saw the call (live feed)
@@ -474,3 +480,86 @@ def transcripts_for(key: str, ids: list[int]) -> dict[int, dict]:
         rows = _conn().execute(f"SELECT * FROM radio_transcripts WHERE key = ? AND id IN "
                                f"({', '.join('?' for _ in ids)})", [key, *ids]).fetchall()
     return {r["id"]: _tr(r) for r in rows}
+
+
+# ---- radio terms: codes and jargon heard per system (outlive the 3-day transcripts) ----
+
+def term_cursor() -> float:
+    with _lock:
+        r = _conn().execute("SELECT v FROM radio_term_meta WHERE k = 'cursor'").fetchone()
+    return float(r[0]) if r else 0.0
+
+
+def done_since(done_at: float, limit: int = 5000) -> list[dict]:
+    """Finished transcripts newer than `done_at` (by when they were transcribed), oldest first."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT key, id, ts, system, text, summary, done_at FROM radio_transcripts "
+            "WHERE status = 'done' AND done_at > ? AND system IS NOT NULL ORDER BY done_at LIMIT ?",
+            (done_at, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def bump_terms(hits: dict[tuple[str, str], tuple[int, float, float, str]], cursor: float,
+               keep_sec: float = 14 * 86400.0) -> None:
+    """Add counts for (scope, term) -> (n, first ts, last ts, example line) and move the
+    scan cursor in the same transaction. Rare, never-defined terms are pruned after
+    `keep_sec` so one-off transcription noise does not pile up."""
+    with _lock:
+        c = _conn()
+        c.executemany(
+            "INSERT INTO radio_terms (scope, term, n, first_ts, last_ts, example) VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(scope, term) DO UPDATE SET n = n + excluded.n, "
+            "first_ts = MIN(first_ts, excluded.first_ts), "
+            "example = CASE WHEN excluded.last_ts >= last_ts THEN excluded.example ELSE example END, "
+            "last_ts = MAX(last_ts, excluded.last_ts)",
+            [(s, t, n, f, last, ex) for (s, t), (n, f, last, ex) in hits.items()])
+        c.execute("INSERT INTO radio_term_meta VALUES ('cursor', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                  (cursor,))
+        c.execute("DELETE FROM radio_terms WHERE meaning IS NULL AND n < 3 AND last_ts < ?",
+                  (time.time() - keep_sec,))
+        c.commit()
+
+
+def terms_for(scope: str) -> list[dict]:
+    with _lock:
+        rows = _conn().execute("SELECT * FROM radio_terms WHERE scope = ? ORDER BY n DESC", (scope,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def learned_terms() -> dict[str, tuple[str, str, int]]:
+    """term -> (meaning, scope, n) from the system that heard it most, for every term a
+    model defined somewhere."""
+    with _lock:
+        rows = _conn().execute("SELECT term, meaning, scope, n FROM radio_terms WHERE meaning IS NOT NULL "
+                               "ORDER BY n").fetchall()
+    return {r[0]: (r[1], r[2], r[3]) for r in rows}           # highest n wins (last write)
+
+
+def terms_to_ask(min_n: int, retry_sec: float, limit: int = 400) -> list[dict]:
+    """Undefined terms heard at least `min_n` times and not asked about recently."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT * FROM radio_terms WHERE meaning IS NULL AND n >= ? AND (asked IS NULL OR asked < ?) "
+            "ORDER BY n DESC LIMIT ?", (min_n, time.time() - retry_sec, limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_term(scope: str, term: str, meaning: str | None, confidence: float | None,
+             source: str = "model", asked: float | None = None) -> None:
+    with _lock:
+        c = _conn()
+        c.execute("UPDATE radio_terms SET meaning = ?, confidence = ?, source = ?, asked = ? "
+                  "WHERE scope = ? AND term = ?",
+                  (meaning, confidence, source if meaning else None, asked or time.time(), scope, term))
+        c.commit()
+
+
+def examples(key: str, system: int, needle: str, limit: int = 3) -> list[str]:
+    """Up to `limit` recent transcript texts on one system that mention `needle`."""
+    with _lock:
+        rows = _conn().execute(
+            "SELECT COALESCE(text, summary) FROM radio_transcripts WHERE key = ? AND system = ? "
+            "AND status = 'done' AND COALESCE(text, summary) LIKE ? ORDER BY ts DESC LIMIT ?",
+            (key, system, f"%{needle}%", limit)).fetchall()
+    return [r[0] for r in rows if r[0]]

@@ -330,6 +330,20 @@
   .rc .rc-thr{font-size:10px;color:#4fd1c5;margin:2px 0 0 26px;cursor:pointer;letter-spacing:.03em}
   .rc .rc-thr:hover{text-decoration:underline}
   .rcalls .rc .rc-line,.rcalls .rc .rc-thr{grid-column:2;margin-left:0}
+  /* radio codes / jargon in transcribed lines: dotted underline, explained on hover or tap */
+  .gl{border-bottom:1px dotted rgba(79,209,197,.75);color:#c2ece7;cursor:help;border-radius:1px}
+  .gl:hover,.gl:focus-visible{background:rgba(79,209,197,.16);outline:none}
+  .rchat .gl{color:inherit;border-bottom-color:rgba(79,209,197,.55)}
+  #glTip{position:fixed;z-index:10000;left:0;top:0;max-width:280px;padding:8px 10px;background:#0c1015;
+    border:1px solid var(--line-3);box-shadow:0 8px 28px rgba(0,0,0,.55);font:400 11px/1.42 var(--font);
+    color:var(--txt);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s}
+  #glTip.on{opacity:1;transform:none}
+  #glTip .gh{display:flex;gap:7px;align-items:baseline;margin-bottom:3px}
+  #glTip .gh b{font-weight:700;color:#4fd1c5;letter-spacing:.02em}
+  #glTip .gh span{font:600 8px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  #glTip .gs{color:var(--dim);font-size:9.5px;margin-top:2px}
+  #glTip .gn{color:var(--txt-2);font-size:10px;margin-top:6px;padding-top:5px;border-top:1px solid var(--line-2)}
+  #glTip .ge{color:var(--dim);font-size:10px;font-style:italic;margin-top:3px}
   #board .rall{cursor:pointer;color:var(--dim);font:500 9.5px/1 var(--font);letter-spacing:.08em;padding:9px 0 3px;text-transform:uppercase}
   #board .rall:hover{color:var(--txt)}
   #board .brow .hot{color:var(--red)}
@@ -3051,7 +3065,7 @@ function openThread(t,where){
     +(t.activity?`<div class="meta" style="color:var(--txt-2)">${esc(t.activity)}</div>`:'')
     +`<div class="rcalls rthread"><div class="rc-list">`+calls.map(c=>`<div class="rc" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
       +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup||'')}</b>${c.kind?' · '+esc(c.kind):''}</div>`
-      +(c.line?`<div class="rc-line">${esc(c.line)}</div>`:'')+`</div>`).join('')+`</div></div>`
+      +(c.line?`<div class="rc-line">${hl(c.line,c.terms,t.sys)}</div>`:'')+`</div>`).join('')+`</div></div>`
     +`<div class="meta" style="margin-top:6px">${esc(calls.length)} calls linked by the model · `
     +(sys?`<a href="#" class="th-sys">${esc(t.system||'system')}</a>`:esc(t.system||''))+` · place shown as a ~2 km area</div>`
     +(t.lat!=null?relBox():'')+`</div>`;
@@ -3086,12 +3100,72 @@ function playCall(c){ const p=radioPlayer(); radioPlaying=c.id; p.src=c.audio; m
 function playNextLive(){ if(radioLive&&radioQueue.length&&radioPlaying==null) playCall(radioQueue.shift()); }
 function stopLive(){ if(radioLive){ clearInterval(radioLive.timer); radioLive=null; } radioQueue=[]; }
 const callTime = ts => new Date(ts*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-function callRow(c){
+// Radio codes and jargon: the server marks each cleaned line's spans ([start, end, key]);
+// meanings come from /live/radio/glossary, and each system's history ("heard 40x here
+// since ...", the local meaning, the newest line using it) from /live/radio/{sys}/terms.
+let GLOSS=null; const glSys=new Map(); let glCur=null, glAt=0;
+async function loadGlossary(){ try{ const r=await fetch('/live/radio/glossary'); if(r.ok) GLOSS=await r.json(); }catch(_){} }
+loadGlossary(); setInterval(loadGlossary,30*60*1000);
+function hl(text,terms,sys){
+  text=String(text||''); if(!Array.isArray(terms)||!terms.length) return esc(text);
+  let out='',i=0;
+  for(const [s,e,k] of terms){ if(s<i||e>text.length) continue;
+    out+=esc(text.slice(i,s))+`<span class="gl" data-g="${esc(k)}" data-s="${esc(sys||'')}" tabindex="0">${esc(text.slice(s,e))}</span>`; i=e; }
+  return out+esc(text.slice(i));
+}
+function glInfo(k){
+  const G=GLOSS||{codes:{},terms:{},learned:{},generic:{}};
+  if(G.codes[k]) return {m:G.codes[k].m,cat:G.codes[k].cat,varies:true};
+  if(G.terms[k]) return {m:G.terms[k].m,cat:G.terms[k].cat};
+  if(G.learned[k]) return {m:G.learned[k].m,cat:'learned',learned:true};
+  const g=/^10-/.test(k)?'10-':/^11-/.test(k)?'11-':(/^(code|signal|priority) /.exec(k)||[])[1];
+  return g?{note:G.generic[g],cat:'code',varies:true}:{};
+}
+function glSysTerms(sys){
+  const c=glSys.get(sys); if(c&&Date.now()-c.t<120000) return c.v;
+  const v=fetch(`/live/radio/${encodeURIComponent(sys)}/terms`).then(r=>r.ok?r.json():[])
+    .then(a=>new Map(a.map(x=>[x.t,x]))).catch(()=>new Map());
+  glSys.set(sys,{t:Date.now(),v}); return v;
+}
+function glHtml(k,local){
+  const i=glInfo(k), day=ts=>new Date(ts*1000).toLocaleDateString([],{month:'short',day:'numeric'});
+  let h=`<div class="gh"><b>${esc(k)}</b>${i.cat?`<span>${esc(i.cat)}</span>`:''}</div>`;
+  if(local&&local.m) h+=`<div>${esc(local.m)}</div><div class="gs">meaning on this system${i.m&&i.m!==local.m?' · usually: '+esc(i.m):''}</div>`;
+  else if(i.m) h+=`<div>${esc(i.m)}</div>`+(i.varies?`<div class="gs">common meaning · agencies differ</div>`:'')+(i.learned?`<div class="gs">learned from what radio systems say</div>`:'');
+  else h+=`<div>${esc(i.note||'Radio term')}</div><div class="gs">not learned for this system yet</div>`;
+  if(local) h+=`<div class="gn">heard ${esc(local.n)}× on this system · since ${esc(day(local.first))} · last ${esc(ago(local.last))}</div>`
+    +(local.ex?`<div class="ge">“${esc(local.ex)}”</div>`:'');
+  return h;
+}
+const glTip=document.createElement('div'); glTip.id='glTip'; glTip.setAttribute('role','tooltip'); document.body.appendChild(glTip);
+function glPlace(el){
+  const r=el.getBoundingClientRect(), w=glTip.offsetWidth, h=glTip.offsetHeight;
+  let y=r.top-h-8; if(y<8) y=r.bottom+8;
+  glTip.style.left=Math.max(8,Math.min(r.left+r.width/2-w/2,innerWidth-w-8))+'px'; glTip.style.top=y+'px';
+}
+function glShow(el){
+  glCur=el; glAt=performance.now(); const k=el.dataset.g, sys=el.dataset.s;
+  glTip.innerHTML=glHtml(k,null); glTip.classList.add('on'); glPlace(el);
+  if(sys) glSysTerms(sys).then(m=>{ if(glCur===el&&m.get(k)){ glTip.innerHTML=glHtml(k,m.get(k)); glPlace(el); } });
+}
+function glHide(){ glCur=null; glTip.classList.remove('on'); }
+document.addEventListener('mouseover',e=>{ const g=e.target.closest&&e.target.closest('.gl');
+  if(g){ if(g!==glCur) glShow(g); } else if(glCur) glHide(); });
+document.addEventListener('focusin',e=>{ const g=e.target.closest&&e.target.closest('.gl'); if(g) glShow(g); });
+document.addEventListener('focusout',e=>{ if(e.target.closest&&e.target.closest('.gl')) glHide(); });
+// a tap on a term explains it instead of triggering the row (ticker fly-to); map bubbles keep their click
+document.addEventListener('click',e=>{ const g=e.target.closest&&e.target.closest('.gl');
+  if(g&&!g.closest('.rchat')){ e.stopPropagation(); e.preventDefault();
+    // a tap fires mouseover just before click: only a second tap closes the tip
+    if(glCur===g&&glTip.classList.contains('on')&&performance.now()-glAt>450) glHide(); else if(glCur!==g) glShow(g); }
+  else if(glCur) glHide(); },true);
+document.addEventListener('scroll',glHide,true); map.on('movestart zoomstart',glHide);
+function callRow(c,sys){
   const tx=c.kind==='dispatch'&&c.type&&c.type!=='noise'
     ?`<div class="rc-tx"><i>${esc(String(c.type).replace(/_/g,' '))} dispatch</i>${c.located?'placed on the map':'area not placed'}</div>`:'';
   return `<div class="rc${c.weight>=0.8?' hi':''}" data-id="${esc(c.id)}"><button class="rc-play" title="play this call">▶</button>`
     +`<div class="rc-m">${esc(callTime(c.ts))} · <b>${esc(c.talkgroup)}</b> · ${esc(c.tag)}</div>${tx}`
-    +(c.line?`<div class="rc-line">${esc(c.line)}</div>`:'')
+    +(c.line?`<div class="rc-line">${hl(c.line,c.terms,sys)}</div>`:'')
     +(c.thread?`<div class="rc-thr" data-th="${esc(c.thread)}">↳ ${esc(c.thread_title||'linked incident')}</div>`:'')+`</div>`;
 }
 async function loadCalls(pop,r){
@@ -3099,7 +3173,7 @@ async function loadCalls(pop,r){
   const el=pop.getElement&&pop.getElement(); const list=el&&el.querySelector('.rc-list'); if(!list) return calls;
   const disp=el.querySelector('.rc-disp').checked;
   const shown=calls.filter(c=>!disp||c.weight>=0.8);
-  list.innerHTML=shown.map(callRow).join('')||`<div class="rc-m" style="padding:6px 0">${disp?'no dispatch calls in the last few minutes — untick to see all':'no calls in the last few minutes'}</div>`;
+  list.innerHTML=shown.map(c=>callRow(c,r.id)).join('')||`<div class="rc-m" style="padding:6px 0">${disp?'no dispatch calls in the last few minutes — untick to see all':'no calls in the last few minutes'}</div>`;
   list.querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{ const c=calls.find(x=>String(x.id)===n.dataset.id); if(c) playCall(c); });
   list.querySelectorAll('.rc-thr').forEach(n=>n.onclick=()=>{ const t=radioThreads.find(x=>x.id===n.dataset.th); if(t) openThread(t); });
   markPlaying();
@@ -3222,13 +3296,13 @@ function drawRadioChats(fresh){
     const max=z>=11?110:z>=8?80:56, text=l.line.length>max?l.line.slice(0,max-2).replace(/\s+\S*$/,'')+'…':l.line;
     const typing=fresh&&lineKey(l)===fresh&&!radioCalm;
     const html=`<div class="rchat${hot?' hot':''}${typing?' new':''}" style="--rc:${col};opacity:${(.62+.38*Math.exp(-age/1200)).toFixed(2)}">`
-      +`<span class="k">${esc(lineKick(l))}${g.n>1?` <i>+${g.n-1}</i>`:''}</span><span class="t">${typing?'':esc(text)}</span></div>`;
+      +`<span class="k">${esc(lineKick(l))}${g.n>1?` <i>+${g.n-1}</i>`:''}</span><span class="t">${typing?'':hl(text,l.terms,l.sys)}</span></div>`;
     const m=L.marker(g.at,{icon:L.divIcon({className:'rchat-ico',html,iconSize:[0,0]}),
       zIndexOffset:hot?900:500,keyboard:false}).addTo(radioChatLayer);
     m.on('click',()=>openChatGroup(g));
     if(typing){
       const t=m.getElement().querySelector('.t'); let i=0;
-      const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length) clearInterval(tm); },
+      const tm=setInterval(()=>{ i+=2; t.textContent=text.slice(0,i); if(i>=text.length){ clearInterval(tm); t.innerHTML=hl(text,l.terms,l.sys); } },
         Math.max(14,Math.min(40,4200/text.length)));
     }
   });
@@ -3238,7 +3312,7 @@ function openChatGroup(g){
   const html=`<div class="pop"><div class="kick">Heard on the radio · ${esc(g.n)} call${g.n===1?'':'s'} here</div>`
     +`<div class="rcalls rthread"><div class="rc-list">`+rows.map(l=>`<div class="rc" data-k="${esc(lineKey(l))}"><button class="rc-play" title="play this call">▶</button>`
       +`<div class="rc-m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))} · <b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b></div>`
-      +`<div class="rc-line">${esc(l.line)}</div></div>`).join('')+`</div></div>`+relBox()+`</div>`;
+      +`<div class="rc-line">${hl(l.line,l.terms,l.sys)}</div></div>`).join('')+`</div></div>`+relBox()+`</div>`;
   const pop=L.popup({maxWidth:360,minWidth:280}).setLatLng(g.at).setContent(html).openOn(map);
   loadRelated(pop,relQuery(g.at[0],g.at[1],rows[0].ts,rows[0].type),g.at);
   pop.getElement().querySelectorAll('.rc').forEach(n=>n.querySelector('.rc-play').onclick=()=>{
@@ -3259,8 +3333,8 @@ function radioTickerAdd(l){
   const el=radioTickerEl(), list=el.querySelector('.tls'), row=document.createElement('div');
   row.className='tl'+((l.priority||0)>=0.6?' hot':'');
   row.innerHTML=`<span class="m">${esc(callTime(l.ts))} · ${esc(sysName(l.sys))}${l.talkgroup?' · '+esc(l.talkgroup):''}</span>`
-    +`<span class="x"><b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b> — ${esc(l.line)}</span>`;
-  row.title=l.line;
+    +`<span class="x"><b style="color:${radioColor(l.type)}">${esc(lineKick(l))}</b> — ${hl(l.line,l.terms,l.sys)}</span>`;
+  if(!(l.terms||[]).length) row.title=l.line;
   row.onclick=()=>{ const r=radioRows.find(x=>x.id===l.sys);
     if(l.lat!=null) map.flyTo([l.lat,l.lon],Math.max(map.getZoom(),11));
     else if(r&&r.lat!=null) map.flyTo([r.lat,r.lon],Math.max(map.getZoom(),r.approx?8:10));

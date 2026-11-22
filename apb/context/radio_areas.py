@@ -332,6 +332,7 @@ def _to_fusion(t: dict, now: float) -> None:
 def public_threads(max_age_sec: float = 10800.0) -> list[dict]:
     """What /live/radio/threads serves: each incident, its ~2 km cell and precision word,
     and its calls in order with a cleaned line each. Never the place text."""
+    from apb.context import radio_terms
     from apb.ingest import rdio
     from apb.store import radio
     out = []
@@ -346,7 +347,8 @@ def public_threads(max_age_sec: float = 10800.0) -> list[dict]:
             "priority": t.get("priority"), "status": t.get("status"), "precision": t.get("precision"),
             "lat": t.get("lat"), "lon": t.get("lon"), "first_ts": t.get("first_ts"), "last_ts": t.get("last_ts"),
             "calls": [{"id": c["id"], "ts": c["ts"], "talkgroup": c.get("tg_label"), "kind": c.get("kind"),
-                       "line": clean(c.get("text") or c.get("summary"))[:240],
+                       "line": (ln := clean(c.get("text") or c.get("summary"))[:240]),
+                       "terms": radio_terms.spans(ln),
                        "audio": f"/live/radio/audio/{t['key']}/{c['id']}"}
                       for c in sorted(calls.values(), key=lambda c: c["ts"])]})
     return out

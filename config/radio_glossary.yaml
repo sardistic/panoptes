@@ -1,0 +1,205 @@
+# Radio terms highlighted in transcribed lines on the map, with a tooltip each.
+#
+# Keys are matched in cleaned transcript lines (apb/context/radio_terms.py):
+#   - "10-N", "11-N", "code N", "signal N", "priority N" are numeric codes (any N is
+#     highlighted; only listed ones carry a common meaning here)
+#   - ALL-CAPS keys are acronyms, matched case-sensitively as whole words
+#   - lower-case keys are phrases, matched case-insensitively as whole words
+# `varies: true` marks codes whose meaning differs between agencies: the tooltip says
+# so, and the learner asks what the code means on each system that uses it.
+# Never add a code whose meaning names a medical condition, an injury or a death —
+# published lines call those "a medical call", and the tooltip must not undo that.
+#
+# cat: code | status | fire | ems | police | traffic | radio | ops
+
+codes:
+  "10-1": {m: "Unable to copy — poor reception", cat: radio}
+  "10-2": {m: "Signal good", cat: radio}
+  "10-3": {m: "Stop transmitting", cat: radio}
+  "10-4": {m: "Acknowledged / OK", cat: radio}
+  "10-5": {m: "Relay this message", cat: radio}
+  "10-6": {m: "Busy — stand by unless urgent", cat: status}
+  "10-7": {m: "Out of service", cat: status}
+  "10-8": {m: "In service, available", cat: status}
+  "10-9": {m: "Repeat your last transmission", cat: radio}
+  "10-10": {m: "Fight in progress (APCO); often 'off duty' or 'negative'", cat: police}
+  "10-11": {m: "Animal problem (APCO); often 'talking too fast'", cat: police}
+  "10-12": {m: "Stand by; officials or visitors present", cat: status}
+  "10-13": {m: "Weather and road report (APCO); many agencies: officer needs help", cat: police}
+  "10-14": {m: "Prowler report", cat: police}
+  "10-15": {m: "Civil disturbance (APCO); often 'subject in custody'", cat: police}
+  "10-16": {m: "Domestic disturbance", cat: police}
+  "10-17": {m: "Meet the complainant", cat: police}
+  "10-18": {m: "Urgent — complete quickly", cat: status}
+  "10-19": {m: "Return to station", cat: status}
+  "10-20": {m: "Location — 'what's your 20?'", cat: radio}
+  "10-21": {m: "Call by telephone", cat: radio}
+  "10-22": {m: "Disregard", cat: radio}
+  "10-23": {m: "Arrived at scene", cat: status}
+  "10-24": {m: "Assignment completed", cat: status}
+  "10-25": {m: "Report in person / meet", cat: ops}
+  "10-26": {m: "Detaining a subject — expedite", cat: police}
+  "10-27": {m: "Driver's licence check", cat: police}
+  "10-28": {m: "Vehicle registration check", cat: police}
+  "10-29": {m: "Check for warrants / stolen", cat: police}
+  "10-30": {m: "Improper use of the radio", cat: radio}
+  "10-31": {m: "Crime in progress", cat: police}
+  "10-32": {m: "Person with a gun", cat: police}
+  "10-33": {m: "Emergency traffic — clear the channel", cat: radio}
+  "10-34": {m: "Riot", cat: police}
+  "10-35": {m: "Major crime alert", cat: police}
+  "10-36": {m: "Correct time", cat: radio}
+  "10-37": {m: "Suspicious vehicle", cat: police}
+  "10-38": {m: "Traffic stop", cat: police}
+  "10-39": {m: "Urgent — use lights and siren", cat: status}
+  "10-40": {m: "Silent run — no lights or siren", cat: status}
+  "10-41": {m: "Beginning shift", cat: status}
+  "10-42": {m: "Ending shift", cat: status}
+  "10-43": {m: "Information", cat: radio}
+  "10-44": {m: "Request permission to leave", cat: status}
+  "10-45": {m: "Dead animal (APCO); some agencies: condition of patient", cat: ops}
+  "10-46": {m: "Assist motorist", cat: traffic}
+  "10-47": {m: "Emergency road repair needed", cat: traffic}
+  "10-48": {m: "Traffic sign or signal repair", cat: traffic}
+  "10-49": {m: "Traffic light out", cat: traffic}
+  "10-50": {m: "Vehicle crash (PI injury / PD damage only)", cat: traffic}
+  "10-51": {m: "Tow truck needed", cat: traffic}
+  "10-52": {m: "Ambulance needed", cat: ems}
+  "10-53": {m: "Road blocked", cat: traffic}
+  "10-54": {m: "Livestock on the road", cat: traffic}
+  "10-55": {m: "Suspected impaired driver", cat: traffic}
+  "10-56": {m: "Intoxicated pedestrian", cat: police}
+  "10-57": {m: "Hit and run", cat: traffic}
+  "10-58": {m: "Direct traffic", cat: traffic}
+  "10-59": {m: "Escort / convoy", cat: ops}
+  "10-60": {m: "Unit in the vicinity", cat: status}
+  "10-61": {m: "Personnel nearby — careful what you say", cat: radio}
+  "10-62": {m: "Reply to message", cat: radio}
+  "10-68": {m: "Dispatch information", cat: radio}
+  "10-69": {m: "Message received", cat: radio}
+  "10-70": {m: "Fire alarm", cat: fire}
+  "10-71": {m: "Advise nature of fire", cat: fire}
+  "10-72": {m: "Report progress on fire", cat: fire}
+  "10-73": {m: "Smoke report", cat: fire}
+  "10-74": {m: "Negative", cat: radio}
+  "10-75": {m: "In contact with", cat: radio}
+  "10-76": {m: "En route", cat: status}
+  "10-77": {m: "Estimated time of arrival", cat: status}
+  "10-78": {m: "Need assistance", cat: ops}
+  "10-80": {m: "Pursuit in progress (common, not APCO)", cat: police}
+  "10-97": {m: "Arrived at scene (common)", cat: status}
+  "10-98": {m: "Assignment finished, available (common)", cat: status}
+  "10-99": {m: "Wanted or stolen hit (common); some agencies: officer needs help", cat: police}
+  "11-99": {m: "Officer needs help, urgently (California)", cat: police}
+  "code 1": {m: "Routine — no lights or siren", cat: status}
+  "code 2": {m: "Urgent — lights, no siren (varies)", cat: status}
+  "code 3": {m: "Emergency — lights and siren", cat: status}
+  "code 4": {m: "No further help needed; under control", cat: status}
+  "code 6": {m: "Out of the vehicle to investigate (common)", cat: police}
+  "code 7": {m: "Meal break (common)", cat: status}
+  "priority 1": {m: "Highest-priority response (scale varies)", cat: status}
+  "priority 2": {m: "Urgent but not life-threatening (scale varies)", cat: status}
+  "priority 3": {m: "Routine response (scale varies)", cat: status}
+
+# Everything numeric above varies between agencies; these generic notes cover codes
+# that are highlighted but have no common meaning listed.
+generic:
+  "10-": "Ten-code. Meanings differ between agencies"
+  "11-": "Eleven-code (common in California). Meanings differ between agencies"
+  "code": "Response or status code. Meanings differ between agencies"
+  "signal": "Signal code. Entirely agency-specific"
+  "priority": "Call priority. The scale differs between agencies"
+
+terms:
+  # dispatch determinants (Medical / Fire Priority Dispatch System)
+  "alpha response": {m: "Lowest-acuity dispatch level — routine response", cat: ems}
+  "bravo response": {m: "Low-to-moderate dispatch level", cat: ems}
+  "charlie response": {m: "Mid-level dispatch, usually advanced life support", cat: ems}
+  "delta response": {m: "High-acuity dispatch — lights and siren", cat: ems}
+  "echo response": {m: "Highest dispatch level — immediate threat to life", cat: ems}
+  "omega response": {m: "Lowest level — may be referred instead of sent", cat: ems}
+  "ALS": {m: "Advanced life support (paramedic level)", cat: ems}
+  "BLS": {m: "Basic life support (EMT level)", cat: ems}
+  "EMS": {m: "Emergency medical services", cat: ems}
+  "EMT": {m: "Emergency medical technician", cat: ems}
+  "LZ": {m: "Landing zone for a medical helicopter", cat: ems}
+  "medevac": {m: "Medical evacuation, usually by helicopter", cat: ems}
+  "MCI": {m: "Mass-casualty incident — more patients than units", cat: ems}
+  "POV": {m: "Privately owned vehicle", cat: ops}
+
+  # fire
+  "working fire": {m: "Confirmed fire that crews are actively fighting", cat: fire}
+  "fully involved": {m: "Fire has engulfed the whole structure or vehicle", cat: fire}
+  "defensive": {m: "Fighting the fire from outside — too dangerous to enter", cat: fire}
+  "offensive": {m: "Crews going inside to attack the fire", cat: fire}
+  "knockdown": {m: "Main body of fire put out", cat: fire}
+  "knocked down": {m: "Main body of fire put out", cat: fire}
+  "overhaul": {m: "Searching for and putting out hidden hot spots", cat: fire}
+  "primary search": {m: "Fast first search of a building for victims", cat: fire}
+  "secondary search": {m: "Slower, thorough second search for victims", cat: fire}
+  "all clear": {m: "Search done — nobody found inside", cat: fire}
+  "PAR": {m: "Personnel accountability report — headcount of crews", cat: fire}
+  "RIT": {m: "Rapid intervention team — stands by to rescue firefighters", cat: fire}
+  "RIC": {m: "Rapid intervention crew — stands by to rescue firefighters", cat: fire}
+  "mayday": {m: "A firefighter or crew is in trouble — top priority", cat: fire}
+  "emergency traffic": {m: "Urgent message — everyone else stay off the channel", cat: radio}
+  "second alarm": {m: "More units called to a growing incident", cat: fire}
+  "third alarm": {m: "Further escalation — even more units called", cat: fire}
+  "box alarm": {m: "Pre-planned full first-alarm assignment", cat: fire}
+  "first due": {m: "The unit whose district the call is in — arrives first", cat: fire}
+  "first in": {m: "First unit to arrive", cat: fire}
+  "size-up": {m: "First-arriving unit's report of what it sees", cat: fire}
+  "IC": {m: "Incident commander", cat: fire}
+  "ICS": {m: "Incident command system", cat: fire}
+  "mutual aid": {m: "Help from a neighbouring jurisdiction", cat: ops}
+  "automatic aid": {m: "Neighbouring units sent automatically by agreement", cat: ops}
+  "in quarters": {m: "Back at the station", cat: status}
+  "fireground": {m: "Channel or area used at an active fire scene", cat: fire}
+  "tender": {m: "Water-carrying truck (also 'tanker')", cat: fire}
+  "quint": {m: "Combined pumper and ladder truck", cat: fire}
+  "brush truck": {m: "Small off-road truck for grass and wildland fires", cat: fire}
+  "hazmat": {m: "Hazardous materials", cat: fire}
+  "CO alarm": {m: "Carbon monoxide detector going off", cat: fire}
+
+  # police
+  "BOLO": {m: "Be on the lookout", cat: police}
+  "ATL": {m: "Attempt to locate", cat: police}
+  "GOA": {m: "Gone on arrival", cat: police}
+  "UTL": {m: "Unable to locate", cat: police}
+  "NCIC": {m: "FBI national crime database (warrants, stolen items)", cat: police}
+  "DUI": {m: "Driving under the influence", cat: traffic}
+  "DWI": {m: "Driving while impaired", cat: traffic}
+  "SWAT": {m: "Special weapons and tactics team", cat: police}
+  "K-9": {m: "Police dog unit", cat: police}
+  "K9": {m: "Police dog unit", cat: police}
+  "welfare check": {m: "Checking that someone is safe", cat: police}
+  "perimeter": {m: "Area sealed off around a scene or suspect", cat: police}
+  "in custody": {m: "Subject detained", cat: police}
+  "felony stop": {m: "High-risk traffic stop, weapons drawn", cat: police}
+  "shots fired": {m: "Gunfire reported", cat: police}
+
+  # traffic
+  "MVA": {m: "Motor vehicle accident", cat: traffic}
+  "MVC": {m: "Motor vehicle collision", cat: traffic}
+  "rollover": {m: "Vehicle has rolled onto its side or roof", cat: traffic}
+  "entrapment": {m: "Someone trapped in a vehicle — needs extrication", cat: traffic}
+  "extrication": {m: "Cutting or prying a vehicle to free someone", cat: traffic}
+  "NB": {m: "Northbound", cat: traffic}
+  "SB": {m: "Southbound", cat: traffic}
+  "EB": {m: "Eastbound", cat: traffic}
+  "WB": {m: "Westbound", cat: traffic}
+  "MM": {m: "Mile marker", cat: traffic}
+
+  # radio / ops
+  "be advised": {m: "Heads-up: important information follows", cat: radio}
+  "staging": {m: "Waiting at a safe spot nearby until cleared to go in", cat: ops}
+  "ETA": {m: "Estimated time of arrival", cat: status}
+  "CAD": {m: "Computer-aided dispatch", cat: radio}
+  "MDT": {m: "Mobile data terminal (in-vehicle computer)", cat: radio}
+  "MDC": {m: "Mobile data computer (in-vehicle computer)", cat: radio}
+  "PSAP": {m: "911 answering point", cat: radio}
+  "TAC": {m: "Tactical channel for an incident", cat: radio}
+  "tones": {m: "Alert tones that wake a station for a call", cat: radio}
+  "toned out": {m: "Station alerted by tones for a call", cat: radio}
+  "landline": {m: "Call me by phone (off the radio)", cat: radio}
+  "OOS": {m: "Out of service", cat: status}
