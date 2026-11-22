@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Panoptes API</title>
+<meta name="description" content="Keyed access to Panoptes data: open hazard feeds relayed through one cache, and Panoptes' own fused events, surges and radio activity." />
+<link rel="icon" type="image/png" href="/assets/logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/developers/dev.css" />
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="/"><img src="/assets/logo.png" alt="" />Panoptes</a>
+  <nav><a href="#start">Quick start</a><a href="#datasets">Datasets</a><a href="#limits">Limits</a><a href="#apply">Apply</a><a href="/developers/terms/">Terms</a></nav>
+</div></header>
+<main>
+  <h1>Panoptes API</h1>
+  <p class="lede">Keyed, rate-limited access to the data behind the map: open hazard and environment
+  feeds relayed through one shared cache, and what Panoptes computes from them, including fused events,
+  incident-rate surges and radio activity. Keys are free and issued by hand to approved applicants.</p>
+
+  <div id="claim" hidden></div>
+
+  <h2 id="start">Quick start</h2>
+  <p>Send your key in the <code>X-API-Key</code> header (or <code>Authorization: Bearer …</code>).
+  Never put it in a URL.</p>
+  <pre><code>curl -H "X-API-Key: pk_…" https://panoptes.run/v1/data/usgs_quakes?max_age_hours=6</code></pre>
+  <p>Every answer has the same envelope. Show the <code>attribution</code> wherever you display the data.</p>
+  <pre><code>{
+  "dataset": "usgs_quakes",
+  "attribution": "U.S. Geological Survey",
+  "licence": "Public domain (U.S. Government work)",
+  "served_at": 1763769600.0,
+  "data": [ … ]
+}</code></pre>
+  <div class="grid">
+    <div class="card"><b><code>GET /v1/datasets</code></b><small>The catalogue, with licences and parameters. No key needed.</small></div>
+    <div class="card"><b><code>GET /v1/data/{dataset}</code></b><small>Current data. Unknown query parameters are ignored.</small></div>
+    <div class="card"><b><code>GET /v1/data/event/{id}</code></b><small>One fused event's history.</small></div>
+    <div class="card"><b><code>GET /v1/me</code></b><small>Your tier, limits, today's usage and 30 days of history.</small></div>
+  </div>
+
+  <h2 id="datasets">Datasets</h2>
+  <p class="lede">Open feeds are relayed exactly as Panoptes holds them, so each source sees no more traffic
+  because of you. Derived datasets are computed by Panoptes. Some sources are on the map but cannot be
+  redistributed; they are listed at the end with the reason. Datasets marked <b>non-commercial</b> come from
+  sources whose licence forbids commercial use.</p>
+  <div class="tablewrap" style="margin-top:14px"><table id="dsTable"><thead><tr><th>Dataset</th><th>Kind</th><th>Licence / attribution</th><th>Parameters</th><th>Refresh</th></tr></thead><tbody><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+  <h3>Not available through the API</h3>
+  <ul id="nope" style="color:var(--txt-2)"></ul>
+
+  <h2 id="limits">Limits and errors</h2>
+  <div class="grid" id="tiers"></div>
+  <p>Each response carries <code>X-RateLimit-Remaining</code> and <code>X-Quota-Remaining</code>.
+  Going over the per-minute rate returns <code>429</code> with <code>Retry-After</code>. Using up the daily quota
+  returns <code>429</code> until 00:00 UTC. Identical requests within a dataset's refresh window are served
+  from cache (<code>X-Cache: HIT</code>), so polling faster than the refresh interval gains nothing. Statuses
+  you may see: <code>401</code> no or bad key · <code>403</code> dataset not granted to your key ·
+  <code>404</code> unknown dataset · <code>502</code> an upstream source failed.</p>
+
+  <h2 id="apply">Apply for a key</h2>
+  <p class="lede">Applications are read by a person. Say what you are building and why. You will get an email
+  when you apply and another when it is decided. Approved applicants collect their key from a private link in
+  that email.</p>
+  <form id="applyForm" novalidate style="margin-top:16px">
+    <label>Your name<input name="name" required maxlength="120" autocomplete="name" /></label>
+    <label>Email<small>Where we send your claim link and the decision. It is never published.</small><input name="email" type="email" required maxlength="200" autocomplete="email" /></label>
+    <label>Organisation <small>(optional)</small><input name="org" maxlength="160" autocomplete="organization" /></label>
+    <label>Website or project link <small>(optional)</small><input name="website" maxlength="300" inputmode="url" /></label>
+    <label>How will you use the data?<small>What you are building, who sees the result, and whether it is commercial. At least a couple of sentences.</small><textarea name="use_case" required maxlength="3000"></textarea></label>
+    <label>Expected volume <small>(rough requests per day)</small><input name="volume" maxlength="200" placeholder="e.g. 2,000/day, polling every minute" /></label>
+    <fieldset style="border:1px solid var(--line-2);padding:10px 12px"><legend style="font-weight:600;font-size:13px;padding:0 6px">Datasets you need</legend><div class="checks" id="dsChecks"></div></fieldset>
+    <div class="hp" aria-hidden="true"><label>Leave empty<input name="website2" tabindex="-1" autocomplete="off" /></label></div>
+    <label class="agree"><input type="checkbox" name="agree_terms" required /> <span>I have read and accept the <a href="/developers/terms/" target="_blank">terms of service</a>.</span></label>
+    <button type="submit">Send application</button>
+    <div id="applyMsg" role="status"></div>
+  </form>
+</main>
+<footer><div class="in">Panoptes · <a href="/">map</a> · <a href="/developers/terms/">terms</a> · <a href="/v1/datasets">/v1/datasets</a></div></footer>
+<script>
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={get(k){try{return localStorage.getItem(k)}catch(_){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(_){}}};
+
+async function catalogue(){
+  let j; try{ const r=await fetch('/v1/datasets'); j=await r.json(); }catch(_){ document.querySelector('#dsTable tbody').innerHTML='<tr><td colspan="5">The catalogue could not be loaded.</td></tr>'; return; }
+  const ds=j.datasets.sort((a,b)=>(a.status!==b.status?(a.status==='enabled'?-1:1):0)||(a.class<b.class?1:a.class>b.class?-1:0)||a.title.localeCompare(b.title));
+  document.querySelector('#dsTable tbody').innerHTML=ds.map(d=>`<tr><td><b>${esc(d.title)}</b><br><code>${esc(d.id)}</code>${d.status!=='enabled'?' <span class="pill review">not yet available</span>':''}</td>`
+    +`<td><span class="pill ${esc(d.class)}">${esc(d.class)}</span>${d.noncommercial?'<br><span class="pill review" title="The upstream licence forbids commercial use">non-commercial</span>':''}</td><td>${esc(d.licence)}<br><small>${esc(d.attribution)}</small></td>`
+    +`<td>${d.params.map(p=>`<code>${esc(p)}</code>`).join(' ')||'—'}${d.cost>1?`<br><small>${esc(d.cost)} units per request</small>`:''}</td><td>${esc(d.refresh_seconds)} s</td></tr>`).join('');
+  document.getElementById('nope').innerHTML=Object.entries(j.not_available).map(([k,v])=>`<li><code>${esc(k)}</code>: ${esc(v)}</li>`).join('');
+  document.getElementById('tiers').innerHTML=Object.entries(j.tiers).map(([k,t])=>`<div class="card"><b>${esc(t.title||k)}</b>${esc(t.per_minute)} requests a minute · ${esc(Number(t.per_day).toLocaleString())} a day<br><small>tier <code>${esc(k)}</code>. Assigned on approval.</small></div>`).join('');
+  document.getElementById('dsChecks').innerHTML=ds.filter(d=>d.status==='enabled').map(d=>`<label><input type="checkbox" name="ds" value="${esc(d.id)}" /> ${esc(d.title)}</label>`).join('');
+}
+
+async function showClaim(token){
+  const box=document.getElementById('claim'); box.hidden=false;
+  box.innerHTML='<div class="note">Checking your application…</div>';
+  let st; try{ const r=await fetch('/v1/apply/status',{headers:{'X-Claim-Token':token}}); st=await r.json(); if(!r.ok) throw st; }
+  catch(e){ box.innerHTML=`<div class="note err">${esc((e&&e.error)||'This claim link is not valid.')}</div>`; return; }
+  const link=`${location.origin}/developers/#claim=${encodeURIComponent(token)}`;
+  if(st.status==='pending'){ box.innerHTML=`<div class="note"><b>Application ${esc(st.application)} is waiting for review.</b><br>Keep this private link and come back to it later: <a href="${esc(link)}">${esc(link)}</a></div>`; return; }
+  if(st.status==='denied'){ box.innerHTML=`<div class="note err"><b>Your application was not approved.</b>${st.note?'<br>'+esc(st.note):''}</div>`; return; }
+  if(st.key_issued){ box.innerHTML=`<div class="note ok"><b>Approved</b> (tier <code>${esc(st.tier)}</code>). Your key has already been shown. If you lost it, ask the owner to reissue it.</div>`; return; }
+  box.innerHTML=`<div class="note ok"><b>Approved</b> (tier <code>${esc(st.tier)}</code>).${st.note?'<br>'+esc(st.note):''}<br>Your key is shown <b>once</b>. Copy it somewhere safe before you leave this page.<div class="row" style="margin-top:10px"><button id="reveal">Show my key</button></div><div id="keyOut"></div></div>`;
+  document.getElementById('reveal').onclick=async ev=>{
+    ev.target.disabled=true;
+    const r=await fetch('/v1/apply/claim',{method:'POST',headers:{'X-Claim-Token':token}}); const j=await r.json();
+    document.getElementById('keyOut').innerHTML=r.ok?`<p style="margin:12px 0 6px">Your API key:</p><div class="keybox">${esc(j.api_key)}</div><div class="row" style="margin-top:8px"><button class="ghost" id="copy">Copy</button><small style="color:var(--dim)">Not shown again.</small></div>`
+      :`<p class="note err">${esc(j.error)}</p>`;
+    const c=document.getElementById('copy'); if(c) c.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(j.api_key).then(()=>c.textContent='Copied');
+  };
+}
+
+document.getElementById('applyForm').addEventListener('submit',async ev=>{
+  ev.preventDefault(); const f=ev.target, msg=document.getElementById('applyMsg'), btn=f.querySelector('button');
+  const E=f.elements;
+  const body={name:E.name.value,email:E.email.value,org:E.org.value,website:E.website.value,use_case:E.use_case.value,
+    volume:E.volume.value,website2:E.website2.value,agree_terms:E.agree_terms.checked,
+    datasets:[...f.querySelectorAll('input[name=ds]:checked')].map(i=>i.value)};
+  btn.disabled=true; msg.innerHTML='';
+  try{
+    const r=await fetch('/v1/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json();
+    if(!r.ok) throw j;
+    if(j.claim_token){ store.set('panoptesClaim',j.claim_token); history.replaceState(null,'','#claim='+encodeURIComponent(j.claim_token)); }
+    f.reset(); msg.innerHTML=`<div class="note ok"><b>Application received.</b> We emailed you a private link. You can also use this one to check on it and collect your key once it is approved: <a href="${esc(j.claim_url||'')}">${esc(j.claim_url||'')}</a></div>`;
+    if(j.claim_token) showClaim(j.claim_token);
+  }catch(e){ msg.innerHTML=`<div class="note err">${esc((e&&e.error)||'Could not send the application.')}</div>`; }
+  finally{ btn.disabled=false; }
+});
+
+catalogue();
+const m=/claim=([^&]+)/.exec(location.hash); const tok=m?decodeURIComponent(m[1]):store.get('panoptesClaim');
+if(tok) showClaim(tok);
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Keyed API tiers. The owner assigns one when approving an application; a key can also
+# be granted extra datasets (only ones whose status is "enabled").
+#   per_minute  requests per minute (token bucket, burst = per_minute)
+#   per_day     request units per UTC day (a dataset's `cost` is its units)
+#   datasets    "all" enabled datasets, or a list of dataset ids
+tiers:
+  research:
+    title: Research / non-commercial
+    per_minute: 60
+    per_day: 20000
+    datasets: all
+  standard:
+    title: Standard
+    per_minute: 120
+    per_day: 50000
+    datasets: all
+  partner:
+    title: Partner
+    per_minute: 600
+    per_day: 500000
+    datasets: all
+default_tier: research

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>API Admin</title>
+<link rel="icon" type="image/png" href="/assets/logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/developers/dev.css" />
+<style>
+  .app{background:var(--panel);border:1px solid var(--line-2);padding:14px;margin-bottom:12px}
+  .app.hl{border-color:var(--teal)}
+  .app .meta{color:var(--dim);font-size:12px}
+  .app .use{white-space:pre-wrap;margin:8px 0;color:var(--txt-2)}
+  .app .act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .app .act select,.app .act input{width:auto;min-width:140px}
+  .app .act input[type=checkbox]{min-width:0}
+  .tabs{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap}
+  .tabs button{padding:10px 12px}
+  .tabs button{background:none;border-color:var(--line-3);color:var(--txt-2)}
+  .tabs button[aria-pressed=true]{color:#fff;border-color:var(--teal)}
+  details summary{cursor:pointer;color:var(--txt-2)}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="/"><img src="/assets/logo.png" alt="" />Panoptes</a>
+  <nav><a href="/developers/">Portal</a><a href="#" id="logout">Sign out</a></nav>
+</div></header>
+<main>
+  <h1>API applications and keys</h1>
+  <form id="login" hidden style="margin-top:16px">
+    <label>Admin token<small>The value of <code>APB_ADMIN_TOKEN</code>. It is kept in this browser only.</small><input name="t" type="password" autocomplete="current-password" required /></label>
+    <button type="submit">Sign in</button>
+  </form>
+  <div id="msg" role="status"></div>
+  <section id="panel" hidden>
+    <div class="tabs" role="group" aria-label="Filter">
+      <button data-f="pending" aria-pressed="true">Pending</button><button data-f="approved" aria-pressed="false">Approved</button>
+      <button data-f="denied" aria-pressed="false">Denied</button><button data-f="" aria-pressed="false">All</button>
+    </div>
+    <div id="apps"></div>
+    <h2>Keys</h2>
+    <div class="tablewrap"><table><thead><tr><th>Key</th><th>Holder</th><th>Tier</th><th>Today</th><th>Last used</th><th></th></tr></thead><tbody id="keys"></tbody></table></div>
+    <p class="meta" id="stats" style="color:var(--dim);font-size:12px"></p>
+  </section>
+</main>
+<script>
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const when=ts=>ts?new Date(ts*1000).toLocaleString():'—';
+let token=''; try{ token=localStorage.getItem('panoptesAdmin')||''; }catch(_){}
+let filter='pending', meta={tiers:[],datasets:[]};
+const msg=t=>{ document.getElementById('msg').innerHTML=t?`<div class="note err">${esc(t)}</div>`:''; };
+
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json',...(opts.headers||{})}});
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401||r.status===503){ signedOut(j.error); throw j; }
+  if(!r.ok) throw j; return j;
+}
+function signedOut(why){ document.getElementById('panel').hidden=true; document.getElementById('login').hidden=false; if(why) msg(why); }
+
+async function load(){
+  msg('');
+  const a=await api('/v1/admin/applications'+(filter?'?status='+filter:'')); meta=a;
+  document.getElementById('login').hidden=true; document.getElementById('panel').hidden=false;
+  const focus=location.hash.slice(1);
+  document.getElementById('apps').innerHTML=a.applications.length?a.applications.map(x=>`
+    <div class="app${x.id===focus?' hl':''}" id="${esc(x.id)}">
+      <b>${esc(x.name)}</b>${x.org?' · '+esc(x.org):''} <span class="pill ${x.status==='approved'?'open':x.status==='denied'?'review':'derived'}">${esc(x.status)}</span>
+      <div class="meta">${esc(x.email)} · ${x.website?`<a href="${esc(/^https?:\/\//.test(x.website)?x.website:'https://'+x.website)}" target="_blank" rel="noopener noreferrer">${esc(x.website)}</a> · `:''}${esc(when(x.created))} · ${esc(x.id)}${x.volume?' · volume: '+esc(x.volume):''}</div>
+      <div class="use">${esc(x.use_case)}</div>
+      <div class="meta">asked for: ${x.datasets.length?x.datasets.map(d=>`<code>${esc(d)}</code>`).join(' '):'not specified'}${x.tier?' · tier '+esc(x.tier)+(x.grant_datasets.length?` · granted only ${x.grant_datasets.length}`:' · granted all'):''}${x.note?' · note: '+esc(x.note):''}${x.key_id?' · key '+esc(x.key_id):''}</div>
+      <div class="act">
+        ${x.status!=='approved'?`<select data-tier>${a.tiers.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" data-only style="width:auto"> only the datasets asked for</label>
+        <input data-note placeholder="note to applicant (optional)" maxlength="500">
+        <button data-do="approve">Approve</button>`:''}
+        ${x.status==='pending'?`<button class="ghost" data-do="deny">Deny</button>`:''}
+        ${x.status==='approved'&&x.key_id?`<button class="ghost" data-do="reissue">Revoke and reissue key</button>`:''}
+      </div>
+    </div>`).join(''):'<p style="color:var(--dim)">Nothing here.</p>';
+  document.querySelectorAll('.app [data-do]').forEach(b=>b.onclick=async()=>{
+    const card=b.closest('.app'), id=card.id, act=b.dataset.do;
+    if(act==='reissue'&&!confirm('Revoke the current key? The applicant can then claim a new one from their link.')) return;
+    const body={note:(card.querySelector('[data-note]')||{}).value||null};
+    if(act==='approve'){ body.tier=card.querySelector('[data-tier]').value;
+      if(card.querySelector('[data-only]').checked){ const x=meta.applications.find(y=>y.id===id); body.datasets=x?x.datasets:[]; } }
+    b.disabled=true;
+    try{ await api(`/v1/admin/applications/${encodeURIComponent(id)}/${act}`,{method:'POST',body:JSON.stringify(body)}); await load(); }
+    catch(e){ msg(e.error||'Failed'); b.disabled=false; }
+  });
+  const k=await api('/v1/admin/keys');
+  document.getElementById('keys').innerHTML=k.keys.map(x=>`<tr><td><code>${esc(x.prefix)}…</code><br><small>${esc(x.id)}</small></td>
+    <td>${esc(x.label)}<br><small>${esc(x.email)}</small></td>
+    <td><select data-key="${esc(x.id)}" ${x.revoked?'disabled':''}>${meta.tiers.map(t=>`<option${t===x.tier?' selected':''}>${esc(t)}</option>`).join('')}</select>${x.datasets.length?`<br><small>${x.datasets.length} datasets only</small>`:''}</td>
+    <td>${esc(x.used_today)}</td><td><small>${esc(when(x.last_used))}</small></td>
+    <td>${x.revoked?'<small>revoked</small>':`<button class="ghost" data-revoke="${esc(x.id)}">Revoke</button>`}</td></tr>`).join('')||'<tr><td colspan="6" style="color:var(--dim)">No keys yet.</td></tr>';
+  document.querySelectorAll('[data-key]').forEach(s=>s.onchange=()=>api(`/v1/admin/keys/${encodeURIComponent(s.dataset.key)}`,{method:'POST',body:JSON.stringify({tier:s.value})}).then(load,e=>msg(e.error)));
+  document.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=()=>confirm('Revoke this key? Calls with it stop working at once.')&&api(`/v1/admin/keys/${encodeURIComponent(b.dataset.revoke)}`,{method:'POST',body:JSON.stringify({revoke:true})}).then(load,e=>msg(e.error)));
+  const s=k.stats; document.getElementById('stats').textContent=`Since restart: ${s.requests} keyed requests · ${s.relay_hits} from cache / ${s.relay_misses} fetched · ${s.throttled} throttled · ${s.quota} over quota · notices: email ${s.notify.email?'on':'off'}, webhook ${s.notify.webhook?'on':'off'}${s.notify.last_error?' · last error: '+s.notify.last_error:''}`;
+  if(focus){ const el=document.getElementById(focus); if(el) el.scrollIntoView({block:'center'}); }
+}
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{ filter=b.dataset.f;
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); load().catch(()=>{}); });
+document.getElementById('login').addEventListener('submit',ev=>{ ev.preventDefault(); token=ev.target.elements.t.value.trim();
+  try{ localStorage.setItem('panoptesAdmin',token); }catch(_){} load().catch(()=>{}); });
+document.getElementById('logout').onclick=ev=>{ ev.preventDefault(); token=''; try{ localStorage.removeItem('panoptesAdmin'); }catch(_){} signedOut(); };
+if(location.hash.length>1) filter='';
+document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.f===filter)));
+if(token) load().catch(()=>{}); else signedOut();
+</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>API Terms of Service</title>
+<meta name="description" content="Terms for using the Panoptes API." />
+<link rel="icon" type="image/png" href="/assets/logo.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/developers/dev.css" />
+<style>main{max-width:760px} main p,main li{color:var(--txt-2)} ol li,ul li{margin-bottom:6px} .ver{color:var(--dim);font-size:13px}</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="/"><img src="/assets/logo.png" alt="" />Panoptes</a>
+  <nav><a href="/developers/">Portal</a><a href="/developers/terms/" aria-current="page">Terms</a></nav>
+</div></header>
+<main>
+  <h1>API Terms of Service</h1>
+  <p class="ver">Version 1.0 · effective 21 November 2026</p>
+  <p>These terms govern your use of the Panoptes application programming interface and the data it provides
+  (together, the "API"). By applying for, collecting or using an API key, you agree to them. If you use the API for an
+  organisation, you confirm you may bind it, and "you" includes it.</p>
+
+  <h2>1. The service</h2>
+  <p>Panoptes ("we", "us") gives approved applicants an API key for the datasets listed at <a href="/v1/datasets">/v1/datasets</a>.
+  Some datasets are relayed from public sources ("open datasets"). Others are computed by Panoptes, for example fused
+  events, incident-rate surges and radio activity summaries ("derived datasets"). Access is currently free and by
+  invitation. We may add, change or remove datasets, parameters and limits at any time.</p>
+
+  <h2>2. Your key</h2>
+  <ul>
+    <li>One key per approved application. Keep it secret: no client-side code, public repositories or URLs.
+      You are responsible for all use of your key. If it leaks, tell us at once so we can revoke and reissue it.</li>
+    <li>Use the data only for the purpose you described when you applied. Ask us before materially changing that
+      purpose, including before starting commercial use if you applied as non-commercial.</li>
+    <li>Do not share, sell or sublicense your key, or open several applications to multiply your limits.</li>
+  </ul>
+
+  <h2>3. Limits</h2>
+  <p>Each key has a per-minute rate and a daily quota set by its tier, shown in every response's headers and at
+  <code>/v1/me</code>. Do not try to get around them, for example by rotating keys or addresses, or by calling the map's
+  own endpoints, which are reserved for the map. We may lower limits or suspend a key to protect the service, without
+  notice when necessary.</p>
+
+  <h2>4. Data licences and attribution</h2>
+  <ul>
+    <li><b>Open datasets</b> remain under their original licence, named in each response's <code>licence</code> field
+      and in the catalogue. Their terms apply to you directly, including any attribution they require.</li>
+    <li><b>Non-commercial datasets</b> are marked <code>"noncommercial": true</code> in the catalogue. You may not use them,
+      or anything made from them, for commercial purposes.</li>
+    <li><b>Share-alike</b>: data under the Open Database License (ODbL), such as the ADS-B datasets, requires databases
+      you build from it to be offered under the ODbL as well.</li>
+    <li><b>Derived datasets</b>: we grant you a non-exclusive, non-transferable, revocable licence to use them for your
+      approved purpose for as long as your key is active. When you show them publicly, credit
+      "Panoptes (panoptes.run)".</li>
+    <li>Display the <code>attribution</code> string from each response wherever you show that data to others.</li>
+  </ul>
+
+  <h2>5. What you may not do</h2>
+  <ul>
+    <li>Use the data to identify, locate, track, profile or target any individual, including by combining it with other
+      sources to re-identify the people or places behind radio activity, incidents or events.</li>
+    <li>Harass, intimidate or interfere with emergency responders or the people they serve, or go to incident scenes
+      because of what the data shows.</li>
+    <li>Use the data for unlawful surveillance, for discrimination in housing, credit, employment, insurance or policing,
+      or in breach of any law.</li>
+    <li>Present the data as an official alert, or make it the only basis for a life-safety decision.</li>
+    <li>Probe, overload, reverse-engineer or attempt unauthorised access to the service.</li>
+  </ul>
+
+  <h2>6. Not for emergencies</h2>
+  <p>The data is delayed, incomplete, sometimes wrong, and produced in part by automated models. It is not a substitute
+  for official alerts or 911. In an emergency, contact local authorities.</p>
+
+  <h2>7. What we collect and the emails we send</h2>
+  <p>We keep what you submit when you apply (name, email, organisation, website, intended use, expected volume). For
+  each key we keep request counts by day and dataset and when the key was last used. We use this only to run, secure
+  and plan the API and to contact you about your application or key. We email you when you apply, when your application is
+  decided, and when your key is reissued, using a transactional email provider (Resend). We do not sell your
+  information or send marketing. To ask for deletion, write to the address below. Deleting your application also
+  revokes your key.</p>
+
+  <h2>8. Suspension and ending</h2>
+  <p>You may stop using the API at any time. We may suspend or revoke a key at any time, including for a breach of
+  these terms, abuse, or a change in what our sources allow us to share. When access ends, stop using derived datasets
+  except copies you have already published with attribution. Sections 4 to 6 and 9 to 11 continue to apply.</p>
+
+  <h2>9. No warranty</h2>
+  <p>The API and data are provided "as is" and "as available", without warranties of any kind, express or implied,
+  including accuracy, completeness, timeliness, availability, merchantability, fitness for a particular purpose and
+  non-infringement.</p>
+
+  <h2>10. Limitation of liability and indemnity</h2>
+  <p>To the maximum extent the law allows, we are not liable for any indirect, incidental, special, consequential or
+  punitive damages, or for lost profits, data or goodwill, arising from use of or reliance on the API or data. Our
+  total liability for any claim is limited to USD 100. You will indemnify us against third-party claims arising from
+  your use of the API in breach of these terms or of law.</p>
+
+  <h2>11. Governing law</h2>
+  <p>These terms are governed by the laws of the State of Delaware, USA, without regard to its conflict-of-laws rules.
+  The state and federal courts located in Delaware have exclusive jurisdiction over any dispute arising from them, and
+  you consent to that jurisdiction.</p>
+
+  <h2>12. Changes</h2>
+  <p>We will post changes here with a new version and date. For material changes we will give at least 14 days' notice
+  on this page and by email to active key holders. Continuing to use the API after a change takes effect means you
+  accept it. If these terms and a dataset's own licence conflict, the stricter one applies to that data.</p>
+
+  <h2>13. Contact</h2>
+  <p>Questions, deletion requests, leaked keys and reports of misuse: <a href="mailto:api@panoptes.run">api@panoptes.run</a>.</p>
+</main>
+<footer><div class="in">Panoptes · <a href="/developers/">API portal</a> · <a href="/">map</a> · <a href="mailto:api@panoptes.run">api@panoptes.run</a></div></footer>
+</body>
+</html>

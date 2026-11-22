@@ -1,0 +1,341 @@
+# Datasets the keyed API (/v1) serves. Each one relays an internal route through a
+# short shared cache, so many keyed clients cost about one internal fetch.
+#
+# status:
+#   enabled   served to keys whose tier (or per-key grant) includes it
+#   review    NOT served until the owner checks the upstream terms and flips it
+# noncommercial: true when the upstream licence forbids commercial use (shown in the catalogue)
+#   excluded  never served: upstream terms forbid redistribution, or privacy policy
+# class: open (public domain / open licence upstream) | derived (computed by Panoptes)
+# path:  internal route; "{id}" is filled from /v1/{dataset}/{id}
+# query: fixed query params added to the internal call (callers cannot override them)
+# params: query params callers may pass through (anything else is dropped);
+#         default [max_age_hours]
+# strip: fields removed from every returned object (raw text from restricted sources)
+# ttl:   seconds the relay keeps one answer for identical requests
+# cost:  request units charged against the daily quota
+
+datasets:
+  # ---- open upstreams -----------------------------------------------------------------
+  usgs_quakes:
+    title: Earthquakes (USGS)
+    status: enabled
+    class: open
+    path: /live/hazards
+    query: {source: usgs}
+    params: [max_age_hours]
+    licence: Public domain (U.S. Government work)
+    attribution: U.S. Geological Survey
+    ttl: 60
+  nws_alerts:
+    title: Weather alerts (NWS)
+    status: enabled
+    class: open
+    path: /live/hazards
+    query: {source: nws}
+    params: [max_age_hours]
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA National Weather Service
+    ttl: 60
+  nasa_eonet:
+    title: Natural events (NASA EONET)
+    status: enabled
+    class: open
+    path: /live/hazards
+    query: {source: eonet}
+    params: [max_age_hours]
+    licence: NASA open data
+    attribution: NASA Earth Observatory Natural Event Tracker
+    ttl: 300
+  flood_gauges:
+    title: River gauges at flood stage (NOAA NWPS)
+    status: enabled
+    class: open
+    path: /live/flood
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA National Water Prediction Service
+    ttl: 300
+  volcanoes:
+    title: Elevated volcanoes (USGS)
+    status: enabled
+    class: open
+    path: /live/volcano
+    licence: Public domain (U.S. Government work)
+    attribution: USGS Volcano Hazards Program
+    ttl: 600
+  smoke:
+    title: Smoke plumes (NOAA HMS)
+    status: enabled
+    class: open
+    path: /live/smoke
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA Hazard Mapping System
+    ttl: 600
+  marine_buoys:
+    title: Buoys reporting high seas (NDBC)
+    status: enabled
+    class: open
+    path: /live/marine
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA National Data Buoy Center
+    ttl: 600
+  storm_reports:
+    title: Storm reports today (SPC)
+    status: enabled
+    class: open
+    path: /live/storm_reports
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA Storm Prediction Center
+    ttl: 300
+  cyclones:
+    title: Tropical cyclones (NHC)
+    status: enabled
+    class: open
+    path: /live/cyclones
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA National Hurricane Center
+    ttl: 600
+  airport_delays:
+    title: Airport delays and ground stops (FAA)
+    status: enabled
+    class: open
+    path: /live/airport_delays
+    licence: Public domain (U.S. Government work)
+    attribution: Federal Aviation Administration
+    ttl: 120
+  wildfires:
+    title: Active wildfires (NIFC WFIGS)
+    status: enabled
+    class: open
+    path: /live/wildfires
+    licence: Public domain (U.S. Government work)
+    attribution: National Interagency Fire Center
+    ttl: 600
+  sigmets:
+    title: SIGMETs (AWC)
+    status: enabled
+    class: open
+    path: /live/sigmets
+    licence: Public domain (U.S. Government work)
+    attribution: NOAA Aviation Weather Center
+    ttl: 300
+  active_fire:
+    title: Satellite fire detections (NASA FIRMS)
+    status: enabled
+    class: open
+    path: /live/fire
+    licence: NASA open data — acknowledgement required
+    attribution: "NASA FIRMS (LANCE), https://earthdata.nasa.gov/firms"
+    ttl: 600
+  air_quality:
+    title: PM2.5 spikes (OpenAQ)
+    status: enabled
+    class: open
+    path: /live/airquality
+    licence: CC BY 4.0 (per OpenAQ; individual providers may differ)
+    attribution: OpenAQ and its data providers
+    ttl: 600
+  disasters:
+    title: Global disaster alerts (GDACS)
+    status: enabled
+    class: open
+    path: /live/disasters
+    licence: Free reuse with acknowledgement (EC JRC)
+    attribution: Global Disaster Alert and Coordination System (GDACS)
+    ttl: 600
+
+  # ---- enabled by the owner 2026-11-21 after review ----------------------------------
+  quakes_global:
+    title: Global earthquakes M4+ (EMSC)
+    status: enabled
+    class: open
+    path: /live/quakes_global
+    licence: EMSC open data — credit EMSC
+    attribution: European-Mediterranean Seismological Centre
+    ttl: 120
+  power_outages:
+    title: Power outages by county (ODIN)
+    status: enabled
+    class: open
+    path: /live/outages
+    licence: ORNL ODIN public outage data
+    attribution: Oak Ridge National Laboratory ODIN
+    ttl: 600
+  airnow:
+    title: Official AQI readings (AirNow)
+    status: enabled
+    class: open
+    path: /live/airnow
+    licence: "U.S. EPA AirNow — preliminary data, not for regulatory use"
+    attribution: U.S. EPA AirNow
+    ttl: 900
+  environment:
+    title: Environmental context grid (Open-Meteo, derived)
+    status: enabled
+    class: derived
+    path: /live/environment
+    licence: "CC BY 4.0 data via Open-Meteo's free API — non-commercial use only"
+    noncommercial: true
+    attribution: Open-Meteo.com
+    ttl: 600
+  incidents:
+    title: Municipal 911/CAD incidents
+    status: enabled
+    class: open
+    path: /incidents
+    params: [metro, incident_type, min_threat, minutes, limit]
+    licence: Each city's open-data licence (mostly public domain or ODC)
+    attribution: Each city's open-data portal
+    ttl: 30
+    cost: 2
+  squawks:
+    title: Aircraft emergency squawks
+    status: enabled
+    class: open
+    path: /live/squawks
+    licence: "ODbL (adsb.lol); fallback airplanes.live is non-commercial"
+    attribution: "adsb.lol / airplanes.live contributors"
+    noncommercial: true
+    ttl: 60
+  loitering_aircraft:
+    title: Loitering rotorcraft (derived from ADS-B)
+    status: enabled
+    class: derived
+    path: /live/aircraft
+    licence: "Panoptes derived from ODbL ADS-B data (adsb.lol); share-alike applies"
+    attribution: "Panoptes; ADS-B data adsb.lol / airplanes.live contributors"
+    noncommercial: true
+    ttl: 60
+  internet_outages:
+    title: Internet outages (Cloudflare Radar)
+    status: enabled
+    class: open
+    path: /live/internet
+    licence: "CC BY-NC 4.0 — non-commercial use only"
+    noncommercial: true
+    attribution: Cloudflare Radar
+    ttl: 600
+
+  # ---- computed by Panoptes -----------------------------------------------------------
+  events:
+    title: Fused events with lifecycle
+    status: enabled
+    class: derived
+    path: /events
+    params: [max_age_hours, limit]
+    strip: [summaries, signal_ids]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 30
+  event:
+    title: One fused event's history
+    status: enabled
+    class: derived
+    path: "/events/{id}"
+    strip: [summaries, signal_ids, camera_checks]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 30
+  emerging:
+    title: Emerging clusters
+    status: enabled
+    class: derived
+    path: /live/emerging
+    params: [min_count, threat_floor, max_age_hours]
+    strip: [summaries, signal_ids, summary, text, title, url, link]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 30
+  surges:
+    title: Incident-rate anomalies by metro
+    status: enabled
+    class: derived
+    path: /baseline/anomalies
+    params: [window_hours, lookback_hours, z]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 120
+  radio_activity:
+    title: Radio system call rates and surges
+    status: enabled
+    class: derived
+    path: /live/radio
+    params: [max_age_minutes, min_z]
+    licence: Panoptes derived data (counts only)
+    attribution: Panoptes (panoptes.run)
+    ttl: 60
+  radio_areas:
+    title: What is going on where, from radio (area summaries)
+    status: enabled
+    class: derived
+    path: /live/radio/areas
+    params: [max_age_minutes]
+    licence: Panoptes derived data — no addresses, names or units
+    attribution: Panoptes (panoptes.run)
+    ttl: 60
+  radio_threads:
+    title: Radio incident threads (with cleaned per-call lines)
+    status: enabled
+    class: derived
+    path: /live/radio/threads
+    params: [max_age_minutes]
+    strip: [audio]
+    licence: Panoptes derived data — cleaned lines, no addresses, names or units
+    attribution: Panoptes (panoptes.run)
+    ttl: 60
+  radio_glossary:
+    title: Radio codes and jargon
+    status: enabled
+    class: derived
+    path: /live/radio/glossary
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 600
+  summary:
+    title: Activity summary for a window (minute / day / week)
+    status: enabled
+    class: derived
+    path: /live/summary
+    params: [period]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 60
+  notable:
+    title: Notable cells (facts above their own history)
+    status: enabled
+    class: derived
+    path: /live/notable
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 300
+  camera_activity:
+    title: Camera-derived activity counts per cell
+    status: enabled
+    class: derived
+    path: /live/camera_activity
+    params: [bbox, hours]
+    licence: Panoptes derived data (counts only, no images)
+    attribution: Panoptes (panoptes.run)
+    ttl: 300
+  scorecard:
+    title: Alert accuracy scorecard
+    status: enabled
+    class: derived
+    path: /scorecard
+    params: [days]
+    licence: Panoptes derived data
+    attribution: Panoptes (panoptes.run)
+    ttl: 600
+
+# Never served by the keyed API (listed so the catalogue can say why).
+excluded:
+  traffic: State 511 feeds are licensed to us per developer key
+  cameras: DOT camera images and streams — agency terms; relaying is not ours to grant
+  radio_audio: Volunteer scanner audio — owners did not license redistribution
+  radio_lines: Per-call transcript lines stay on the map (privacy policy)
+  unrest: ACLED licence forbids redistribution
+  maritime: AISStream terms forbid redistribution
+  rail: Amtrak data is not openly licensed
+  social: Social posts belong to their authors / platforms
+  news: News headlines and links belong to publishers
+  explain_facts_street: Paid model / imagery calls — cost, and imagery terms

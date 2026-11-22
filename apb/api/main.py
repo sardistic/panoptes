@@ -374,7 +374,10 @@ def _db():
 app = FastAPI(title="APB", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Accept", "Content-Type"], allow_credentials=False,
+    allow_headers=["Accept", "Content-Type", "X-API-Key", "Authorization", "X-Claim-Token"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset",
+                    "X-Quota-Limit", "X-Quota-Remaining", "Retry-After", "X-Cache"],
+    allow_credentials=False,
 )
 
 _WEB_DIR = Path(__file__).resolve().parents[2] / "web"
@@ -390,6 +393,65 @@ except ValueError:
     _RATE_PER_MIN = 300
 _hits: dict[str, deque] = defaultdict(deque)
 _hits_lock = threading.Lock()
+# The data routes are for the map. Callers that are not the map page (no same-origin
+# browser signal) get a much lower per-IP allowance and are pointed at the keyed API
+# (/v1, apb/api/platform.py). Headers can be forged, so this is a deterrent; the keyed
+# API is where volume, stable schemas and licensing live.
+try:
+    _ANON_PER_MIN = max(0, int(os.environ.get("APB_ANON_RATE_LIMIT", "20")))
+except ValueError:
+    _ANON_PER_MIN = 20
+_anon_hits: dict[str, deque] = defaultdict(deque)
+_MAP_ONLY = ("/live/", "/incidents", "/activity", "/emerging", "/events", "/baseline/",
+             "/correlate", "/feeds", "/facts", "/explain", "/street", "/looks", "/scorecard")
+
+
+def client_ip(request: Request) -> str:
+    """The caller's address. Behind the Cloudflare tunnel every request arrives from a
+    private address (cloudflared); then CF-Connecting-IP names the real client. It is
+    trusted only when the direct peer is private/loopback, so a public caller cannot
+    pick its own address."""
+    import ipaddress
+    peer = request.client.host if request.client else "?"
+    if os.environ.get("APB_TRUST_CF_IP", "1") != "0":
+        cf = request.headers.get("cf-connecting-ip", "").strip()
+        try:
+            if cf and ipaddress.ip_address(peer).is_private:
+                ipaddress.ip_address(cf)
+                return cf
+        except ValueError:
+            pass
+    return peer
+
+
+def _from_map(request: Request) -> bool:
+    """A same-origin browser request (the map page, its images and audio)."""
+    site = request.headers.get("sec-fetch-site", "")
+    if site == "same-origin":
+        return True
+    if site:                                     # cross-site / same-site / none (typed URL)
+        return False
+    host = request.headers.get("host", "")
+    for h in ("origin", "referer"):
+        v = request.headers.get(h, "")
+        if v and host and v.split("://", 1)[-1].split("/", 1)[0] == host:
+            return True
+    return False
+
+
+def _over(table: dict, ip: str, limit: int, now: float) -> bool:
+    q = table[ip]
+    while q and q[0] < now - 60.0:
+        q.popleft()
+    if len(q) >= limit:
+        return True
+    q.append(now)
+    if len(table) > 10_000:      # evict stale/old clients without resetting all
+        for key in [k for k, hits in table.items() if not hits or hits[-1] < now - 60.0]:
+            table.pop(key, None)
+        while len(table) > 10_000:
+            table.pop(next(iter(table)))
+    return False
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -433,26 +495,27 @@ async def _throttle_and_cache(request: Request, call_next):
     request_id = request.headers.get("x-request-id", "")[:80]
     if not request_id or not all(c.isalnum() or c in "-_." for c in request_id):
         request_id = uuid4().hex
-    if _RATE_PER_MIN and request.url.path != "/health":
-        ip = request.client.host if request.client else "?"
+    from apb.api import platform as _platform
+    internal = request.headers.get("x-apb-internal") == _platform.INTERNAL_TOKEN
+    anon = False
+    if not internal and _RATE_PER_MIN and request.url.path != "/health":
+        ip = client_ip(request)
         now = _time.time()
+        anon = request.url.path.startswith(_MAP_ONLY) and not _from_map(request)
         with _hits_lock:
-            q = _hits[ip]
-            while q and q[0] < now - 60.0:
-                q.popleft()
-            if len(q) >= _RATE_PER_MIN:
-                return JSONResponse({"error": "rate limited"}, status_code=429,
-                                    headers={"Retry-After": "30", "X-Request-ID": request_id,
-                                             **_SECURITY_HEADERS})
-            q.append(now)
-            if len(_hits) > 10_000:      # evict stale/old clients without resetting all
-                stale = [key for key, hits in _hits.items()
-                         if not hits or hits[-1] < now - 60.0]
-                for key in stale:
-                    _hits.pop(key, None)
-                while len(_hits) > 10_000:
-                    _hits.pop(next(iter(_hits)))
+            limited = _over(_hits, ip, _RATE_PER_MIN, now) or (
+                anon and _ANON_PER_MIN and _over(_anon_hits, ip, _ANON_PER_MIN, now))
+        if limited:
+            body = {"error": "rate limited"}
+            if anon:
+                body.update(error="these routes are for the map; use the keyed API",
+                            docs="/developers/")
+            return JSONResponse(body, status_code=429,
+                                headers={"Retry-After": "30", "X-Request-ID": request_id,
+                                         **_SECURITY_HEADERS})
     resp = await call_next(request)
+    if anon:
+        resp.headers["X-Panoptes-API"] = "/developers/"
     if (request.method == "GET" and request.url.path != "/live/stream"
             and "cache-control" not in resp.headers
             and request.url.path.startswith(("/live/", "/baseline/"))):
@@ -1005,7 +1068,7 @@ def explain_scene(req: ExplainRequest, request: Request):
     if not explainer.api_key():
         return JSONResponse({"error": "scene explainer is not configured (GEMINI_API_KEY)"},
                             status_code=503)
-    ip = request.client.host if request.client else "?"
+    ip = client_ip(request)
     now = _time.time()
     q = _explain_hits[ip]
     while q and q[0] < now - 60:
@@ -1570,6 +1633,7 @@ def status():
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
         "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
         "radio_terms": __import__("apb.context.radio_terms", fromlist=["status"]).status(),
+        "api_platform": __import__("apb.api.platform", fromlist=["status"]).status(),
         "streams": __import__("apb.ingest.streams", fromlist=["status"]).status(),
         "trunkrec": __import__("apb.ingest.trunkrec", fromlist=["status"]).status(),
         "costs": _costs_brief(),
@@ -1922,7 +1986,7 @@ def live_radio_audio(request: Request, key: str, call_id: int):
         return JSONResponse({"error": "unknown call"}, status_code=404)
     hit = _audio_cache.get((key, call_id))
     if hit is None:
-        ip = request.client.host if request.client else "?"
+        ip = client_ip(request)
         now = _time.time()
         with _hits_lock:
             q = _audio_hits[ip]
@@ -2232,6 +2296,10 @@ def correlate(lat: Latitude, lon: Longitude,
     return _cached(("correlate", round(lat, 2), round(lon, 2), ",".join(tl), timespan),
                    120.0, _build)
 
+
+# Keyed API platform (/v1): applications, keys, dataset relays.
+from apb.api.platform import router as _platform_router  # noqa: E402
+app.include_router(_platform_router)
 
 # Serve the test UI at / (mounted last so it doesn't shadow API routes).
 if _WEB_DIR.exists():

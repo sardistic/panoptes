@@ -496,3 +496,53 @@ death are not seeded (10-79, 11-44), learned meanings matching the medical list 
 "Medical call code", and unknown acronyms (possible names or call signs) are counted but
 never served. Rejected: client-side regex matching (two detectors drifting apart); storing
 raw transcripts longer (owner's privacy rule).
+
+### 2026-11-21 — Keyed API platform: approval-gated keys, open + derived data only
+
+Owner asked for a portal where approved users get keys to the data, an email to the
+owner on each request (reason for use, email, etc.), relays that act as a cache in
+front of sources, terms of service, and throttling / capabilities. Owner's choices:
+notify the owner only (applicants are not emailed); serve open-licence feeds plus
+Panoptes-derived products, never restricted third-party content; lock the map's own
+routes to the map; free tiers assigned on approval.
+
+Decision:
+- `apb/api/platform.py` (router at /v1) + `apb/store/apikeys.py` (SQLite tables
+  api_applications / api_keys / api_usage). Applicants apply on /developers/. The owner is
+  notified by SMTP and/or a webhook (`apb/alerts/mail.py`) and decides on /developers/admin/
+  (`APB_ADMIN_TOKEN`). The applicant collects the key once from a private claim link. Only
+  SHA-256 hashes of keys and claim tokens are stored; the owner can revoke and reissue.
+- Datasets in `config/api_datasets.yaml`, each enabled / review / excluded with licence and
+  attribution. `/v1/data/{id}` relays the internal route in-process (ASGI) with a per-dataset
+  TTL cache and single flight. N clients cost about one internal fetch, and upstreams see no
+  extra traffic. `strip` removes raw member text (fused events' `summaries`). Datasets
+  whose upstream terms are unclear (EMSC, ODIN, AirNow, Open-Meteo, municipal CAD,
+  ADS-B, Cloudflare Radar, radio threads) start in `review` and are not served.
+- Tiers in `config/api_tiers.yaml`: a per-key token bucket per minute plus a daily
+  quota of request units (UTC); 429 with Retry-After / X-Quota-*. A global semaphore caps
+  concurrent relay fetches. Keys can be limited to the datasets the owner grants.
+- Map lock: data routes from callers with no same-origin browser signal (Sec-Fetch-Site,
+  or Origin/Referer = host) get `APB_ANON_RATE_LIMIT` (20/min/IP) and a pointer to
+  /developers/. Headers can be forged, so this is a deterrent, not access control.
+- Client IP: behind the tunnel every peer was cloudflared, so the existing "per-IP"
+  300/min was one shared bucket. `client_ip()` now uses CF-Connecting-IP when the
+  direct peer is private, and is used by all limiters.
+
+Rejected: emailing applicants (owner chose notify-only; no transactional mail provider);
+API keys in query strings (leak into logs); relaying cameras / audio / 511 / ACLED / AIS /
+news / social (upstream terms); a separate API service (one process on the Toughbook is
+enough; the relay reuses the app's caches).
+
+### 2026-11-21 — API platform: Resend email, all reviewed datasets on, terms 1.0
+
+Owner revised the platform decision above the same day: email goes through Resend
+(`RESEND_API_KEY`, from `Panoptes API <api@panoptes.run>`, replies to api@panoptes.run).
+Applicants are now emailed: a receipt with their claim link, and the decision. Approval
+and reissue emails carry a fresh link (`claim_hash2`), and the link shown on the page
+keeps working. The admin can decide without email (`"email": false`). SMTP was dropped.
+The owner enabled all nine `review` datasets. Datasets whose upstream licence forbids
+commercial use carry `noncommercial: true` (Open-Meteo grid, Cloudflare Radar, both
+ADS-B sets), and the terms bind users to it. ADS-B is ODbL share-alike. Terms are v1.0:
+the contact is api@panoptes.run, Delaware law and courts, a USD 100 liability cap, an
+indemnity, and 14 days' notice of material changes. api@panoptes.run needs Cloudflare
+Email Routing to forward to the owner's inbox.
