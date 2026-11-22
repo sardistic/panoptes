@@ -641,3 +641,24 @@ worldwide.
   on a canvas GridLayer).
 - `/live/radiation/survey?bbox&z` and `/live/radiation/survey-drives`.
 - `/v1` datasets `radiation_survey` and `radiation_survey_drives` (CC0).
+
+### 2026-11-22 — Radio STT: paced 6 h/day budget; Flash-Lite rejected for audio
+
+**What happened:** the map showed calls but no new transcriptions. The 2 h/day live
+budget (7,200 s, UTC day) was spent by ~03:45 UTC, about 10:45 pm Eastern, after the
+stream and Trunking Recorder expansion. Every later run budget-stopped until 00:00 UTC.
+
+**Decision:**
+- The daily budgets (live and Batch-API backlog) are now paced across the UTC day:
+  allowance = cap × (hour + 1) / 24, so unused hours roll forward (`APB_RADIO_STT_PACED`).
+- The owner raised the live budget to 6 h/day (`APB_RADIO_STT_DAILY_SEC=21600` in the
+  prod .env, about $1.75/day at about $0.29 per audio hour).
+- 2026-11-22 only: the 7,184 s spent before the change hold transcription until about
+  07:00 UTC.
+
+**Flash-Lite A/B** (16 recent real calls, same prompt and batches):
+- It was 47% cheaper but swapped content between clips in a batch (two Baltimore
+  dispatches became one invented "Seacliff Road crash").
+- It found fewer and garbled addresses (6 vs 9 locations), and 6/16 incident types
+  differed, often wrongly.
+- Gemini 3.8 Flash stays the STT model. Flash-Lite remains fine for text-only tasks.
