@@ -85,6 +85,17 @@ def daily_sec() -> int:
         return 7200
 
 
+def paced(cap: int, now: float | None = None) -> int:
+    """How much of a daily cap may be spent by now (UTC day): it grows by 1/24 an hour, one
+    hour ahead, so a busy evening cannot use the whole day by itself and quiet hours roll
+    forward. APB_RADIO_STT_PACED=0 turns it off (the whole cap is available at 00:00)."""
+    if os.environ.get("APB_RADIO_STT_PACED", "1").strip() in ("0", "false", "no", "off"):
+        return cap
+    t = time.gmtime(now or time.time())
+    hours = t.tm_hour + t.tm_min / 60.0 + 1.0
+    return min(cap, math.ceil(cap * hours / 24.0))
+
+
 def batch_daily_sec() -> int:
     """Audio seconds a day for the half-price backlog (0 turns it off)."""
     try:
@@ -633,7 +644,7 @@ def run_once(now: float | None = None, fetch=None, gen=None, locate=None) -> int
         batch = clips[i:i + BATCH]
         need = math.ceil(sum(c["seconds"] for c in batch))
         cap = daily_sec()
-        if not spend.allow("radio_stt_sec", need, monthly_cap=cap * 31, daily_cap=cap):
+        if not spend.allow("radio_stt_sec", need, monthly_cap=cap * 31, daily_cap=paced(cap, now)):
             _stats["budget_stops"] += 1
             break                                      # the backlog may take them later
         try:
@@ -710,7 +721,7 @@ def submit_backlog(now: float | None = None, fetch=None, post=None) -> int:
     for i in range(0, len(clips), BATCH):
         batch = clips[i:i + BATCH]
         need = math.ceil(sum(c["seconds"] for c in batch))
-        if not spend.allow("radio_stt_batch_sec", need, monthly_cap=cap * 31, daily_cap=cap):
+        if not spend.allow("radio_stt_batch_sec", need, monthly_cap=cap * 31, daily_cap=paced(cap, now)):
             _stats["backlog_budget_stops"] += 1
             break
         requests.append({"request": _request(batch), "metadata": {"key": f"r{len(requests)}"}})
@@ -975,6 +986,7 @@ def stop() -> None:
 def status() -> dict:
     from apb.store import radio, spend
     return {**_stats, "running": bool(_thread and _thread.is_alive()), "daily_sec": daily_sec(),
+            "paced_now": paced(daily_sec()),
             "used_sec": spend.used("radio_stt_sec"), "model": STT_MODEL,
             "batch_daily_sec": batch_daily_sec(), "batch_used_sec": spend.used("radio_stt_batch_sec"),
             "jobs_pending": len(radio.jobs()), "last_24h": radio.stt_stats(24.0),

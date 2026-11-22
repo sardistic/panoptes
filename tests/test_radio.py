@@ -1078,3 +1078,14 @@ def test_api_serves_term_spans_and_glossary(terms, db, monkeypatch):
     hist = {x["t"]: x for x in c.get(f"/live/radio/{db['key']}:1/terms").json()}
     assert hist["code 3"]["n"] == 1 and "working fire" in hist["code 3"]["ex"]
     assert c.get("/live/radio/nope/terms").status_code == 400
+
+
+def test_stt_budget_is_paced_across_the_utc_day(monkeypatch):
+    import calendar
+    from apb.context import radio_stt
+    day = calendar.timegm((2026, 11, 22, 0, 0, 0))
+    assert radio_stt.paced(7200, day) == 300                       # first hour: 1/24
+    assert radio_stt.paced(7200, day + 11.5 * 3600) == 3750        # midday
+    assert radio_stt.paced(7200, day + 23.9 * 3600) == 7200        # all of it by the end
+    monkeypatch.setenv("APB_RADIO_STT_PACED", "0")
+    assert radio_stt.paced(7200, day) == 7200
