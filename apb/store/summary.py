@@ -10,7 +10,7 @@ from apb.store import events, metrics, radio, sigbuf, snapshots, state
 
 PERIOD_SECONDS = {"minute": 60, "day": 86400, "week": 7 * 86400}
 _WEATHER = {"hz_nws", "nws", "spc", "nhc", "sigmet", "ndbc"}
-_ECOLOGY = {"airnow", "openaq", "firms", "nifc_fire", "hms_smoke", "usgs_flood"}
+_ECOLOGY = {"airnow", "openaq", "firms", "nifc_fire", "hms_smoke", "usgs_flood", "safecast"}
 _OTHER = {"adsb", "faa_tfr", "fema", "odin", "volcano", "faa_delay",
           "acled", "emsc", "gdacs", "radar", "amtrak", "squawk", "hz_usgs"}
 _TYPES = {item.value for item in IncidentType}

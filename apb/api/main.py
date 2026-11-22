@@ -87,6 +87,7 @@ _LOADERS: list[tuple[str, Callable[[], int]]] = [
     ("acled", cad_mod.load_acled),
     ("emsc", cad_mod.load_emsc),
     ("gdacs", cad_mod.load_gdacs),
+    ("safecast", cad_mod.load_safecast),  # reads the radiation lane's state (APB_RAD_OFF)
     ("sigmet", cad_mod.load_sigmet),
     ("chp", cad_mod.load_chp),
     ("amtrak", cad_mod.load_amtrak),
@@ -302,6 +303,13 @@ def _startup() -> None:
         from apb.fusion import maritime_store
         maritime_store.start()
 
+    # Radiation: Safecast real-time sensors, per-sensor baselines, a budgeted digest.
+    if _poller_leader:
+        try:
+            __import__("apb.context.radiation", fromlist=["start"]).start()
+        except Exception as e:
+            log.warning("radiation lane disabled: %s", e)
+
     # Radio activity from open Rdio Scanner instances (call metadata only, through
     # the egress proxy). Starts only when an instance list and APB_RDIO_PROXY exist.
     if _poller_leader and not _off("APB_RDIO_OFF"):
@@ -354,6 +362,7 @@ async def _lifespan(app: FastAPI):
         __import__("apb.context.radio_stt", fromlist=["stop"]).stop()
         __import__("apb.context.radio_areas", fromlist=["stop"]).stop()
         __import__("apb.context.radio_terms", fromlist=["stop"]).stop()
+        __import__("apb.context.radiation", fromlist=["stop"]).stop()
         __import__("apb.ingest.streams", fromlist=["stop"]).stop()
         __import__("apb.ingest.trunkrec", fromlist=["stop"]).stop()
         maritime_store.stop()
@@ -925,6 +934,39 @@ def live_quakes_global(max_age_hours: Hours = 24.0):
     return [d for d in kept if d.get("source") == "emsc"]
 
 
+@app.get("/live/radiation/elevated")
+def live_radiation_elevated(max_age_hours: Hours = 0.0):
+    """Safecast sensors sustained above their own baseline, as hazard rows (what fusion sees)."""
+    return _live_feed("safecast", max_age_hours)
+
+
+@app.get("/live/radiation")
+def live_radiation(flagged_only: bool = False):
+    """Safecast real-time radiation sensors heard in the last 3 h: dose rate (µSv/h), the
+    sensor's own baseline over the history window, the ratio, and a status (normal /
+    elevated / high / learning). Positions are rounded to ~1 km. Data: Safecast, CC0."""
+    from apb.context import radiation
+    return JSONResponse(radiation.public_sensors(flagged_only), headers={"Cache-Control": "public, max-age=120"})
+
+
+@app.get("/live/radiation/summary")
+def live_radiation_summary(days: float = Query(7.0, gt=0.0, le=90.0)):
+    """The model-written radiation digest: the latest note and every earlier one within
+    `days` (capped by the history window), each with the statistics it was written from.
+    Notes are written in the background only when the picture changes; reading costs nothing."""
+    from apb.context import radiation
+    return JSONResponse(radiation.public_summary(days), headers={"Cache-Control": "public, max-age=120"})
+
+
+@app.get("/live/radiation/sensor/{device:path}")
+def live_radiation_sensor(device: str, days: float = Query(7.0, gt=0.0, le=90.0)):
+    """One sensor's hourly mean and max dose rate (µSv/h) over `days`."""
+    if not __import__("re").fullmatch(r"[A-Za-z0-9:_\-.]{1,80}", device):
+        return JSONResponse({"error": "bad id"}, status_code=400)
+    from apb.context import radiation
+    return JSONResponse(radiation.sensor_history(device, days), headers={"Cache-Control": "public, max-age=300"})
+
+
 @app.get("/live/disasters")
 def live_disasters(max_age_hours: Hours = 0.0):
     """GDACS Orange/Red global disaster alerts (EQ/TC/flood/wildfire/volcano)."""
@@ -974,7 +1016,7 @@ def _hazards_all_rows(max_age_hours: float = 24.0) -> list[dict]:
                    live_storm_reports, live_cyclones, live_airport_delays,
                    live_wildfires, live_airnow, live_unrest, live_quakes_global,
                    live_disasters, live_sigmets, live_rail, live_squawks,
-                   live_internet):
+                   live_internet, live_radiation_elevated):
             rows.extend(fn(max_age_hours=max_age_hours))
         rows.sort(key=lambda d: d.get("ts") or 0, reverse=True)
         return rows[:10_000]
@@ -1633,6 +1675,7 @@ def status():
         "radio_stt": __import__("apb.context.radio_stt", fromlist=["status"]).status(),
         "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
         "radio_terms": __import__("apb.context.radio_terms", fromlist=["status"]).status(),
+        "radiation": __import__("apb.context.radiation", fromlist=["status"]).status(),
         "api_platform": __import__("apb.api.platform", fromlist=["status"]).status(),
         "streams": __import__("apb.ingest.streams", fromlist=["status"]).status(),
         "trunkrec": __import__("apb.ingest.trunkrec", fromlist=["status"]).status(),

@@ -625,6 +625,16 @@ def load_emsc() -> int:
     return 1
 
 
+def load_safecast() -> int:
+    """Register the radiation feed: Safecast sensors above their own baseline
+    (apb.context.radiation keeps the history; this reads its state, no upstream call)."""
+    if "safecast" in FEEDS or __import__("apb.context.radiation", fromlist=["off"]).off():
+        return 0
+    FEEDS["safecast"] = CadFeed(metro="safecast", name="Safecast Radiation (elevated sensors)",
+                                url="safecast", kind="safecast", hidden=True)
+    return 1
+
+
 def load_gdacs() -> int:
     """Register the GDACS global-disaster feed (apb.ingest.gdacs). Keyless."""
     if "gdacs" in FEEDS:
@@ -745,7 +755,7 @@ class CadIngest:
         "airnow": "_fetch_airnow", "acled": "_fetch_acled",
         "emsc": "_fetch_emsc", "gdacs": "_fetch_gdacs", "sigmet": "_fetch_sigmet",
         "chp": "_fetch_chp", "amtrak": "_fetch_amtrak", "squawk": "_fetch_squawk",
-        "radar": "_fetch_radar",
+        "radar": "_fetch_radar", "safecast": "_fetch_safecast",
     }
 
     # Kinds whose feeds all hit ONE upstream: when it is down or refusing us, hundreds
@@ -1021,6 +1031,11 @@ class CadIngest:
             from apb.ingest.emsc import EmscIngest
             self._emsc = EmscIngest()
         return self._emsc.fetch()
+
+    def _fetch_safecast(self, feed: CadFeed) -> list[dict]:
+        """Radiation sensors sustained above their own baseline (from the radiation lane)."""
+        from apb.context import radiation
+        return radiation.hazard_rows()
 
     def _fetch_gdacs(self, feed: CadFeed) -> list[dict]:
         """Fetch current Orange/Red GDACS disasters (rows already normalized)."""

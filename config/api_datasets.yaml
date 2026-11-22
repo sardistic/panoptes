@@ -144,6 +144,25 @@ datasets:
     attribution: Global Disaster Alert and Coordination System (GDACS)
     ttl: 600
 
+  radiation:
+    title: Radiation sensors (EPA RadNet + Safecast) with per-sensor baselines
+    status: enabled
+    class: open
+    path: /live/radiation
+    params: [flagged_only]
+    licence: "EPA RadNet: public domain (U.S. Government work); Safecast: CC0"
+    attribution: "U.S. EPA RadNet; Safecast"
+    ttl: 300
+  radiation_sensor:
+    title: One radiation sensor's hourly history
+    status: enabled
+    class: open
+    path: "/live/radiation/sensor/{id}"
+    params: [days]
+    licence: "EPA RadNet: public domain (U.S. Government work); Safecast: CC0"
+    attribution: "U.S. EPA RadNet; Safecast"
+    ttl: 900
+
   # ---- enabled by the owner 2026-11-21 after review ----------------------------------
   quakes_global:
     title: Global earthquakes M4+ (EMSC)
@@ -316,6 +335,15 @@ datasets:
     params: [bbox, hours]
     licence: Panoptes derived data (counts only, no images)
     attribution: Panoptes (panoptes.run)
+    ttl: 300
+  radiation_summary:
+    title: Radiation digest over time (written in the background; reading costs nothing)
+    status: enabled
+    class: derived
+    path: /live/radiation/summary
+    params: [days]
+    licence: Panoptes derived data from EPA RadNet and Safecast
+    attribution: "Panoptes (panoptes.run); U.S. EPA RadNet; Safecast"
     ttl: 300
   scorecard:
     title: Alert accuracy scorecard

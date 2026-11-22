@@ -546,3 +546,56 @@ ADS-B sets), and the terms bind users to it. ADS-B is ODbL share-alike. Terms ar
 the contact is api@panoptes.run, Delaware law and courts, a USD 100 liability cap, an
 indemnity, and 14 days' notice of material changes. api@panoptes.run needs Cloudflare
 Email Routing to forward to the owner's inbox.
+
+### 2026-11-22 — Radiation lane: RadNet + Safecast, own-baseline flags, budgeted digest
+
+Owner asked for radiation data like the Safecast map, plus a cheap LLM summary whose
+changes are stored over time within a capped period, done efficiently.
+
+Sources:
+- Safecast `tt.safecast.org/devices` (CC0): one keyless GET per cycle.
+  - Real-time *radiation* coverage is about 146 sensors worldwide, about 17 in North
+    America.
+  - The many `note:` devices are Airnotes (PM2.5, no tube) and are skipped.
+  - CPM to µSv/h uses 334 (LND 7318) and 108 (LND 7128).
+- EPA RadNet: about 142 U.S. fixed monitors, hourly gamma dose. Only whole-year CSVs
+  exist (~0.75 MB; no range, gzip or ETag).
+  - A rotation refreshes each station about every 6 h, a few per 15-min cycle, roughly
+    16 MB/h. A station's first fetch backfills the cap period, so baselines exist at once.
+  - Station coordinates come from `apb/discover/radnet_stations.py` (Nominatim once,
+    Census state check) into `data/radnet_stations.json`.
+
+Storage:
+- Raw readings are not kept. Readings fold into per-sensor hourly buckets
+  (`rad_hourly`: count/sum/max).
+- Buckets and digests are pruned after `APB_RAD_KEEP_DAYS` (30).
+
+Flags:
+- Each sensor is judged only against its own history: median/MAD of hourly means,
+  excluding the last 6 h, with at least 48 h of history.
+- Elevated = its own last two hours both ≥ max(1.5×median, median+0.05, median+4·MAD).
+  "High" = elevated and ≥ 1.0 µSv/h, or ≥ 5 µSv/h while still learning.
+- Constant-high places (Chernobyl zone 2.6, Fukushima 1.8 µSv/h) are not flagged.
+- Corroborated = another sensor within 30 km is ≥ 1.2× its own baseline.
+- Elevated sensors become hidden feed `safecast` rows, the hazard family `radiation`
+  (into fusion as context).
+
+Digest:
+- Pinned Flash-Lite (`thinking_level=MINIMAL`; 3.5 Flash-Lite rejects thinkingBudget 0)
+  writes headline / summary / changes / level.
+- Input is compact statistics, not raw data: per-network medians, same-sensor ratios
+  now vs 24 h / 7 d, the median ratio to own baseline, elevated places, and its last
+  three notes.
+- It runs only when a cheap in-memory digest of the state changes (elevated set, ratio
+  to 0.5, reporting count to 25, median to 0.005), at least 2 h apart, plus a daily
+  heartbeat. Cap `APB_RAD_SUMMARY_DAILY` (8); a failed call is refunded.
+- Mixed-population medians were rejected: they reported a false rise when Safecast
+  (no backfill) joined RadNet.
+- Reading /live/radiation* and /v1 radiation datasets never calls a model.
+
+Map:
+- Radiation overlay in Earth: a dose-coloured trefoil (L.circleMarker is banned by
+  test_web_security), with a 7-day chart against the sensor's normal and the digest
+  history in the popup. Positions are rounded to ~1 km.
+- The same fix (MINIMAL thinking + refund on failure) was applied to the radio-term
+  learner, whose six prod calls had all returned 400.
