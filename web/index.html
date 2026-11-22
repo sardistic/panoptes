@@ -310,6 +310,8 @@
   button#notableBtn.on .led{background:#ffd23f}
   button#radioBtn.on .led{background:#4fd1c5}
   button#radBtn.on .led{background:#c6e83a;box-shadow:0 0 6px rgba(198,232,58,.55)}
+  button#surveyBtn.on .led{background:#3fbf6a}
+  .rad-survey{pointer-events:none}
   .rad-pop .rad-lv{display:inline-block;font:700 8px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;padding:3px 5px;border:1px solid;margin-right:6px}
   .rad-pop .rad-note{margin-top:8px;padding-top:7px;border-top:1px solid var(--line-2)}
   .rad-pop .rad-note b{display:block;color:var(--txt);margin-bottom:2px}
@@ -606,6 +608,7 @@
     <button id="envBtn" class="on" aria-pressed="true" data-desc="heat, moisture, rain, UV and air as one field"><span class="led"></span>Conditions</button>
     <button id="camerasBtn" aria-pressed="false" data-desc="public DOT and traffic cameras"><span class="led"></span>Cameras</button>
     <button id="radBtn" aria-pressed="false" data-desc="EPA RadNet + Safecast dose rate vs each sensor's normal"><span class="led"></span>Radiation</button>
+    <button id="surveyBtn" aria-pressed="false" data-desc="Safecast drive surveys, ~100 m road cells (ingested)"><span class="led"></span>Radiation surveys</button>
     <button id="radioBtn" class="on" aria-pressed="true" title="public-safety radio: incidents heard on volunteer scanners, live calls and transcriptions"><span class="led"></span>Radio</button>
   </span>
   <span class="spacer"></span>
@@ -2203,7 +2206,7 @@ const DOMAINS=[
     ['sub','Events'],['haz','severe'],['haz','tornado'],['haz','winter'],['haz','heat'],['haz','cyclone'],['haz','weather']]],
   ['water','Water',[['haz','flood'],['haz','marine'],['haz','tsunami'],['haz','maritime']]],
   ['fireair','Fire & Air',[['haz','fire'],['haz','smoke'],['haz','airquality']]],
-  ['earth','Earth',[['haz','quake'],['haz','volcano'],['haz','disaster'],['btn','radBtn'],['haz','radiation']]],
+  ['earth','Earth',[['haz','quake'],['haz','volcano'],['haz','disaster'],['btn','radBtn'],['btn','surveyBtn'],['haz','radiation']]],
   ['transport','Transport',[['haz','traffic'],['haz','aircraft'],['haz','tfr'],['haz','delay'],['haz','rail'],['btn','camerasBtn']]],
   ['infra','Infrastructure',[['haz','outage'],['haz','internet'],['haz','declaration']]],
   ['civil','Civil',[['haz','civil'],['haz','unrest']]],
@@ -3064,6 +3067,47 @@ document.getElementById('radBtn').onclick=e=>{
   showRad=!showRad; e.currentTarget.classList.toggle('on',showRad); e.currentTarget.setAttribute('aria-pressed',String(showRad));
   loadRad(); scheduleUrl();
 };
+// ── radiation surveys: Safecast drive logs ingested into ~100 m cells (our own copy) ──
+// Each tile asks the server for its cells, aggregated for the zoom, and paints small
+// squares on a canvas, coloured like the live sensors. Click a cell for its readings.
+const SurveyLayer=L.GridLayer.extend({
+  createTile(coords,done){
+    const sz=this.getTileSize(), c=document.createElement('canvas'); c.width=sz.x; c.height=sz.y;
+    fetch(`/live/radiation/survey/${coords.z}/${coords.x}/${coords.y}`).then(r=>r.ok?r.json():[]).then(rows=>{
+      const ctx=c.getContext('2d'), m=this._map, o=coords.scaleBy(sz), z=coords.z;
+      const step=z<=4?0.2:z<=6?0.05:z<=8?0.02:z<=10?0.005:z<=12?0.002:0.001;
+      for(const [lat,lon,mean] of rows){
+        const p=m.project([lat,lon],z).subtract(o), q=m.project([lat+step,lon+step],z).subtract(o);
+        const d=Math.max(2,Math.min(14,Math.abs(q.x-p.x)));
+        ctx.fillStyle=radColor(mean); ctx.globalAlpha=.85; ctx.fillRect(p.x-d/2,p.y-d/2,d,d);
+      }
+      done(null,c);
+    }).catch(()=>done(null,c));
+    return c;
+  }
+});
+let showSurvey=false; const surveyLayer=new SurveyLayer({className:'rad-survey',maxNativeZoom:16,updateWhenIdle:true,zIndex:350});
+let lastPopupAt=0; map.on('popupopen',()=>{ lastPopupAt=performance.now(); });
+async function surveyClick(e){
+  if(!showSurvey) return;
+  const t0=performance.now(); await new Promise(r=>setTimeout(r,80));
+  if(lastPopupAt>=t0) return;                    // a marker under the click opened its own popup
+  const z=map.getZoom(), r=z<=6?0.3:z<=9?0.05:z<=12?0.01:0.003, ll=e.latlng;
+  let rows=[]; try{ rows=await (await fetch(`/live/radiation/survey?bbox=${(ll.lng-r).toFixed(4)},${(ll.lat-r).toFixed(4)},${(ll.lng+r).toFixed(4)},${(ll.lat+r).toFixed(4)}&z=${Math.max(z,9)}`)).json(); }catch(_){}
+  if(!rows.length) return;
+  const near=rows.sort((a,b)=>Math.hypot(a[0]-ll.lat,a[1]-ll.lng)-Math.hypot(b[0]-ll.lat,b[1]-ll.lng))[0];
+  const nb=rows.reduce((t,x)=>t+x[4],0), mean=rows.reduce((t,x)=>t+x[2]*x[4],0)/nb;
+  L.popup({maxWidth:300}).setLatLng([near[0],near[1]]).setContent(`<div class="pop rad-pop"><div class="kick" style="color:#3fbf6a">Radiation survey · Safecast drives</div>`
+    +`<div class="ttl">${esc(near[2].toFixed(3))} µSv/h here</div>`
+    +`<div class="meta">max ${esc(near[3].toFixed(3))} · ${esc(near[4])} readings · last driven ${esc(new Date(near[5]*1000).toLocaleDateString())}</div>`
+    +`<div class="rad-cap">Around this spot: ${esc(rows.length)} cells, ${esc(nb)} readings, mean ${esc(mean.toFixed(3))} µSv/h</div>`
+    +`<div class="rad-cap" style="margin-top:6px">Data: Safecast volunteer drives (CC0), ingested by Panoptes · cells ~100 m</div></div>`).openOn(map);
+}
+map.on('click',surveyClick);
+document.getElementById('surveyBtn').onclick=e=>{
+  showSurvey=!showSurvey; e.currentTarget.classList.toggle('on',showSurvey); e.currentTarget.setAttribute('aria-pressed',String(showSurvey));
+  if(showSurvey) surveyLayer.addTo(map); else map.removeLayer(surveyLayer);
+};
 map.on('moveend zoomend',()=>{ if(showRad){ clearTimeout(window._rdT); window._rdT=setTimeout(drawRad,150); } });
 setInterval(()=>{ if(showRad&&!document.hidden) loadRad(); },600000);
 
@@ -3726,7 +3770,7 @@ setInterval(()=>{
 // layer toggles) so a URL reproduces the exact view. Written with replaceState so
 // panning never floods history; read once at boot before the first load.
 const LAYER_BTNS={spikes:'spikesBtn',surges:'surgesBtn',warnings:'warningsBtn',
-  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn',radio:'radioBtn',rad:'radBtn'};
+  env:'envBtn',radar:'radarBtn',goes:'goesBtn',cameras:'camerasBtn',notable:'notableBtn',radio:'radioBtn',rad:'radBtn',survey:'surveyBtn'};
 let urlT=null, urlReady=false;
 function readViewState(){
   const q=new URLSearchParams(location.hash.replace(/^#/,''));

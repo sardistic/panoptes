@@ -153,6 +153,25 @@ datasets:
     licence: "EPA RadNet: public domain (U.S. Government work); Safecast: CC0"
     attribution: "U.S. EPA RadNet; Safecast"
     ttl: 300
+  radiation_survey:
+    title: Safecast drive-survey cells (~100 m) in a box, aggregated by zoom
+    status: enabled
+    class: open
+    path: /live/radiation/survey
+    params: [bbox, z]
+    licence: CC0 (Safecast)
+    attribution: Safecast
+    ttl: 600
+    cost: 2
+  radiation_survey_drives:
+    title: Safecast drives ingested, with per-drive statistics
+    status: enabled
+    class: open
+    path: /live/radiation/survey-drives
+    params: [days, region]
+    licence: CC0 (Safecast)
+    attribution: Safecast
+    ttl: 600
   radiation_sensor:
     title: One radiation sensor's hourly history
     status: enabled

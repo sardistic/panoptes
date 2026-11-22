@@ -207,7 +207,26 @@ def stats(now: float, sensors: list[dict]) -> dict:
                       "network": x["source"], "usvh": x["usvh"],
                       "baseline": x["baseline"], "ratio": x["ratio"], "status": x["status"],
                       "corroborated": x["corroborated"]} for x in hot[:12]],
-        "elevated_count": len(hot), "corroborated_count": sum(x["corroborated"] for x in hot)}
+        "elevated_count": len(hot), "corroborated_count": sum(x["corroborated"] for x in hot),
+        "drive_surveys": _survey_stats(now)}
+
+
+def _survey_stats(now: float) -> dict | None:
+    try:
+        from apb.context import radsurvey
+        return radsurvey.digest_stats(now)
+    except Exception:
+        return None
+
+
+def _survey_key() -> list:
+    """Flagged drives in the last week (ids): a newly flagged drive is a change worth a note."""
+    try:
+        from apb.store import radiation as store
+        return sorted(r["id"] for r in store.survey_logs(time.time() - 7 * 86400)
+                      if (r.get("flagged_cells") or 0) >= 5)
+    except Exception:
+        return []
 
 
 def digest(sensors: list[dict]) -> str:
@@ -217,14 +236,16 @@ def digest(sensors: list[dict]) -> str:
     hot = sorted((x["id"], round((x["ratio"] or 0) * 2) / 2, x["corroborated"], x["status"])
                  for x in sensors if x["status"] in ("elevated", "high"))
     med = statistics.median(x["usvh"] for x in sensors) if sensors else 0
-    key = {"e": hot, "r": round(len(sensors) / 25), "m": round(med / 0.005)}
+    key = {"e": hot, "r": round(len(sensors) / 25), "m": round(med / 0.005), "s": _survey_key()}
     return hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
 
 
 PROMPT = """You write a short public status note about environmental radiation measured by \
 two networks: EPA RadNet (about 140 official fixed monitors across the U.S., hourly data \
 refreshed every few hours) and Safecast (volunteer real-time sensors, mostly Japan and \
-Europe, a few in North America). You get statistics (µSv/h = microsieverts per hour), \
+Europe, a few in North America). "drive_surveys" are Safecast volunteer drives with \
+mobile counters, uploaded days after the drive; a drive is flagged when several road \
+cells read well above what earlier drives saw there. You get statistics (µSv/h = microsieverts per hour), \
 not raw data, and your own previous notes. Typical background is about 0.05-0.20 µSv/h; rain \
 can briefly raise readings by washing natural radon decay products down. A sensor is "elevated" \
 only against its own history and only when sustained for two hours.

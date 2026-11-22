@@ -31,6 +31,16 @@ def _conn() -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS rad_summaries (
             ts REAL PRIMARY KEY, headline TEXT, summary TEXT, changes TEXT, level TEXT,
             stats TEXT, digest TEXT, model TEXT);
+        CREATE TABLE IF NOT EXISTS rad_survey_cells (
+            la INTEGER NOT NULL, lo INTEGER NOT NULL, n INTEGER NOT NULL, sum REAL NOT NULL,
+            max REAL NOT NULL, first_ts REAL, last_ts REAL, last_log INTEGER, logs INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY (la, lo)) WITHOUT ROWID;
+        CREATE TABLE IF NOT EXISTS rad_survey_logs (
+            id INTEGER PRIMARY KEY, created REAL, first_ts REAL, last_ts REAL, kind TEXT, device TEXT,
+            region TEXT, lat REAL, lon REAL, n INTEGER, cells INTEGER, mean REAL, max REAL,
+            flagged_cells INTEGER, cities TEXT, credits TEXT, state TEXT, ingested REAL);
+        CREATE INDEX IF NOT EXISTS idx_rsl_ingested ON rad_survey_logs(ingested);
+        CREATE TABLE IF NOT EXISTS rad_survey_meta (k TEXT PRIMARY KEY, v TEXT);
         """)
         c.commit()
         _ready = True
@@ -112,3 +122,102 @@ def counts() -> dict:
         return {"sensors": c.execute("SELECT COUNT(*) FROM rad_sensors").fetchone()[0],
                 "hourly_rows": c.execute("SELECT COUNT(*) FROM rad_hourly").fetchone()[0],
                 "summaries": c.execute("SELECT COUNT(*) FROM rad_summaries").fetchone()[0]}
+
+
+# ---- drive surveys (Safecast bGeigie logs) -------------------------------------------
+# Readings fold into ~100 m cells (lat/lon x 1000, rounded): count, sum, max, first/last
+# seen, last log. One row per log records where and what it was, or why it was skipped.
+
+def _survey_conn() -> sqlite3.Connection:
+    return _conn()                       # the survey tables are created with the others
+
+
+def survey_meta(k: str, default=None):
+    with _lock:
+        r = _survey_conn().execute("SELECT v FROM rad_survey_meta WHERE k = ?", (k,)).fetchone()
+    return json.loads(r[0]) if r else default
+
+
+def set_survey_meta(k: str, v) -> None:
+    with _lock:
+        c = _survey_conn()
+        c.execute("INSERT INTO rad_survey_meta VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                  (k, json.dumps(v)))
+        c.commit()
+
+
+def survey_known(ids: list[int]) -> set[int]:
+    if not ids:
+        return set()
+    with _lock:
+        q = ",".join("?" * len(ids))
+        return {r[0] for r in _survey_conn().execute(f"SELECT id FROM rad_survey_logs WHERE id IN ({q})", ids)}
+
+
+def survey_cells_prior(keys: list[tuple[int, int]]) -> dict[tuple[int, int], tuple[int, float, int]]:
+    """(la, lo) -> (n, mean, logs) before a new log is added."""
+    out = {}
+    with _lock:
+        c = _survey_conn()
+        for i in range(0, len(keys), 400):
+            part = keys[i:i + 400]
+            q = " OR ".join("(la = ? AND lo = ?)" for _ in part)
+            for la, lo, n, s, logs in c.execute(f"SELECT la, lo, n, sum, logs FROM rad_survey_cells WHERE {q}",
+                                                [v for k in part for v in k]):
+                out[(la, lo)] = (n, s / n, logs)
+    return out
+
+
+def add_survey_log(row: dict, cells: dict[tuple[int, int], list]) -> None:
+    """Record one log and fold its cells ([n, sum, max, first_ts, last_ts]) in one transaction."""
+    with _lock:
+        c = _survey_conn()
+        c.executemany(
+            "INSERT INTO rad_survey_cells VALUES (?,?,?,?,?,?,?,?,1) ON CONFLICT(la, lo) DO UPDATE SET "
+            "n = n + excluded.n, sum = sum + excluded.sum, max = MAX(max, excluded.max), "
+            "first_ts = MIN(first_ts, excluded.first_ts), last_ts = MAX(last_ts, excluded.last_ts), "
+            "last_log = CASE WHEN excluded.last_ts >= last_ts THEN excluded.last_log ELSE last_log END, "
+            "logs = logs + 1",
+            [(la, lo, v[0], v[1], v[2], v[3], v[4], row["id"]) for (la, lo), v in cells.items()])
+        cols = ("id", "created", "first_ts", "last_ts", "kind", "device", "region", "lat", "lon", "n", "cells",
+                "mean", "max", "flagged_cells", "cities", "credits", "state", "ingested")
+        c.execute(f"INSERT OR REPLACE INTO rad_survey_logs ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                  [row.get(k) for k in cols])
+        c.commit()
+
+
+def survey_cells(w: float, s: float, e: float, n: float, step: int, limit: int = 20000) -> list[tuple]:
+    """Cells in a box, aggregated to `step` (in 1/1000 degree): (lat, lon, mean, max, n, last_ts)."""
+    with _lock:
+        rows = _survey_conn().execute(
+            # +OFF keeps the integer division flooring (SQLite truncates toward zero)
+            "SELECT ((la + ?) / ?) * ? - ?, ((lo + ?) / ?) * ? - ?, SUM(sum) / SUM(n), MAX(max), SUM(n), "
+            "MAX(last_ts) FROM rad_survey_cells WHERE la BETWEEN ? AND ? AND lo BETWEEN ? AND ? "
+            "GROUP BY (la + ?) / ?, (lo + ?) / ? LIMIT ?",
+            (_OFF, step, step, _OFF, _OFF, step, step, _OFF, int(s * 1000), int(n * 1000), int(w * 1000),
+             int(e * 1000), _OFF, step, _OFF, step, limit)).fetchall()
+    return [(la / 1000 + step / 2000, lo / 1000 + step / 2000, m, mx, cnt, ts) for la, lo, m, mx, cnt, ts in rows]
+
+
+_OFF = 1_000_000                     # divisible by every step used
+
+
+def survey_logs(since: float = 0.0, region: str | None = None, limit: int = 200) -> list[dict]:
+    sql = "SELECT * FROM rad_survey_logs WHERE state = 'ingested' AND COALESCE(last_ts, created) >= ?"
+    args: list = [since]
+    if region:
+        sql += " AND region = ?"
+        args.append(region)
+    with _lock:
+        rows = _survey_conn().execute(sql + " ORDER BY COALESCE(last_ts, created) DESC LIMIT ?", args + [limit])
+        return [dict(r) for r in rows]
+
+
+def survey_counts() -> dict:
+    with _lock:
+        c = _survey_conn()
+        states = dict(c.execute("SELECT state, COUNT(*) FROM rad_survey_logs GROUP BY state").fetchall())
+        regions = dict(c.execute("SELECT region, COUNT(*) FROM rad_survey_logs WHERE state = 'ingested' "
+                                 "GROUP BY region").fetchall())
+        cells = c.execute("SELECT COUNT(*), COALESCE(SUM(n), 0) FROM rad_survey_cells").fetchone()
+    return {"logs_by_state": states, "ingested_by_region": regions, "cells": cells[0], "readings": cells[1]}

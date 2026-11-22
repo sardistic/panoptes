@@ -599,3 +599,45 @@ Map:
   history in the popup. Positions are rounded to ~1 km.
 - The same fix (MINIMAL thinking + refund on failure) was applied to the radio-term
   learner, whose six prod calls had all returned 400.
+
+### 2026-11-22 — Safecast drive surveys ingested as ~100 m cells (North America backfill)
+
+The owner wanted Safecast's bGeigie drive data ingested and internalized, not shown as
+their tiles.
+
+**Activity, measured 2026-11-22:**
+- About 16 approved drive logs a day worldwide, 975 in 60 days, 1.43 M readings.
+- Recent activity is 90% Europe, and about 75% of it is one Czech device (`$CZRDD`).
+- North America: about 1–2 drives a week. The dense US map is the 2011+ archive.
+- The import list holds about 55k logs (2,201 pages of 25).
+
+**Choice:** back-fill North America for all years, and ingest new approved logs
+worldwide.
+- Rejected: worldwide backfill (several GB, mostly Japan and Europe), the last 12 months
+  only (the US map would be nearly empty), and forward-only.
+
+**Method:**
+- The measurements API pages 25 rows, so the raw logs are read directly from S3.
+- To find a backfill log's region, its first GPS fix is probed with an HTTP Range request
+  (8–32 KB). Logs whose city text is Japanese skip the request. Non-North-American logs
+  are recorded as skipped, with their point.
+- Any `$xxRDD` sentence is parsed when it has a valid reading and a valid GPS fix.
+  CPM is converted to µSv/h at 334 (LND 7317); the sentence kind is kept.
+- Readings fold into `rad_survey_cells` (lat/lon ×1000: n, sum, max, first/last, last
+  log, logs), with one `rad_survey_logs` row per log.
+- Backfill runs oldest first, so each new drive is compared with earlier drives in the
+  same cells. A cell is raised when it reads ≥ max(1.5×, +0.05) over ≥ 20 earlier
+  readings from ≥ 2 logs. A drive with ≥ 5 raised cells is "flagged".
+- Flagged drives reach the digest (a newly flagged drive counts as a state change).
+  They don't feed live alerts, because uploads come days after the drive.
+
+**Size:**
+- 4 pages take about 4 s. The default of 4 pages every 20 s finishes in about 3 h.
+- Estimated about 5k North American logs and 2–4 M cells, about 150–250 MB of SQLite.
+  Prod had 32 GB free (disk 86% used).
+
+**Served:**
+- `/live/radiation/survey/{z}/{x}/{y}` (cells aggregated per zoom, our own data, drawn
+  on a canvas GridLayer).
+- `/live/radiation/survey?bbox&z` and `/live/radiation/survey-drives`.
+- `/v1` datasets `radiation_survey` and `radiation_survey_drives` (CC0).

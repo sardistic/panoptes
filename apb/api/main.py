@@ -307,6 +307,7 @@ def _startup() -> None:
     if _poller_leader:
         try:
             __import__("apb.context.radiation", fromlist=["start"]).start()
+            __import__("apb.context.radsurvey", fromlist=["start"]).start()   # drive surveys
         except Exception as e:
             log.warning("radiation lane disabled: %s", e)
 
@@ -363,6 +364,7 @@ async def _lifespan(app: FastAPI):
         __import__("apb.context.radio_areas", fromlist=["stop"]).stop()
         __import__("apb.context.radio_terms", fromlist=["stop"]).stop()
         __import__("apb.context.radiation", fromlist=["stop"]).stop()
+        __import__("apb.context.radsurvey", fromlist=["stop"]).stop()
         __import__("apb.ingest.streams", fromlist=["stop"]).stop()
         __import__("apb.ingest.trunkrec", fromlist=["stop"]).stop()
         maritime_store.stop()
@@ -956,6 +958,42 @@ def live_radiation_summary(days: float = Query(7.0, gt=0.0, le=90.0)):
     Notes are written in the background only when the picture changes; reading costs nothing."""
     from apb.context import radiation
     return JSONResponse(radiation.public_summary(days), headers={"Cache-Control": "public, max-age=120"})
+
+
+@app.get("/live/radiation/survey/{z}/{x}/{y}")
+def live_radiation_survey_tile(z: int, x: int, y: int):
+    """Safecast drive-survey cells in one map tile, from Panoptes' own ingested copy,
+    aggregated for the zoom: [lat, lon, mean µSv/h, max µSv/h, readings, last reading ts]."""
+    if not (0 <= z <= 16 and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
+        return JSONResponse({"error": "bad tile"}, status_code=400)
+    from apb.context import radsurvey
+    return JSONResponse(radsurvey.tile(z, x, y), headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/live/radiation/survey")
+def live_radiation_survey(bbox: str = Query(..., max_length=80), z: int = Query(8, ge=2, le=16)):
+    """Drive-survey cells in a box (`bbox=w,s,e,n`), aggregated for zoom `z` (at most 20,000 cells):
+    [lat, lon, mean µSv/h, max µSv/h, readings, last reading ts]. Data: Safecast, CC0."""
+    try:
+        w, s, e, n = (float(v) for v in bbox.split(","))
+    except ValueError:
+        return JSONResponse({"error": "bbox must be w,s,e,n"}, status_code=400)
+    if not (-180 <= w < e <= 180 and -90 <= s < n <= 90):
+        return JSONResponse({"error": "bbox out of range"}, status_code=400)
+    from apb.context import radsurvey
+    from apb.store import radiation as store
+    rows = store.survey_cells(w, s, e, n, radsurvey._step(z))
+    return JSONResponse([[round(a, 4), round(b, 4), round(m, 4), round(mx, 4), c, int(t or 0)]
+                         for a, b, m, mx, c, t in rows], headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.get("/live/radiation/survey-drives")
+def live_radiation_survey_drives(days: float = Query(30.0, gt=0.0, le=36500.0),
+                                 region: str | None = Query(None, max_length=20)):
+    """Ingested Safecast drives, newest first: when, where (median point), readings, cells,
+    mean / max µSv/h and how many road cells read well above earlier drives."""
+    from apb.context import radsurvey
+    return JSONResponse(radsurvey.recent(days, region), headers={"Cache-Control": "public, max-age=600"})
 
 
 @app.get("/live/radiation/sensor/{device:path}")
@@ -1676,6 +1714,7 @@ def status():
         "radio_areas": __import__("apb.context.radio_areas", fromlist=["status"]).status(),
         "radio_terms": __import__("apb.context.radio_terms", fromlist=["status"]).status(),
         "radiation": __import__("apb.context.radiation", fromlist=["status"]).status(),
+        "radiation_surveys": __import__("apb.context.radsurvey", fromlist=["status"]).status(),
         "api_platform": __import__("apb.api.platform", fromlist=["status"]).status(),
         "streams": __import__("apb.ingest.streams", fromlist=["status"]).status(),
         "trunkrec": __import__("apb.ingest.trunkrec", fromlist=["status"]).status(),
