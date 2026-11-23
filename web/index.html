@@ -43,6 +43,7 @@
   .lab{font:600 9.5px/1 var(--font);letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
   #map{position:absolute;inset:0;background:#12140f}
   .incident-field{pointer-events:none;mix-blend-mode:normal;opacity:.94}
+  .radio-field{filter:url(#radioCut)}        /* see the #radioCut note at <body> */
   .environment-field{pointer-events:none;mix-blend-mode:screen;opacity:.8}
   .leaflet-container,.leaflet-interactive{cursor:crosshair!important}
   /* candle-dust grain over the basemap */
@@ -573,6 +574,15 @@
   <script defer src="https://analytics.sardistic.com/script.js" data-website-id="c408d91e-9870-415b-9749-eae3787acfc7"></script>
 </head>
 <body>
+<!-- Radio heat is blended with color-dodge, which amplifies the near-transparent tail of
+     every glow: 8-bit premultiplied pixels at alpha 1-6/255 carry garbage colour (black,
+     cyan-white) and showed as speckled dark/pink rings over bright clouds. This drops
+     pixels under ~3% alpha and rescales the rest, so glows still fade to zero smoothly. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="radioCut" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+    <feComponentTransfer><feFuncA type="linear" slope="1.0315" intercept="-0.0315"/></feComponentTransfer>
+  </filter>
+</svg>
 <div id="map"></div>
 
 <div id="top" class="hud">
